@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Global Horizons School logo</title>
+  <desc id="desc">A rising sun above an open book and globe</desc>
+  <defs>
+    <linearGradient id="sky" x1="20" y1="14" x2="106" y2="112" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F766E"/>
+      <stop offset="1" stop-color="#0891B2"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="49" y1="27" x2="78" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FCD34D"/>
+      <stop offset="1" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="30" fill="url(#sky)"/>
+  <circle cx="64" cy="47" r="17" fill="url(#sun)"/>
+  <path d="M34 58a31 31 0 0 1 60 0" fill="none" stroke="#ECFEFF" stroke-width="5" stroke-linecap="round"/>
+  <path d="M39 50h50M64 30c-8 8-12 17-12 28M64 30c8 8 12 17 12 28" fill="none" stroke="#ECFEFF" stroke-width="3" stroke-linecap="round" opacity=".9"/>
+  <path d="M23 70c15-4 28-1 41 10 13-11 26-14 41-10v30c-15-4-28-1-41 10-13-11-26-14-41-10V70Z" fill="#fff"/>
+  <path d="M64 80v30M30 78c12-1 22 2 30 9M98 78c-12-1-22 2-30 9M31 89c11-1 20 2 29 8M97 89c-11-1-20 2-29 8" fill="none" stroke="#99F6E4" stroke-width="3" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,821 @@
+/* Adventure Game Stylesheet - Redesigned console controls & glassmorphic panels */
+
+.adventure-game-world {
+  --adventure-accent: #7bf3d1;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 540px;
+  overflow: hidden;
+  background: linear-gradient(#58bcd5 0 38%, #2c9063 39%, #0a4a3e);
+  isolation: isolate;
+  color: #fff;
+}
+
+.adventure-environment {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.adventure-daylight {
+  position: absolute;
+  inset: 0 0 55%;
+  background: linear-gradient(#3aaed2, #a9e4d5);
+}
+
+.adventure-daylight:after {
+  content: "";
+  position: absolute;
+  top: 13%;
+  right: 8%;
+  width: 95px;
+  height: 95px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff7bd 0 24%, #ffd759 50%, transparent 71%);
+  filter: drop-shadow(0 0 30px rgba(255, 221, 91, 0.6));
+  animation: adventure-light 4s ease-in-out infinite alternate;
+}
+
+.adventure-clouds i {
+  position: absolute;
+  top: 12%;
+  left: -150px;
+  width: 135px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  animation: adventure-cloud-move 22s linear infinite;
+}
+
+.adventure-clouds i:before,
+.adventure-clouds i:after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  border-radius: 50%;
+  background: inherit;
+}
+
+.adventure-clouds i:before {
+  left: 20px;
+  width: 45px;
+  height: 48px;
+}
+
+.adventure-clouds i:after {
+  right: 18px;
+  width: 58px;
+  height: 58px;
+}
+
+.adventure-clouds i:nth-child(2) {
+  top: 26%;
+  animation-delay: -9s;
+  transform: scale(0.7);
+}
+
+.adventure-clouds i:nth-child(3) {
+  top: 8%;
+  animation-delay: -15s;
+  animation-duration: 30s;
+  transform: scale(0.5);
+}
+
+.adventure-landscape {
+  position: absolute;
+  inset: 25% -3% 0;
+  background: linear-gradient(155deg, #2a7566, #0d4c45);
+  clip-path: polygon(0 100%, 0 45%, 12% 12%, 24% 43%, 37% 4%, 52% 45%, 67% 9%, 81% 49%, 92% 20%, 100% 48%, 100% 100%);
+}
+
+.adventure-water {
+  position: absolute;
+  z-index: 2;
+  top: 42%;
+  bottom: -10%;
+  left: 47%;
+  width: 13%;
+  background: linear-gradient(90deg, transparent, #82e5e2, #c0ffff, #56bdcf, transparent);
+  clip-path: polygon(30% 0, 72% 0, 58% 24%, 83% 45%, 37% 65%, 79% 100%, 0 100%, 27% 64%, 4% 43%, 45% 23%);
+  animation: adventure-water-shine 1.5s ease-in-out infinite alternate;
+}
+
+.adventure-water i {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(180deg, transparent 0 23px, rgba(255, 255, 255, 0.35) 24px 27px);
+  animation: adventure-water-flow 0.7s linear infinite;
+}
+
+.adventure-nature {
+  position: absolute;
+  z-index: 3;
+  inset: 39% 0 0;
+}
+
+.adventure-nature i {
+  position: absolute;
+  bottom: 0;
+  width: 18px;
+  height: 80px;
+  border-radius: 4px;
+  background: #68452a;
+}
+
+.adventure-nature i:before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 39px;
+  width: 72px;
+  height: 78px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: linear-gradient(145deg, #4fc66a, #075f42);
+  box-shadow: 0 0 0 10px rgba(15, 100, 66, 0.15);
+  animation: adventure-tree-sway 2.3s ease-in-out infinite alternate;
+}
+
+.adventure-nature i:nth-child(1) { left: 2%; }
+.adventure-nature i:nth-child(2) { left: 11%; bottom: 11%; }
+.adventure-nature i:nth-child(3) { left: 20%; transform: scale(0.7); }
+.adventure-nature i:nth-child(4) { left: 31%; bottom: 4%; transform: scale(0.62); }
+.adventure-nature i:nth-child(5) { right: 2%; }
+.adventure-nature i:nth-child(6) { right: 11%; bottom: 12%; }
+.adventure-nature i:nth-child(7) { right: 21%; transform: scale(0.72); }
+.adventure-nature i:nth-child(8) { right: 31%; bottom: 6%; transform: scale(0.58); }
+.adventure-nature i:nth-child(n+9) { display: none; }
+
+.adventure-wildlife {
+  position: absolute;
+  z-index: 4;
+  top: 30%;
+  left: 10%;
+  font-size: 25px;
+  animation: adventure-wildlife 14s linear infinite;
+}
+
+.adventure-magic i {
+  position: absolute;
+  z-index: 5;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff1a2;
+  box-shadow: 0 0 12px #fdef81;
+  animation: adventure-firefly-move 2.8s ease-in-out infinite alternate;
+}
+
+.world-castle {
+  --adventure-accent: #a78bfa;
+  background: linear-gradient(#59689a 0 40%, #28395f 41%, #131c36);
+}
+
+.world-castle .adventure-daylight {
+  background: linear-gradient(#3d5687, #b6acd4);
+}
+
+.world-castle .adventure-architecture {
+  position: absolute;
+  z-index: 2;
+  inset: 28% 21% 0;
+  background: linear-gradient(90deg, #4b526d, #8991aa 50%, #414962);
+  clip-path: polygon(0 100%, 0 28%, 10% 28%, 10% 4%, 25% 4%, 25% 24%, 42% 24%, 42% 0, 58% 0, 58% 24%, 75% 24%, 75% 4%, 90% 4%, 90% 28%, 100% 28%, 100% 100%);
+  box-shadow: inset 0 15px rgba(255, 255, 255, 0.09);
+}
+
+.world-castle .adventure-nature i:before {
+  background: linear-gradient(145deg, #486f66, #1b3e48);
+}
+
+.world-temple {
+  --adventure-accent: #f59e0b;
+  background: linear-gradient(#d89855 0 40%, #916632 41%, #44331f);
+}
+
+.world-temple .adventure-daylight {
+  background: linear-gradient(#c57b45, #f0d49c);
+}
+
+.world-temple .adventure-architecture {
+  position: absolute;
+  z-index: 2;
+  top: 27%;
+  left: 50%;
+  width: 350px;
+  height: 300px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, #806e45, #d1b878, #71603e);
+  clip-path: polygon(50% 0, 100% 34%, 89% 34%, 89% 100%, 11% 100%, 11% 34%, 0 34%);
+  box-shadow: inset 0 15px rgba(255, 240, 178, 0.16);
+}
+
+.world-temple .adventure-architecture i {
+  display: inline-block;
+  width: 31px;
+  height: 190px;
+  margin: 92px 20px 0;
+  background: #5e5137;
+  box-shadow: inset 7px 0 rgba(255, 255, 255, 0.09);
+}
+
+.world-temple .adventure-nature i:before {
+  background: linear-gradient(145deg, #8fa348, #3f622e);
+}
+
+/* Glassmorphic Top HUD display */
+.adventure-world-hud {
+  position: absolute;
+  z-index: 30;
+  top: 16px;
+  left: 24px;
+  right: 24px;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  gap: 12px;
+}
+
+.adventure-world-hud .hud-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.adventure-world-hud svg {
+  width: 16px;
+  height: 16px;
+  color: var(--adventure-accent);
+}
+
+.adventure-world-hud small {
+  display: block;
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.05em;
+}
+
+.adventure-world-hud b {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+/* Question Banner Panel */
+.adventure-world-question {
+  position: absolute;
+  z-index: 31;
+  top: 75px;
+  left: 50%;
+  width: min(840px, calc(100% - 32px));
+  transform: translateX(-50%);
+  padding: 18px 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  background: rgba(15, 23, 42, 0.6);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255,255,255,0.05);
+  text-align: center;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.adventure-world-question > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--adventure-accent) !important;
+}
+
+.adventure-world-question svg {
+  width: 14px;
+  height: 14px;
+}
+
+.adventure-world-question h1 {
+  margin-top: 8px;
+  font-size: clamp(16px, 1.8vw, 22px);
+  line-height: 1.4;
+  font-weight: 800;
+  color: #ffffff;
+  margin-bottom: 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.adventure-world-question img {
+  width: 48px;
+  height: 48px;
+  margin: 8px auto 0;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Stage & Checkpoint styling */
+.adventure-world-stage {
+  position: absolute;
+  z-index: 10;
+  inset: 154px 2% 180px;
+}
+
+.adventure-path {
+  position: absolute;
+  inset: 8% 9%;
+  border: 2px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 48% 44% 50% 42%;
+  transform: rotate(-3deg);
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.05));
+}
+
+.adventure-path i {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--adventure-accent);
+  box-shadow: 0 0 12px var(--adventure-accent);
+  opacity: 0.45;
+}
+
+.adventure-path i:first-child {
+  top: -6px;
+  left: 45%;
+}
+
+.adventure-path i:last-child {
+  right: 8%;
+  bottom: -6px;
+}
+
+.adventure-checkpoint {
+  position: absolute;
+  z-index: 12;
+  display: flex;
+  width: clamp(160px, 20vw, 240px);
+  min-height: 112px;
+  transform: translate(-50%, -50%);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  background: rgba(15, 23, 42, 0.7);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: #fff !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: adventure-checkpoint-float 2.2s ease-in-out infinite alternate;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.adventure-checkpoint:nth-of-type(even) {
+  animation-delay: -1.1s;
+}
+
+.adventure-checkpoint:hover:not(:disabled),
+.adventure-checkpoint:focus-visible {
+  z-index: 20;
+  transform: translate(-50%, -55%) scale(1.04);
+  outline: none;
+  border-color: var(--adventure-accent);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.45), 0 0 20px calc(var(--adventure-accent) + '4D');
+}
+
+.checkpoint-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 2px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+.checkpoint-badge span {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.adventure-checkpoint > img {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.adventure-checkpoint strong {
+  max-width: 100%;
+  font-size: clamp(12px, 1.25vw, 15px);
+  line-height: 1.3;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  color: #ffffff;
+  text-align: center;
+}
+
+.adventure-checkpoint small {
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.adventure-checkpoint.is-unlocking {
+  z-index: 24;
+  animation: adventure-gate-open 0.9s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.adventure-checkpoint.is-departing {
+  opacity: 0.25;
+  filter: grayscale(0.7);
+}
+
+/* Character Token style */
+.adventure-player {
+  position: absolute;
+  z-index: 27;
+  width: 72px;
+  height: 82px;
+  transform: translate(-50%, -50%);
+  transition: left 0.35s cubic-bezier(0.25, 0.8, 0.25, 1), top 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
+  pointer-events: none;
+}
+
+.player-avatar-ring {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 62px;
+  height: 62px;
+  border: 3px solid var(--adventure-accent);
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  box-shadow: 0 0 15px rgba(123, 243, 209, 0.3), inset 0 2px 4px rgba(255, 255, 255, 0.1);
+  box-sizing: border-box;
+}
+
+.player-avatar-ring span {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.player-avatar-ring em {
+  position: absolute;
+  z-index: 3;
+  bottom: -2px;
+  right: -2px;
+  font-size: 18px;
+  font-style: normal;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));
+}
+
+.player-avatar-shadow {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  filter: blur(2px);
+  transition: all 0.35s ease;
+}
+
+.adventure-player.is-running {
+  animation: adventure-player-run 0.2s ease-in-out infinite alternate;
+}
+
+.adventure-player.is-jumping .player-avatar-ring {
+  animation: avatar-jump 0.5s ease-out;
+}
+
+.adventure-player.is-jumping .player-avatar-shadow {
+  animation: shadow-shrink 0.5s ease-out;
+}
+
+/* Pulsing aura ring around player for real-time vibe */
+.adventure-player::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  left: 5px;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  border: 2px solid var(--adventure-accent);
+  opacity: 0;
+  pointer-events: none;
+  animation: player-ripple 2s infinite;
+}
+
+@keyframes player-ripple {
+  0% { transform: scale(0.7); opacity: 0.8; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+.adventure-confetti {
+  position: absolute;
+  z-index: 40;
+  top: 50%;
+  left: 50%;
+}
+
+.adventure-confetti i {
+  position: absolute;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  background: hsl(calc(var(--piece) * 43) 90% 62%);
+  animation: adventure-confetti-pop 1.1s ease-out forwards;
+}
+
+/* Map Collectable Items styling */
+.map-collectable {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 20px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  z-index: 11;
+  animation: float-collectable 1.5s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.collectable-star {
+  font-size: 24px;
+  filter: drop-shadow(0 0 12px rgba(251, 191, 36, 0.7));
+}
+
+.map-collectable.is-floating {
+  margin-top: -24px;
+  animation: float-collectable-high 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes float-collectable {
+  0% { transform: translate(-50%, -50%) translateY(0); }
+  100% { transform: translate(-50%, -50%) translateY(-6px); }
+}
+
+@keyframes float-collectable-high {
+  0% { transform: translate(-50%, -50%) translateY(0); }
+  100% { transform: translate(-50%, -50%) translateY(-10px); }
+}
+
+/* Arcade Console D-Pad layout styling */
+.adventure-controls {
+  position: absolute;
+  z-index: 40;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: repeat(3, 44px);
+  grid-template-rows: repeat(3, 44px);
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px;
+  border-radius: 50%;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  width: 144px;
+  height: 144px;
+  box-sizing: content-box;
+}
+
+.adventure-controls button {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  background: rgba(30, 41, 59, 0.8);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.adventure-controls button:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(30, 41, 59, 0.95);
+}
+
+.adventure-controls button:active:not(:disabled) {
+  transform: scale(0.9);
+  background: rgba(6, 182, 212, 0.2);
+  border-color: var(--adventure-accent);
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.4);
+}
+
+.adventure-controls button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.adventure-controls svg {
+  width: 18px;
+  height: 18px;
+}
+
+.control-up { grid-column: 2; grid-row: 1; }
+.control-left { grid-column: 1; grid-row: 2; }
+.control-jump { grid-column: 2; grid-row: 2; border-color: var(--adventure-accent) !important; color: var(--adventure-accent) !important; box-shadow: 0 0 10px rgba(123, 243, 209, 0.4) !important; }
+.control-right { grid-column: 3; grid-row: 2; }
+.control-down { grid-column: 2; grid-row: 3; }
+
+/* Progress bar style */
+.adventure-world-progress {
+  position: absolute;
+  z-index: 35;
+  right: 24px;
+  bottom: 24px;
+  width: 180px;
+  height: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.adventure-world-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ffdb65, var(--adventure-accent));
+  box-shadow: 0 0 12px var(--adventure-accent);
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.adventure-world-progress svg {
+  position: absolute;
+  top: -11px;
+  right: -9px;
+  width: 25px;
+  color: #ffd85e;
+}
+
+/* Animations declarations */
+@keyframes adventure-light {
+  to { transform: scale(1.08); }
+}
+
+@keyframes adventure-cloud-move {
+  to { transform: translateX(calc(100vw + 300px)); }
+}
+
+@keyframes adventure-water-shine {
+  to { filter: brightness(1.2); transform: translateX(5px); }
+}
+
+@keyframes adventure-water-flow {
+  to { background-position-y: 27px; }
+}
+
+@keyframes adventure-tree-sway {
+  to { transform: translateX(-50%) rotate(2deg); }
+}
+
+@keyframes adventure-wildlife {
+  to { transform: translateX(82vw) translateY(-35px); }
+}
+
+@keyframes adventure-firefly-move {
+  0% { opacity: 0.15; transform: scale(0.4); }
+  100% { opacity: 1; transform: translate(10px, -12px) scale(1.6); }
+}
+
+@keyframes adventure-checkpoint-float {
+  0% { transform: translate(-50%, -50%); }
+  100% { transform: translate(-50%, -54%); }
+}
+
+@keyframes adventure-gate-open {
+  50% { transform: translate(-50%, -57%) scale(1.12); }
+  100% { transform: translate(-50%, -50%) scale(0.15); opacity: 0; }
+}
+
+@keyframes adventure-player-run {
+  to { transform: translate(-50%, -53%) rotate(3deg); }
+}
+
+@keyframes avatar-jump {
+  50% { transform: translateY(-40px) scale(1.08); }
+}
+
+@keyframes shadow-shrink {
+  50% { transform: translateX(-50%) scale(0.5); opacity: 0.15; filter: blur(3px); }
+}
+
+@keyframes adventure-confetti-pop {
+  to { transform: translate(calc((var(--piece) - 14) * 22px), calc(-130px + (var(--piece) % 7) * 38px)) rotate(600deg); opacity: 0; }
+}
+
+/* Responsive configurations */
+@media (max-width: 760px) {
+  .adventure-world-hud {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+  }
+  
+  .adventure-world-hud .hud-pill {
+    padding: 6px 12px;
+  }
+  
+  .adventure-world-hud b {
+    font-size: 11px;
+  }
+  
+  .adventure-world-hud .hud-pill.game-mode {
+    display: none;
+  }
+  
+  .adventure-world-question {
+    top: 53px;
+    padding: 10px 14px;
+    width: calc(100% - 16px);
+  }
+  
+  .adventure-world-question h1 {
+    font-size: 14px;
+  }
+  
+  .adventure-world-stage {
+    inset: 118px 0 170px;
+  }
+  
+  .adventure-checkpoint {
+    width: 144px;
+    min-height: 88px;
+    padding: 10px;
+    border-radius: 18px;
+  }
+  
+  .checkpoint-badge {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .checkpoint-badge span {
+    font-size: 18px;
+  }
+  
+  .adventure-checkpoint strong {
+    font-size: 11px;
+  }
+  
+  .adventure-checkpoint small,
+  .adventure-world-progress {
+    display: none;
+  }
+  
+  .adventure-player {
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+}
+
+@media (max-height: 650px) {
+  .adventure-world-question h1 {
+    font-size: 13px;
+  }
+  
+  .adventure-world-stage {
+    inset: 112px 1% 150px;
+  }
+  
+  .adventure-checkpoint {
+    min-height: 76px;
+  }
+  
+  .adventure-controls {
+    bottom: 8px;
+    transform: translateX(-50%) scale(0.85);
+  }
+}

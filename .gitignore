@@ -1,0 +1,18 @@
+# Node
+node_modules/
+**/node_modules/
+
+# Next.js cache
+frontend/.next.pre-*/
+.stale-next-cache-*
+
+# Generated PDFs
+output/pdf/
+
+# Environment
+.env
+**/.env
+
+# macOS
+.DS_Store
+backups/
