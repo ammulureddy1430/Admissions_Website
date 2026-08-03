@@ -108,6 +108,8 @@ export default function AdminAssessments() {
   const [selectedBookingAssessmentId, setSelectedBookingAssessmentId] = useState<string | null>(null);
   const [bookingSchedule, setBookingSchedule] = useState<any>(null);
   const [reschedulingBooking, setReschedulingBooking] = useState<any>(null);
+  const [slotCapacityDrafts, setSlotCapacityDrafts] = useState<Record<string, number>>({});
+  const [savingSlotCapacityId, setSavingSlotCapacityId] = useState<string | null>(null);
 
   // Core Data
   const [templates, setTemplates] = useState<any[]>([]);
@@ -395,15 +397,47 @@ export default function AdminAssessments() {
       });
       if (res.ok) {
         const schedule = await res.json();
+        const scheduleSlots = Array.isArray(schedule?.slots) ? schedule.slots : [];
         setBookingSchedule({
           ...schedule,
-          slots: Array.isArray(schedule?.slots) ? schedule.slots.map(displaySlot) : [],
+          slots: scheduleSlots.map(displaySlot),
         });
+        setSlotCapacityDrafts(Object.fromEntries(scheduleSlots.map((slot: any) => [slot.id, Number(slot.capacity)])));
       } else {
         setBookingSchedule(null);
       }
     } catch (e) {
       console.error("Failed to fetch booking schedule", e);
+    }
+  };
+
+  const saveSlotCapacity = async (slot: any) => {
+    const capacity = Number(slotCapacityDrafts[slot.id]);
+    if (!Number.isInteger(capacity) || capacity < 1) {
+      alert("Maximum capacity must be a whole number greater than zero.");
+      return;
+    }
+    setSavingSlotCapacityId(slot.id);
+    try {
+      const res = await fetch(`http://localhost:5001/assessments/schedule/slots/${slot.id}/capacity`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-tenant-id": schoolId,
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ capacity }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(Array.isArray(payload?.message) ? payload.message.join(", ") : payload?.message || "Unable to update capacity");
+      await Promise.all([
+        fetchBookingSchedule(selectedBookingAssessmentId!),
+        fetchBookings(selectedBookingAssessmentId!),
+      ]);
+    } catch (error: any) {
+      alert(error.message || "Unable to update capacity.");
+    } finally {
+      setSavingSlotCapacityId(null);
     }
   };
 
@@ -1104,7 +1138,7 @@ export default function AdminAssessments() {
       return;
     }
 
-    if (isPublishing && isPublishing.assessmentMode === 'SCHOOL') {
+    if (isPublishing && ['SCHOOL', 'BOTH'].includes(isPublishing.assessmentMode)) {
       if (!assessmentDate) {
         alert("Please select the Assessment Date.");
         return;
@@ -1142,7 +1176,7 @@ export default function AdminAssessments() {
           assessmentId: isPublishing.id,
           applicationIds: publishTargetAppIds,
           dueDate: publishDueDate,
-          ...(isPublishing.assessmentMode === 'SCHOOL' && {
+          ...(['SCHOOL', 'BOTH'].includes(isPublishing.assessmentMode) && {
             schedule: {
               assessmentDate,
               campus,
@@ -2942,7 +2976,7 @@ export default function AdminAssessments() {
                    className="w-full sm:w-72 text-xs font-semibold rounded-xl border border-[#dceae6] bg-white p-3 text-[#071633] outline-none shadow-sm"
                  >
                    <option value="">-- Select Assessment Template --</option>
-                   {templates.filter(t => t.assessmentMode === 'SCHOOL').map(t => (
+                   {templates.filter(t => ['SCHOOL', 'BOTH'].includes(t.assessmentMode)).map(t => (
                      <option key={t.id} value={t.id}>{t.title} ({t.grade})</option>
                    ))}
                  </select>
@@ -2969,6 +3003,39 @@ export default function AdminAssessments() {
                              className={`h-full transition-all duration-300 ${percent >= 100 ? "bg-red-500" : "bg-[#007f70]"}`}
                              style={{ width: `${percent}%` }}
                            />
+                         </div>
+                         <div className="mt-3 border-t border-[#dceae6] pt-3">
+                           <div className="mb-2 flex items-center justify-between">
+                             <label htmlFor={`slot-capacity-${slot.id}`} className="text-[10px] font-extrabold text-[#344054]">
+                               Maximum capacity
+                             </label>
+                             <span className="text-[10px] font-extrabold text-[#007f70]">
+                               {Math.max(0, slot.capacity - slot.bookedCount)} spots left
+                             </span>
+                           </div>
+                           <div className="flex gap-2">
+                             <input
+                               id={`slot-capacity-${slot.id}`}
+                               type="number"
+                               min={Math.max(1, slot.bookedCount)}
+                               step="1"
+                               value={slotCapacityDrafts[slot.id] ?? slot.capacity}
+                               onChange={(event) => setSlotCapacityDrafts(current => ({
+                                 ...current,
+                                 [slot.id]: Number(event.target.value),
+                               }))}
+                               className="min-w-0 flex-1 rounded-lg border border-[#cfe6e0] bg-white px-2.5 py-2 text-xs font-bold text-[#071633] outline-none focus:border-[#007f70]"
+                             />
+                             <button
+                               type="button"
+                               disabled={savingSlotCapacityId === slot.id || Number(slotCapacityDrafts[slot.id] ?? slot.capacity) === Number(slot.capacity)}
+                               onClick={() => saveSlotCapacity(slot)}
+                               className="rounded-lg bg-[#007f70] px-3 py-2 text-[10px] font-extrabold text-white hover:bg-[#00665a] disabled:cursor-not-allowed disabled:opacity-45"
+                             >
+                               {savingSlotCapacityId === slot.id ? "Saving..." : "Save"}
+                             </button>
+                           </div>
+                           <p className="mt-1.5 text-[9px] text-[#71818d]">Booked: {slot.bookedCount} · Available: {Math.max(0, slot.capacity - slot.bookedCount)}</p>
                          </div>
                        </div>
                      );
@@ -3337,7 +3404,7 @@ export default function AdminAssessments() {
       {/* Publish assessment modal */}
       {isPublishing && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#071633]/60 backdrop-blur-sm p-4">
-          <div className={`w-full ${isPublishing.assessmentMode === 'SCHOOL' ? 'max-w-3xl' : 'max-w-lg'} bg-white rounded-2xl border border-[#dceae6] shadow-xl overflow-hidden flex flex-col max-h-[85vh]`}>
+          <div className={`w-full ${['SCHOOL', 'BOTH'].includes(isPublishing.assessmentMode) ? 'max-w-3xl' : 'max-w-lg'} bg-white rounded-2xl border border-[#dceae6] shadow-xl overflow-hidden flex flex-col max-h-[85vh]`}>
             <div className="p-5 border-b border-[#dceae6] bg-[#f8fbf9] flex items-center justify-between">
               <h3 className="text-sm font-bold text-[#071633]">Assign Assessment: {isPublishing.title}</h3>
               <button 
@@ -3349,7 +3416,7 @@ export default function AdminAssessments() {
             </div>
 
             <div className="p-6 overflow-y-auto space-y-5 flex-1">
-              {isPublishing.assessmentMode === 'SCHOOL' && (
+              {['SCHOOL', 'BOTH'].includes(isPublishing.assessmentMode) && (
                 <div className="bg-[#f8fbf9] border border-[#cfe6e0] p-4 rounded-xl space-y-4">
                   <h4 className="font-extrabold text-xs text-[#007f70] border-b border-[#cfe6e0] pb-2">At-School Scheduling Details</h4>
                   
@@ -3721,7 +3788,7 @@ export default function AdminAssessments() {
                     </div>
                     {requiredDocs.includes("Hall Ticket") && (
                       <p className="text-[9px] font-medium leading-4 text-[#71818d]">
-                        <span className="font-bold">*</span> After booking a slot, open At-School Assessment Scheduling and select <span className="font-bold">Print Hall Ticket</span> under Slot Assignment.
+                        <span className="font-bold">*</span> In the <span className="font-bold">Parent Portal</span>, after booking a slot, open <span className="font-bold">At-School Assessment Scheduling</span> and select <span className="font-bold">Print Hall Ticket</span> under Slot Assignment.
                       </p>
                     )}
                   </div>

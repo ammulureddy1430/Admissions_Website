@@ -482,6 +482,12 @@ export default function GameAssessmentsPage() {
               <div className="mt-4 rounded-2xl border border-[#dceae6] bg-[#f8fcfa] p-4">
                 <div className="mb-4"><h3 className="text-xs font-extrabold text-[#071633]">Game settings</h3><p className="mt-1 text-[10px] text-[#71818d]">Configure how students will play this assessment. Recommended defaults are already selected.</p></div>
                 <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="Assessment delivery" hint="Choose where students are allowed to play">
+                    <select value={form.assessmentMode} onChange={(e) => setForm({ ...form, assessmentMode: e.target.value })} className="input">
+                      <option value="HOME">Home assessment</option>
+                      <option value="SCHOOL">At-school assessment</option>
+                    </select>
+                  </Field>
                   <Field label="Difficulty" hint="Medium suits most classes"><select value={form.difficulty} onChange={(e) => setForm({ ...form, difficulty: e.target.value })} className="input"><option>EASY</option><option>MEDIUM</option><option>HARD</option></select></Field>
                   <Field label="Questions" hint="Recommended: 10–20"><input type="number" min={1} max={50} value={form.numberOfQuestions} onChange={(e) => setForm({ ...form, numberOfQuestions: Number(e.target.value) })} className="input" /></Field>
                   <Field label="Time limit (minutes)" hint="Recommended: 15–30"><input type="number" min={1} max={180} value={form.timeLimit} onChange={(e) => setForm({ ...form, timeLimit: Number(e.target.value) })} className="input" /></Field>

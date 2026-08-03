@@ -19,7 +19,9 @@ import {
   AlertCircle,
   Building,
   GraduationCap,
-  ArrowRight
+  ArrowRight,
+  Gamepad2,
+  Play
 } from "lucide-react";
 
 type SlotAvailability = "BEFORE" | "ACTIVE" | "AFTER" | "INVALID";
@@ -92,6 +94,7 @@ export default function StudentDashboard() {
   // Auth & API states
   const [profile, setProfile] = useState<any>(null);
   const [assessments, setAssessments] = useState<any[]>([]);
+  const [assignedGames, setAssignedGames] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<"PENDING" | "SUBMITTED">("PENDING");
   
   // Loading & error
@@ -302,12 +305,14 @@ export default function StudentDashboard() {
       try {
         const headers = { 
           "Authorization": `Bearer ${token}`,
+          "x-tenant-id": localStorage.getItem("studentSchoolId") || localStorage.getItem("schoolId") || "",
           "Content-Type": "application/json"
         };
 
-        const [profileRes, listRes] = await Promise.all([
+        const [profileRes, listRes, gamesRes] = await Promise.all([
           fetch("http://localhost:5001/assessments/student/profile", { headers }),
-          fetch("http://localhost:5001/assessments/student/list", { headers })
+          fetch("http://localhost:5001/assessments/student/list", { headers }),
+          fetch("http://localhost:5001/game-assessments/student/games", { headers })
         ]);
 
         if (profileRes.status === 401 || listRes.status === 401) {
@@ -322,9 +327,11 @@ export default function StudentDashboard() {
 
         const profileData = await profileRes.json();
         const listData = await listRes.json();
+        const gamesData = gamesRes.ok ? await gamesRes.json() : [];
 
         setProfile(profileData);
         setAssessments(listData);
+        setAssignedGames(Array.isArray(gamesData) ? gamesData : []);
       } catch (err: any) {
         console.error(err);
         setError(err.message || "Failed to sync dashboard.");
@@ -342,14 +349,23 @@ export default function StudentDashboard() {
       try {
         const currentToken = localStorage.getItem("studentToken");
         if (!currentToken) return;
-        const response = await fetch("http://localhost:5001/assessments/student/list", {
-          headers: {
-            "Authorization": `Bearer ${currentToken}`,
-            "Content-Type": "application/json",
-          },
-          cache: "no-store",
-        });
+        const headers = {
+          "Authorization": `Bearer ${currentToken}`,
+          "x-tenant-id": localStorage.getItem("studentSchoolId") || localStorage.getItem("schoolId") || "",
+          "Content-Type": "application/json",
+        };
+        const [response, gamesResponse] = await Promise.all([
+          fetch("http://localhost:5001/assessments/student/list", {
+            headers,
+            cache: "no-store",
+          }),
+          fetch("http://localhost:5001/game-assessments/student/games", {
+            headers,
+            cache: "no-store",
+          }),
+        ]);
         if (response.ok) setAssessments(await response.json());
+        if (gamesResponse.ok) setAssignedGames(await gamesResponse.json());
       } catch {
         // Preserve the last successfully loaded state during a transient outage.
       }
@@ -389,6 +405,10 @@ export default function StudentDashboard() {
   const filteredAssessments = assessments.filter(
     (ass) => ass.tab.toUpperCase() === activeTab
   );
+  const filteredGames = assignedGames.filter((game) => {
+    const isComplete = game.result?.status === "COMPLETED";
+    return activeTab === "SUBMITTED" ? isComplete : !isComplete;
+  });
 
   const getSubjectColor = (sub: string) => {
     const s = sub.toLowerCase();
@@ -506,21 +526,21 @@ export default function StudentDashboard() {
 
         {/* Tab Selection */}
         <section className="flex flex-col gap-6 flex-1">
-          <div className="flex w-full gap-1.5 rounded-2xl border border-[#d8e6e3] bg-white p-1.5 shadow-sm sm:w-fit">
+          <div className="grid w-full grid-cols-2 gap-1.5 rounded-2xl border border-[#d8e6e3] bg-white p-1.5 shadow-sm sm:w-[520px]">
             {(["PENDING", "SUBMITTED"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`flex-1 rounded-xl px-4 py-2.5 text-[11px] font-extrabold transition-all sm:flex-none sm:px-5 ${
                   activeTab === tab
-                    ? "bg-[#008f80] !text-white shadow-sm"
+                    ? "bg-[#008f80] !text-white shadow-[0_6px_16px_rgba(0,143,128,0.2)]"
                     : "text-[#607580] hover:bg-[#f0f7f5] hover:text-[#173349]"
                 }`}
               >
                 {tab === "PENDING" && "Pending Assessments"}
                 {tab === "SUBMITTED" && "Submitted Assessments"}
                 <span className={`ml-2 rounded-md px-1.5 py-0.5 text-[9px] font-extrabold ${activeTab === tab ? "bg-white/20 !text-white" : "bg-[#e8f0ee] text-[#647a81]"}`}>
-                  {assessments.filter((a) => a.tab.toUpperCase() === tab).length}
+                  {assessments.filter((a) => a.tab.toUpperCase() === tab).length + assignedGames.filter((game) => tab === "SUBMITTED" ? game.result?.status === "COMPLETED" : game.result?.status !== "COMPLETED").length}
                 </span>
               </button>
             ))}
@@ -528,7 +548,7 @@ export default function StudentDashboard() {
 
           <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
           {/* Assessment List Grid */}
-          {filteredAssessments.length === 0 ? (
+          {filteredAssessments.length === 0 && filteredGames.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center space-y-4 rounded-3xl border border-dashed border-[#c9dcd7] bg-white/60 py-20 text-center">
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[#d8e6e3] bg-[#f1f7f5] text-[#7a918d]">
                 <BookOpenCheck className="h-8 w-8" />
@@ -541,13 +561,13 @@ export default function StudentDashboard() {
               </div>
             </div>
           ) : (
-            <div className="grid gap-5">
+            <div className="grid gap-4 xl:grid-cols-2">
               {filteredAssessments.map((ass) => (
                 <div
                   key={ass.id}
-                  className="group h-fit self-start overflow-hidden rounded-3xl border border-[#d8e6e3] bg-white px-5 pb-1 pt-5 shadow-[0_10px_30px_rgba(25,69,61,0.06)] transition duration-300 hover:-translate-y-0.5 hover:border-[#9bcfc6] hover:shadow-[0_16px_38px_rgba(25,69,61,0.11)] sm:px-6 sm:pb-2 sm:pt-6"
+                  className="group relative flex h-full min-h-[315px] flex-col overflow-hidden rounded-2xl border border-[#d8e6e3] bg-white p-5 shadow-[0_8px_24px_rgba(25,69,61,0.06)] transition duration-300 before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-[#008f80] hover:-translate-y-0.5 hover:border-[#9bcfc6] hover:shadow-[0_14px_32px_rgba(25,69,61,0.1)]"
                 >
-                  <div className="space-y-3.5">
+                  <div className="flex-1 space-y-3">
                     {/* Header: Subject badge & status */}
                     <div className="flex items-center justify-between">
                       <span className={`rounded-lg border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${getSubjectColor(ass.subject)}`}>
@@ -578,8 +598,8 @@ export default function StudentDashboard() {
                     </div>
 
                     {/* Metadata items */}
-                    <div className="grid grid-cols-2 gap-3.5 border-t border-[#e5edeb] pt-4 text-[11px] text-[#657985]">
-                      <div className="flex items-center gap-2">
+                    <div className="grid grid-cols-2 gap-2 rounded-xl border border-[#e5edeb] bg-[#f8fbfa] p-3 text-[11px] text-[#657985]">
+                      <div className="flex items-center gap-2 border-r border-[#dfe9e6]">
                         <Clock className="h-3.5 w-3.5 text-slate-600 shrink-0" />
                         <span>{ass.duration}</span>
                       </div>
@@ -590,7 +610,7 @@ export default function StudentDashboard() {
                     </div>
 
                     {/* Component list */}
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 rounded-xl bg-[#fbfdfc] px-3 py-2.5">
                       <span className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider block">Components</span>
                       <div className="flex flex-wrap gap-1.5">
                         {ass.components.map((comp: string, i: number) => (
@@ -607,9 +627,9 @@ export default function StudentDashboard() {
                   </div>
 
                   {/* Actions buttons */}
-                  <div className="pt-5">
+                  <div className="pt-4">
                     {activeTab === "PENDING" && (
-                      ass.assessmentMode === 'SCHOOL' ? (
+                      (ass.assessmentMode === 'SCHOOL' || (ass.assessmentMode === 'BOTH' && ass.venueChoice === 'SCHOOL')) ? (
                         <div className="space-y-2.5">
                           {ass.slotBookings && ass.slotBookings.length > 0 && ass.slotBookings[0].bookingStatus !== 'CANCELLED' ? (
                             <>
@@ -708,6 +728,47 @@ export default function StudentDashboard() {
                       </button>
                     )}
                   </div>
+                </div>
+              ))}
+              {filteredGames.map((game) => (
+                <div
+                  key={`game-${game.id}`}
+                  className="group relative flex h-full min-h-[315px] flex-col overflow-hidden rounded-2xl border border-[#d8e6e3] bg-white p-5 shadow-[0_8px_24px_rgba(25,69,61,0.06)] transition duration-300 before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-[#008f80] hover:-translate-y-0.5 hover:border-[#9bcfc6] hover:shadow-[0_14px_32px_rgba(25,69,61,0.1)]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-[#b9e8dc] bg-[#effaf7] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#087466]">
+                      <Gamepad2 className="h-3.5 w-3.5" /> Game Assessment
+                    </span>
+                    <span className="rounded-md border border-[#cbd8f8] bg-[#f2f5ff] px-2 py-0.5 text-[10px] font-bold text-[#435da8]">
+                      {game.result?.status === "COMPLETED" ? "COMPLETED" : game.result?.status === "IN_PROGRESS" ? "IN PROGRESS" : "ASSIGNED"}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="mt-4 text-base font-black leading-snug text-[#0b1f33] group-hover:text-[#008f80]">
+                      {game.generatedGame?.title || game.gameAssessment?.name || "Assigned Game"}
+                    </h3>
+                    <p className="mt-1 text-[10px] font-semibold text-slate-500">
+                      {game.gameAssessment?.name || "Game-based assessment"} · {game.gameAssessment?.grade || profile?.class}
+                    </p>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-[#e5edeb] bg-[#f8fbfa] p-3 text-[11px] text-[#657985]">
+                    <div className="flex items-center gap-2 border-r border-[#dfe9e6]">
+                      <Clock className="h-3.5 w-3.5 shrink-0" />
+                      <span>{game.timeLimitMinutes || game.gameAssessment?.timeLimit || "—"} mins</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Gamepad2 className="h-3.5 w-3.5 shrink-0" />
+                      <span>{game.generatedGame?.engineKey?.replaceAll("_", " ") || "Interactive game"}</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/student-assessment/games")}
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#008f80] px-4 py-3 text-xs font-extrabold !text-white shadow-[0_10px_22px_rgba(0,143,128,0.18)] transition hover:bg-[#007d70]"
+                  >
+                    <Play className="h-4 w-4" />
+                    {game.result?.status === "COMPLETED" ? "View Game Result" : game.result?.status === "IN_PROGRESS" ? "Resume Game" : "Open Game"}
+                  </button>
                 </div>
               ))}
             </div>

@@ -652,7 +652,9 @@ export class AssessmentService {
       throw new NotFoundException('Template assessment not found.');
     }
 
-    if (template.assessmentMode === 'SCHOOL' && dto.schedule && dto.slots) {
+    // BOTH assessments must also keep an at-school schedule ready. Otherwise a
+    // parent who chooses At School has no venue or slots to select.
+    if (['SCHOOL', 'BOTH'].includes(template.assessmentMode) && dto.schedule && dto.slots) {
       const schedule = await this.prisma.assessmentSchedule.upsert({
         where: { assessmentId: dto.assessmentId },
         update: {
@@ -1448,12 +1450,36 @@ Do not use markdown. Do not change the recorded score or correctness.`;
       orderBy: [{ applicationId: 'asc' }, { attemptNumber: 'desc' }, { createdAt: 'desc' }],
     });
 
+    const templateSchedules = assessments.length
+      ? await this.prisma.assessmentSchedule.findMany({
+          where: {
+            assessment: {
+              schoolId: assessments[0].schoolId,
+              applicationId: null,
+              status: { not: 'ARCHIVED' },
+            },
+          },
+          include: {
+            assessment: { select: { title: true, grade: true, subject: true } },
+          },
+        })
+      : [];
+    const scheduleByTemplate = new Map(
+      templateSchedules.map((schedule) => [
+        `${schedule.assessment.title}::${schedule.assessment.grade}::${schedule.assessment.subject}`,
+        schedule.assessmentDate,
+      ]),
+    );
+
     return assessments.map((assessment) => {
       const venueChoiceDeadline = assessment.dueDate
         ? new Date(assessment.dueDate.getTime() - 4 * 24 * 60 * 60 * 1000)
         : null;
       return {
         ...assessment,
+        scheduledAssessmentDate: scheduleByTemplate.get(
+          `${assessment.title}::${assessment.grade}::${assessment.subject}`,
+        ) || null,
         venueChoiceDeadline,
         venueChoiceLocked:
           assessment.assessmentMode === 'BOTH' &&
@@ -3197,10 +3223,43 @@ Do not use markdown. Do not change the recorded score or correctness.`;
     return { success: true };
   }
 
-  async getSchedule(assessmentId: string) {
-    return this.prisma.assessmentSchedule.findUnique({
-      where: { assessmentId },
+  async getSchedule(assessmentId: string, schoolId: string) {
+    return this.prisma.assessmentSchedule.findFirst({
+      where: { assessmentId, assessment: { schoolId } },
       include: { slots: true },
+    });
+  }
+
+  async updateSlotCapacity(slotId: string, capacityValue: number, schoolId: string) {
+    const capacity = Number(capacityValue);
+    if (!Number.isInteger(capacity) || capacity < 1) {
+      throw new BadRequestException('Maximum capacity must be a whole number greater than zero.');
+    }
+
+    const slot = await this.prisma.assessmentSlot.findFirst({
+      where: { id: slotId, schedule: { assessment: { schoolId } } },
+    });
+    if (!slot) throw new NotFoundException('Assessment slot not found');
+
+    const bookedCount = await this.prisma.studentSlotBooking.count({
+      where: {
+        slotId,
+        bookingStatus: { in: ['BOOKED', 'RESCHEDULED', 'COMPLETED'] },
+      },
+    });
+    if (capacity < bookedCount) {
+      throw new BadRequestException(
+        `Capacity cannot be less than the ${bookedCount} existing booking${bookedCount === 1 ? '' : 's'}.`,
+      );
+    }
+
+    return this.prisma.assessmentSlot.update({
+      where: { id: slotId },
+      data: {
+        capacity,
+        bookedCount,
+        status: bookedCount >= capacity ? 'FULL' : 'AVAILABLE',
+      },
     });
   }
 

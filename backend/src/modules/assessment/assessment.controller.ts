@@ -243,7 +243,17 @@ export class AssessmentController {
   @Get('schedule/:assessmentId')
   @Roles(Role.SCHOOL_ADMIN, Role.ADMISSIONS_STAFF)
   async getSchedule(@Param('assessmentId') assessmentId: string, @SchoolId() schoolId: string) {
-    return this.assessmentService.getSchedule(assessmentId);
+    return this.assessmentService.getSchedule(assessmentId, schoolId);
+  }
+
+  @Patch('schedule/slots/:slotId/capacity')
+  @Roles(Role.SCHOOL_ADMIN, Role.ADMISSIONS_STAFF)
+  async updateSlotCapacity(
+    @Param('slotId') slotId: string,
+    @Body() dto: { capacity: number },
+    @SchoolId() schoolId: string,
+  ) {
+    return this.assessmentService.updateSlotCapacity(slotId, dto.capacity, schoolId);
   }
 
   @Get('bookings')

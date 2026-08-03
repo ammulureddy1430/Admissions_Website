@@ -9,6 +9,7 @@ import {
   Eye,
   Gamepad2,
   Loader2,
+  MapPin,
   RefreshCcw,
   Send,
   Sparkles,
@@ -20,6 +21,28 @@ import {
 import { GameRuntimePlayer } from "@/components/game-runtime-player";
 
 type Row = Record<string, any>;
+const emptySchoolVenue = () => ({
+  assessmentDate: "",
+  campus: "",
+  building: "",
+  floor: "",
+  roomNumber: "",
+  venue: "",
+  slotId: "",
+  slotName: "",
+  startTime: "",
+  endTime: "",
+  sourceAssessment: "",
+});
+const toTimeInput = (value: string) => {
+  const match = String(value || "").match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (!match) return "";
+  let hour = Number(match[1]);
+  const period = match[3]?.toUpperCase();
+  if (period === "PM" && hour < 12) hour += 12;
+  if (period === "AM" && hour === 12) hour = 0;
+  return `${String(hour).padStart(2, "0")}:${match[2]}`;
+};
 
 export default function TeacherGameStudio() {
   const [tab, setTab] = useState<"games" | "assign" | "analytics">("games"),
@@ -48,8 +71,11 @@ export default function TeacherGameStudio() {
       timeLimitMinutes: 20,
       passingScore: 60,
       allowRestart: true,
+      deliveryMode: "HOME",
     });
   const [students, setStudents] = useState<Row[]>([]);
+  const [schoolVenue, setSchoolVenue] = useState<Row | null>(null);
+  const [venueLoading, setVenueLoading] = useState(false);
   const [showAssignmentSettings, setShowAssignmentSettings] = useState(false);
   const request = async (path: string, init?: RequestInit) => {
     const token = localStorage.getItem("token") || "",
@@ -94,7 +120,8 @@ export default function TeacherGameStudio() {
       setLeaderboard(l);
       setStudents(
         (studentApplications || []).filter((student: Row) =>
-          ["APPROVED", "ASSESSMENT"].includes(student.status),
+          student.assessmentRequired !== false &&
+          !["DRAFT", "REJECTED", "WITHDRAWN"].includes(String(student.status || "").toUpperCase()),
         ),
       );
       setError("");
@@ -136,6 +163,25 @@ export default function TeacherGameStudio() {
     () => games.filter((game) => game.status === "PUBLISHED"),
     [games],
   );
+  useEffect(() => {
+    if (assignment.deliveryMode !== "SCHOOL" || !selectedAssessment?.grade) {
+      setSchoolVenue(null);
+      return;
+    }
+    let cancelled = false;
+    setVenueLoading(true);
+    request(`game-assessments/assignment-venue?grade=${encodeURIComponent(selectedAssessment.grade)}`)
+      .then((venue) => {
+        if (!cancelled) setSchoolVenue(venue ? {
+          ...venue,
+          startTime: toTimeInput(venue.startTime),
+          endTime: toTimeInput(venue.endTime),
+        } : emptySchoolVenue());
+      })
+      .catch((e) => { if (!cancelled) setError(msg(e)); })
+      .finally(() => { if (!cancelled) setVenueLoading(false); });
+    return () => { cancelled = true; };
+  }, [assignment.deliveryMode, selectedAssessment?.grade]);
   const assessmentChoices = useMemo(() => {
     const unique = new Map<string, Row>();
     [...assessments]
@@ -210,25 +256,31 @@ export default function TeacherGameStudio() {
     }
   };
   const assign = async () => {
+    if (assignment.deliveryMode === "SCHOOL" && (!schoolVenue?.assessmentDate || !schoolVenue?.campus || !schoolVenue?.building || !schoolVenue?.roomNumber || !schoolVenue?.startTime || !schoolVenue?.endTime)) {
+      setError("Enter the at-school date, time, campus, building, and room before assigning the game.");
+      return;
+    }
     setBusy("assign");
     setError("");
     setSuccess("");
     try {
+      const { deliveryMode, ...assignmentPayload } = assignment;
       const result = await request("game-assessments/game-assignments", {
         method: "POST",
         body: JSON.stringify({
-          ...assignment,
+          ...assignmentPayload,
           targetIds: assignment.targetIds
             .split(",")
             .map((x) => x.trim())
             .filter(Boolean),
+          settings: { deliveryMode, ...(deliveryMode === "SCHOOL" && { location: schoolVenue }) },
         }),
       });
       const student = students.find((row) => row.id === assignment.targetIds);
       setSuccess(
         result.alreadyAssigned
-          ? `This game is already assigned to ${student?.studentFirstName || "the selected student"}.`
-          : `Game assigned to ${student?.studentFirstName || "the selected student"} successfully. It is now visible in the parent portal.`,
+          ? `This game was already assigned to ${student?.studentFirstName || "the selected student"}; its delivery mode is now ${deliveryMode === "SCHOOL" ? "At School" : "Home"}.`
+          : `Game assigned to ${student?.studentFirstName || "the selected student"} successfully for ${deliveryMode === "SCHOOL" ? "At School" : "Home"} delivery.`,
       );
       await load();
     } catch (e) {
@@ -540,10 +592,12 @@ export default function TeacherGameStudio() {
                   className="input"
                   value={assignment.gameAssessmentId}
                   onChange={(e) => {
+                    const assessment = assessments.find((row) => row.id === e.target.value);
                     setAssignment({
                       ...assignment,
                       gameAssessmentId: e.target.value,
                       targetIds: "",
+                      deliveryMode: assessment?.assessmentMode === "SCHOOL" ? "SCHOOL" : "HOME",
                     });
                     setSuccess("");
                   }}
@@ -555,21 +609,105 @@ export default function TeacherGameStudio() {
                     <option key={assessment.id} value={assessment.id}>
                       {assessment.name || assessment.title || "Untitled assessment"}
                       {assessment.grade ? ` · ${assessment.grade}` : ""}
+                      {` · ${assessment.assessmentMode === "SCHOOL" ? "At School" : "Home"}`}
                     </option>
                   ))}
                 </select>
               </Field>
             </div>
             {assignment.generatedGameId && assignment.gameAssessmentId && (
-              <div className="mt-3 flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-[10px] font-bold text-emerald-800">
-                <CheckCircle2 className="h-4 w-4" />
-                Game and assessment selected
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-[10px] font-bold text-emerald-800">
+                <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4" />Game and assessment selected</span>
+                <span className="rounded-full bg-white px-2.5 py-1 font-black uppercase tracking-wide text-[#007f70]">
+                  Assessment default: {selectedAssessment?.assessmentMode === "SCHOOL" ? "At School" : "Home"}
+                </span>
               </div>
             )}
           </div>
           <div className="mt-4 rounded-xl border border-[#dceae6] p-4">
             <h3 className="flex items-center gap-2 text-xs font-black text-[#071633]">
               <span className="keep-white flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#007f70] text-xs font-black shadow-sm ring-2 ring-[#bde8df]">2</span>
+              Choose delivery mode
+            </h3>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {[
+                ["HOME", "Home", "Student can play remotely from the portal."],
+                ["SCHOOL", "At School", "Game is assigned for supervised play at school."],
+              ].map(([value, label, description]) => {
+                const selected = assignment.deliveryMode === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setAssignment({ ...assignment, deliveryMode: value })}
+                    className={`rounded-xl border p-3 text-left transition ${selected ? "border-[#008c78] bg-[#e6f7f2] shadow-sm" : "border-[#dceae6] bg-white hover:border-[#9fd5cc]"}`}
+                  >
+                    <span className={`block text-xs font-black ${selected ? "text-[#006f63]" : "text-[#071633]"}`}>{label}</span>
+                    <span className="mt-1 block text-[9px] font-semibold leading-4 text-[#71818d]">{description}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {assignment.deliveryMode === "SCHOOL" && (
+              <div className="mt-4 rounded-xl border border-[#b9ddd6] bg-[#f4fbf9] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="flex items-center gap-2 text-xs font-black text-[#006f63]">
+                      <MapPin className="h-4 w-4" /> At-school location
+                    </p>
+                    <p className="mt-1 text-[9px] font-semibold text-[#71818d]">
+                      Enter a location for this game, or review the values prefilled from a matching written assessment.
+                    </p>
+                  </div>
+                  {schoolVenue?.sourceAssessment && (
+                    <span className="rounded-full bg-white px-2.5 py-1 text-[8px] font-black uppercase tracking-wide text-[#007f70]">
+                      From written assessment
+                    </span>
+                  )}
+                </div>
+                {venueLoading ? (
+                  <div className="mt-4 flex items-center gap-2 text-[10px] font-bold text-[#607580]">
+                    <Loader2 className="h-4 w-4 animate-spin text-[#008f80]" /> Loading school location…
+                  </div>
+                ) : schoolVenue ? (
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <Field label="Assessment date *">
+                      <input className="input" type="date" value={schoolVenue.assessmentDate || ""} onChange={(e) => setSchoolVenue({ ...schoolVenue, assessmentDate: e.target.value })} />
+                    </Field>
+                    <Field label="Start time *">
+                      <input className="input" type="time" value={schoolVenue.startTime || ""} onChange={(e) => setSchoolVenue({ ...schoolVenue, startTime: e.target.value, slotName: schoolVenue.slotName || "Game Session" })} />
+                    </Field>
+                    <Field label="End time *">
+                      <input className="input" type="time" value={schoolVenue.endTime || ""} onChange={(e) => setSchoolVenue({ ...schoolVenue, endTime: e.target.value, slotName: schoolVenue.slotName || "Game Session" })} />
+                    </Field>
+                    <Field label="Campus *">
+                      <input className="input" placeholder="e.g. Main Campus" value={schoolVenue.campus || ""} onChange={(e) => setSchoolVenue({ ...schoolVenue, campus: e.target.value })} />
+                    </Field>
+                    <Field label="Building *">
+                      <input className="input" placeholder="e.g. Block A" value={schoolVenue.building || ""} onChange={(e) => setSchoolVenue({ ...schoolVenue, building: e.target.value })} />
+                    </Field>
+                    <Field label="Floor">
+                      <input className="input" placeholder="e.g. Ground Floor" value={schoolVenue.floor || ""} onChange={(e) => setSchoolVenue({ ...schoolVenue, floor: e.target.value })} />
+                    </Field>
+                    <Field label="Room number *">
+                      <input className="input" placeholder="e.g. Room 101" value={schoolVenue.roomNumber || ""} onChange={(e) => setSchoolVenue({ ...schoolVenue, roomNumber: e.target.value })} />
+                    </Field>
+                    <div className="sm:col-span-2">
+                      <Field label="Venue notes">
+                        <input className="input" placeholder="e.g. Computer lab beside the library" value={schoolVenue.venue || ""} onChange={(e) => setSchoolVenue({ ...schoolVenue, venue: e.target.value })} />
+                      </Field>
+                    </div>
+                    {schoolVenue.sourceAssessment && <p className="text-[9px] font-semibold text-[#607580] sm:col-span-2 lg:col-span-3">Prefilled from: {schoolVenue.sourceAssessment}. You can edit these values for this game.</p>}
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setSchoolVenue(emptySchoolVenue())} className="mt-4 rounded-lg border border-[#b9ddd6] bg-white px-3 py-2 text-[10px] font-bold text-[#007f70]">Enter game location</button>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="mt-4 rounded-xl border border-[#dceae6] p-4">
+            <h3 className="flex items-center gap-2 text-xs font-black text-[#071633]">
+              <span className="keep-white flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#007f70] text-xs font-black shadow-sm ring-2 ring-[#bde8df]">3</span>
               Choose student
             </h3>
             <div className="mt-3">

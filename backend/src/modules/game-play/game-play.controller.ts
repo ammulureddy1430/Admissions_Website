@@ -18,6 +18,11 @@ export class GamePlayController {
   @Get('game-assignments')
   @Roles(Role.SCHOOL_ADMIN, Role.PRINCIPAL, Role.TEACHER, Role.ADMISSIONS_STAFF)
   assignments(@SchoolId() schoolId: string, @Query() query: any) { return this.service.assignments(schoolId, query); }
+  @Get('assignment-venue')
+  @Roles(Role.SCHOOL_ADMIN, Role.PRINCIPAL, Role.TEACHER, Role.ADMISSIONS_STAFF)
+  assignmentVenue(@SchoolId() schoolId: string, @Query('grade') grade: string) {
+    return this.service.assignmentVenue(schoolId, grade);
+  }
   @Get('parent/games')
   @Roles(Role.PARENT)
   parentGames(@SchoolId() schoolId: string, @Req() req: any) { return this.service.parentGames(schoolId, req.user.id); }
@@ -50,29 +55,29 @@ export class GamePlayController {
   parentFinishPractice(@Param('assignmentId') assignmentId: string, @Body() body: { childId: string; sessionId: string }, @SchoolId() schoolId: string, @Req() req: any) { return this.service.parentFinishPractice(assignmentId, body.sessionId, body.childId, schoolId, req.user.id); }
   @Get('student/games')
   @Roles(Role.STUDENT)
-  studentGames(@SchoolId() schoolId: string, @Req() req: any) { return this.service.studentGames(schoolId, req.user.id); }
+  async studentGames(@SchoolId() schoolId: string, @Req() req: any) { return this.service.studentGames(schoolId, await this.service.studentApplicationId(schoolId, req.user.id)); }
   @Get('student/games/:assignmentId/tutorial')
   @Roles(Role.STUDENT)
-  tutorial(@Param('assignmentId') assignmentId: string, @SchoolId() schoolId: string, @Req() req: any) { return this.service.tutorial(assignmentId, schoolId, req.user.id); }
+  async tutorial(@Param('assignmentId') assignmentId: string, @SchoolId() schoolId: string, @Req() req: any) { return this.service.tutorial(assignmentId, schoolId, await this.service.studentApplicationId(schoolId, req.user.id)); }
   @Post('student/games/:assignmentId/tutorial/progress')
   @Roles(Role.STUDENT)
-  tutorialProgress(@Param('assignmentId') assignmentId: string, @Body() body: { tutorialViewed?: boolean; practiceCompleted?: boolean }, @SchoolId() schoolId: string, @Req() req: any) { return this.service.saveTutorialProgress(assignmentId, schoolId, req.user.id, body); }
+  async tutorialProgress(@Param('assignmentId') assignmentId: string, @Body() body: { tutorialViewed?: boolean; practiceCompleted?: boolean }, @SchoolId() schoolId: string, @Req() req: any) { return this.service.saveTutorialProgress(assignmentId, schoolId, await this.service.studentApplicationId(schoolId, req.user.id), body); }
   @Post('student/games/:assignmentId/practice/start')
   @Roles(Role.STUDENT)
-  practice(@Param('assignmentId') assignmentId: string, @SchoolId() schoolId: string, @Req() req: any) { return this.service.startPractice(assignmentId, schoolId, req.user.id); }
+  async practice(@Param('assignmentId') assignmentId: string, @SchoolId() schoolId: string, @Req() req: any) { return this.service.startPractice(assignmentId, schoolId, await this.service.studentApplicationId(schoolId, req.user.id)); }
   @Post('student/games/:assignmentId/practice/finish')
   @Roles(Role.STUDENT)
-  finishPractice(@Param('assignmentId') assignmentId: string, @Body() body: { sessionId: string }, @SchoolId() schoolId: string, @Req() req: any) { return this.service.finishPractice(assignmentId, body.sessionId, schoolId, req.user.id); }
+  async finishPractice(@Param('assignmentId') assignmentId: string, @Body() body: { sessionId: string }, @SchoolId() schoolId: string, @Req() req: any) { return this.service.finishPractice(assignmentId, body.sessionId, schoolId, await this.service.studentApplicationId(schoolId, req.user.id)); }
   @Post('student/games/:assignmentId/start')
   @Roles(Role.STUDENT)
-  start(@Param('assignmentId') assignmentId: string, @SchoolId() schoolId: string, @Req() req: any) { return this.service.start(assignmentId, schoolId, req.user.id); }
+  async start(@Param('assignmentId') assignmentId: string, @SchoolId() schoolId: string, @Req() req: any) { return this.service.start(assignmentId, schoolId, await this.service.studentApplicationId(schoolId, req.user.id)); }
   @Post('student/games/:assignmentId/restart')
   @Roles(Role.STUDENT)
-  restart(@Param('assignmentId') assignmentId: string, @SchoolId() schoolId: string, @Req() req: any) { return this.service.start(assignmentId, schoolId, req.user.id, true); }
+  async restart(@Param('assignmentId') assignmentId: string, @SchoolId() schoolId: string, @Req() req: any) { return this.service.start(assignmentId, schoolId, await this.service.studentApplicationId(schoolId, req.user.id), true); }
   @Get('student/games/:assignmentId/resume')
   @Roles(Role.STUDENT)
-  resume(@Param('assignmentId') assignmentId: string, @SchoolId() schoolId: string, @Req() req: any) { return this.service.resume(assignmentId, schoolId, req.user.id); }
+  async resume(@Param('assignmentId') assignmentId: string, @SchoolId() schoolId: string, @Req() req: any) { return this.service.resume(assignmentId, schoolId, await this.service.studentApplicationId(schoolId, req.user.id)); }
   @Post('student/games/:assignmentId/submit')
   @Roles(Role.STUDENT)
-  submit(@Param('assignmentId') assignmentId: string, @Body() dto: SubmitGameDto, @SchoolId() schoolId: string, @Req() req: any) { return this.service.submit(assignmentId, dto.sessionId, schoolId, req.user.id); }
+  async submit(@Param('assignmentId') assignmentId: string, @Body() dto: SubmitGameDto, @SchoolId() schoolId: string, @Req() req: any) { return this.service.submit(assignmentId, dto.sessionId, schoolId, await this.service.studentApplicationId(schoolId, req.user.id)); }
 }

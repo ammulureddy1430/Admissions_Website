@@ -5,6 +5,7 @@ import { GameRuntimeService } from '../game-runtime/game-runtime.service';
 import { GameInsightsService } from '../game-insights/game-insights.service';
 import { CreateGameAssignmentDto } from './dto/game-play.dto';
 import { tutorialFor } from './game-tutorial.catalog';
+import { randomUUID } from 'crypto';
 
 const TARGETS = ['STUDENT','SECTION','CLASS','MULTIPLE_CLASSES','ENTIRE_GRADE'];
 
@@ -12,8 +13,24 @@ const TARGETS = ['STUDENT','SECTION','CLASS','MULTIPLE_CLASSES','ENTIRE_GRADE'];
 export class GamePlayService {
   constructor(private readonly prisma: PrismaService, private readonly runtime: GameRuntimeService, private readonly insights: GameInsightsService) {}
 
+  async studentApplicationId(schoolId: string, userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true, firstName: true, lastName: true } });
+    if (!user) throw new ForbiddenException('Student account was not found.');
+    const application = await this.prisma.application.findFirst({
+      where: {
+        schoolId, status: { not: 'DRAFT' },
+        OR: [{ studentEmail: user.email }, { studentFirstName: user.firstName, studentLastName: user.lastName }],
+      },
+      select: { id: true },
+    });
+    if (!application) throw new ForbiddenException('Student application was not found.');
+    return application.id;
+  }
+
   async assign(dto: CreateGameAssignmentDto, schoolId: string, userId: string) {
     if (!TARGETS.includes(dto.targetType)) throw new BadRequestException('Unsupported assignment target.');
+    const deliveryMode = String((dto.settings as any)?.deliveryMode || 'HOME').toUpperCase();
+    if (!['HOME', 'SCHOOL'].includes(deliveryMode)) throw new BadRequestException('Delivery mode must be HOME or SCHOOL.');
     const game = await this.prisma.generatedGame.findFirst({ where: { id: dto.generatedGameId, schoolId, status: 'PUBLISHED' } });
     if (!game) throw new BadRequestException('Only a published game can be assigned.');
     const assessment = await this.prisma.gameAssessment.findFirst({ where: { id: dto.gameAssessmentId, schoolId } });
@@ -39,22 +56,76 @@ export class GamePlayService {
       },
       include: { generatedGame: true, gameAssessment: true },
     });
-    if (existing) return { ...existing, alreadyAssigned: true };
+    if (existing) {
+      const updated = await this.prisma.gameAssignment.update({
+        where: { id: existing.id },
+        data: { assignmentSettings: { ...((existing.assignmentSettings as Record<string, unknown>) || {}), ...(dto.settings || {}), deliveryMode } as Prisma.InputJsonValue },
+        include: { generatedGame: true, gameAssessment: true },
+      });
+      return { ...updated, alreadyAssigned: true, deliveryModeUpdated: true };
+    }
     const assignment = await this.prisma.gameAssignment.create({ data: {
       gameAssessmentId: dto.gameAssessmentId, generatedGameId: game.id, assignedById: userId,
       targetType: dto.targetType, targetIds: dto.targetIds, startDate: dto.startDate ? new Date(dto.startDate) : null,
       endDate: dto.endDate ? new Date(dto.endDate) : null, scheduledAt: dto.startDate ? new Date(dto.startDate) : null,
       dueDate: dto.endDate ? new Date(dto.endDate) : null, maxAttempts: dto.maxAttempts,
       timeLimitMinutes: dto.timeLimitMinutes, passingScore: dto.passingScore, allowRestart: dto.allowRestart || false,
-      assignmentSettings: (dto.settings || {}) as Prisma.InputJsonValue, status: 'ASSIGNED',
+      assignmentSettings: { ...(dto.settings || {}), deliveryMode } as Prisma.InputJsonValue, status: 'ASSIGNED',
     }, include: { generatedGame: true, gameAssessment: true } });
     if (dto.targetType === 'STUDENT') {
       await this.prisma.gameResult.createMany({ data: dto.targetIds.map((studentId) => ({ gameAssignmentId: assignment.id, studentId })), skipDuplicates: true });
+      if (deliveryMode === 'SCHOOL') {
+        await Promise.all(dto.targetIds.map(async studentId => {
+          const application = await this.prisma.application.findFirst({ where: { id: studentId, schoolId }, select: { accessCode: true } });
+          if (!application) return;
+          await this.prisma.application.update({
+            where: { id: studentId },
+            data: {
+              assessmentAccessEnabled: true,
+              accessCode: application.accessCode || `STU-${randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()}`,
+            },
+          });
+        }));
+      }
     }
     return { ...assignment, alreadyAssigned: false };
   }
   assignments(schoolId: string, q: any) {
     return this.prisma.gameAssignment.findMany({ where: { gameAssessment: { schoolId }, ...(q.status && { status: q.status }) }, include: { generatedGame: true, gameAssessment: true, _count: { select: { results: true } } }, orderBy: { createdAt: 'desc' } });
+  }
+  async assignmentVenue(schoolId: string, grade: string) {
+    if (!grade) throw new BadRequestException('Grade is required to find the school venue.');
+    const schedule = await this.prisma.assessmentSchedule.findFirst({
+      where: {
+        assessment: {
+          schoolId,
+          applicationId: null,
+          grade,
+          assessmentMode: { in: ['SCHOOL', 'BOTH'] },
+          status: { not: 'ARCHIVED' },
+        },
+      },
+      include: {
+        assessment: { select: { title: true } },
+        slots: { where: { status: 'AVAILABLE' }, orderBy: { startTime: 'asc' } },
+      },
+      orderBy: { assessmentDate: 'asc' },
+    });
+    if (!schedule) return null;
+    const slot = schedule.slots[0] || null;
+    return {
+      sourceAssessment: schedule.assessment.title,
+      assessmentDate: schedule.assessmentDate.toISOString().slice(0, 10),
+      campus: schedule.campus,
+      building: schedule.building,
+      floor: schedule.floor,
+      roomNumber: schedule.roomNumber,
+      venue: schedule.venue || '',
+      slotId: slot?.id || '',
+      slotName: slot?.slotName || '',
+      startTime: slot?.startTime || '',
+      endTime: slot?.endTime || '',
+    };
   }
   async parentGames(schoolId: string, parentId: string) {
     const children = await this.prisma.application.findMany({

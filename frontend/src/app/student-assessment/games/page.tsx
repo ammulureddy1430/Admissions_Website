@@ -151,24 +151,26 @@ export default function StudentGames() {
     await load();
   };
   return (
-    <div className="min-h-screen bg-[#f5f8fb] p-4 text-[#071633] sm:p-6">
-      <div className="mx-auto max-w-6xl space-y-5">
-        <header className="rounded-3xl bg-gradient-to-r from-[#08203e] via-[#13536a] to-[#65439a] p-6 text-white">
+    <div className="min-h-screen bg-[#f4f8f7] p-4 text-[#071633] sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-6xl space-y-6">
+        <header className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#073f3b] via-[#087466] to-[#008f80] p-6 shadow-[0_18px_45px_rgba(7,63,59,0.16)] sm:p-8">
+          <div className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full border border-white/10" />
+          <div className="pointer-events-none absolute -right-2 -top-12 h-44 w-44 rounded-full bg-white/5" />
           <Link
             href="/student-assessment/dashboard"
-            className="inline-flex items-center gap-1 text-xs font-bold text-white/70"
+            className="relative inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-bold !text-white transition hover:bg-white/20"
           >
             <ArrowLeft className="h-4 w-4" /> Dashboard
           </Link>
-          <div className="mt-5 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+          <div className="relative mt-6 flex flex-col justify-between gap-6 md:flex-row md:items-end">
             <div>
-              <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase">
+              <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] !text-white">
                 Student game zone
               </span>
-              <h1 className="mt-3 text-3xl font-black">
+              <h1 className="mt-3 text-3xl font-black !text-white sm:text-4xl">
                 Learn. Play. Level up.
               </h1>
-              <p className="mt-2 text-xs text-white/70">
+              <p className="mt-2 text-xs !text-[#c9e7e2]">
                 Your assigned educational games and rewards.
               </p>
             </div>
@@ -178,10 +180,10 @@ export default function StudentGames() {
                 [Coins, profile.coins || 0, "Coins"],
                 [Trophy, profile.level || 1, "Level"],
               ].map(([I, v, l]: any) => (
-                <div key={l} className="rounded-xl bg-white/10 p-3">
-                  <I className="mx-auto h-4 w-4 text-cyan-200" />
-                  <p className="mt-1 font-black">{v}</p>
-                  <p className="text-[8px] uppercase text-white/50">{l}</p>
+                <div key={l} className="min-w-[70px] rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur-sm">
+                  <I className="mx-auto h-4 w-4 !text-[#8ce0d2]" />
+                  <p className="mt-1 font-black !text-white">{v}</p>
+                  <p className="text-[8px] font-bold uppercase tracking-wider !text-[#b7dcd6]">{l}</p>
                 </div>
               ))}
             </div>
@@ -191,28 +193,30 @@ export default function StudentGames() {
           {games.map((a) => (
             <article
               key={a.id}
-              className="overflow-hidden rounded-2xl border bg-white shadow-sm"
+              className={`group overflow-hidden rounded-3xl border border-[#d8e6e3] bg-white shadow-[0_10px_30px_rgba(25,69,61,0.07)] transition hover:-translate-y-0.5 hover:border-[#9bcfc6] hover:shadow-[0_16px_38px_rgba(25,69,61,0.11)] ${games.length === 1 ? "md:col-span-2 xl:col-span-2" : ""}`}
             >
-              <div className="h-2 bg-gradient-to-r from-cyan-400 to-violet-500" />
-              <div className="p-5">
-                <div className="flex justify-between">
-                  <Gamepad2 className="h-7 w-7 text-violet-600" />
+              <div className="h-1.5 bg-[#008f80]" />
+              <div className="p-5 sm:p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#effaf7] text-[#087466] ring-1 ring-[#b9e8dc]">
+                    <Gamepad2 className="h-6 w-6" />
+                  </div>
                   <span
-                    className={`rounded-full px-2 py-1 text-[9px] font-black ${a.availability.available ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
+                    className={`rounded-full border px-3 py-1.5 text-[9px] font-black tracking-wider ${a.availability.available ? "border-[#b9e8dc] bg-[#effaf7] text-[#087466]" : "border-slate-200 bg-slate-100 text-slate-500"}`}
                   >
                     {a.availability.available ? "AVAILABLE" : "LOCKED"}
                   </span>
                 </div>
-                <h2 className="mt-3 font-black">{a.generatedGame?.title}</h2>
-                <p className="mt-1 text-[10px] text-slate-500">
+                <h2 className="mt-4 text-lg font-black text-[#0b1f33] group-hover:text-[#008f80]">{a.generatedGame?.title}</h2>
+                <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   {a.generatedGame?.engineKey?.replaceAll("_", " ")} ·{" "}
                   {a.maxAttempts} attempts
                 </p>
                 {a.result && (
-                  <div className="mt-3 rounded-xl bg-slate-50 p-3 text-xs">
+                  <div className="mt-5 rounded-2xl border border-[#e5edeb] bg-[#f8fbfa] p-4 text-xs">
                     <div className="flex justify-between">
-                      <span>Progress</span>
-                      <b>{a.result.status}</b>
+                      <span className="font-bold text-[#657985]">Progress</span>
+                      <b className="rounded-md bg-white px-2 py-1 text-[10px] text-[#173349] shadow-sm">{(a.result.status === "NOT_STARTED" ? "IN_PROGRESS" : a.result.status).replaceAll("_", " ")}</b>
                     </div>
                     {a.result.status === "COMPLETED" && (
                       <p className="mt-1 text-emerald-700">
@@ -225,7 +229,7 @@ export default function StudentGames() {
                   <button
                     disabled={!a.availability.available || !!busy}
                     onClick={() => openTutorial(a)}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-violet-600 py-2.5 text-xs font-black text-white disabled:opacity-40"
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#008f80] py-3 text-xs font-black !text-white shadow-[0_10px_22px_rgba(0,143,128,0.18)] transition hover:bg-[#007d70] disabled:opacity-40"
                   >
                     {busy === a.id ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -237,7 +241,7 @@ export default function StudentGames() {
                   {a.allowRestart && a.result && (
                     <button
                       onClick={() => start(a, true)}
-                      className="rounded-xl border p-2.5"
+                      className="rounded-xl border border-[#c9dcd7] bg-white p-3 text-[#506877] transition hover:border-[#80c9be] hover:text-[#008f80]"
                     >
                       <RotateCcw className="h-4 w-4" />
                     </button>
@@ -248,8 +252,8 @@ export default function StudentGames() {
           ))}
         </section>
         <div className="grid gap-5 lg:grid-cols-2">
-          <section className="rounded-2xl border bg-white p-5">
-            <h2 className="text-sm font-black">Badges & achievements</h2>
+          <section className="rounded-3xl border border-[#d8e6e3] bg-white p-5 shadow-[0_8px_24px_rgba(25,69,61,0.05)] sm:p-6">
+            <div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-600"><Trophy className="h-4 w-4" /></div><h2 className="text-sm font-black">Badges & achievements</h2></div>
             <div className="mt-3 flex flex-wrap gap-2">
               {profile.badges?.map((b: Row) => (
                 <span
@@ -266,12 +270,12 @@ export default function StudentGames() {
               )}
             </div>
           </section>
-          <section className="rounded-2xl border bg-white p-5">
-            <h2 className="text-sm font-black">Leaderboard</h2>
+          <section className="rounded-3xl border border-[#d8e6e3] bg-white p-5 shadow-[0_8px_24px_rgba(25,69,61,0.05)] sm:p-6">
+            <div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#effaf7] text-[#087466]"><Flag className="h-4 w-4" /></div><h2 className="text-sm font-black">Leaderboard</h2></div>
             {leaderboard.slice(0, 5).map((p, i) => (
               <div
                 key={p.studentId}
-                className="mt-2 flex justify-between rounded-xl bg-slate-50 p-3 text-xs"
+                className="mt-3 flex justify-between rounded-xl border border-[#e5edeb] bg-[#f8fbfa] p-3 text-xs"
               >
                 <span>
                   #{i + 1} · Player {p.studentId.slice(0, 6)}

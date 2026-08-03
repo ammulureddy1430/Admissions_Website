@@ -114,24 +114,36 @@ export class StudentAssessmentController {
     }
 
     const credential = code.trim();
-    const matchingApplications = await this.prisma.application.findMany({
+    const accessCodeApplications = await this.prisma.application.findMany({
       where: {
         schoolId,
         status: { not: 'DRAFT' },
         assessmentAccessEnabled: true,
         accessCode: { equals: credential, mode: 'insensitive' },
-        assessments: {
-          some: {
-            OR: [
-              { assessmentMode: 'SCHOOL' },
-              { assessmentMode: 'BOTH', venueChoice: 'SCHOOL' },
-            ],
+      },
+    });
+    const matchingApplications = [];
+    for (const candidate of accessCodeApplications) {
+      const [schoolAssessment, gameAssignments] = await Promise.all([
+        this.prisma.assessment.findFirst({
+          where: {
+            applicationId: candidate.id,
+            OR: [{ assessmentMode: 'SCHOOL' }, { assessmentMode: 'BOTH', venueChoice: 'SCHOOL' }],
             status: { not: 'ARCHIVED' },
           },
-        },
-      },
-      take: 2,
-    });
+          select: { id: true },
+        }),
+        this.prisma.gameAssignment.findMany({
+          where: { targetType: 'STUDENT', targetIds: { has: candidate.id }, status: 'ASSIGNED', gameAssessment: { schoolId } },
+          select: { assignmentSettings: true },
+        }),
+      ]);
+      const hasAtSchoolGame = gameAssignments.some(
+        assignment => String((assignment.assignmentSettings as any)?.deliveryMode || 'HOME').toUpperCase() === 'SCHOOL',
+      );
+      if (schoolAssessment || hasAtSchoolGame) matchingApplications.push(candidate);
+      if (matchingApplications.length >= 2) break;
+    }
 
     if (matchingApplications.length === 0) {
       throw new NotFoundException(

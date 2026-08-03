@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -14,6 +15,9 @@ export class GameAssessmentService {
   constructor(private readonly prisma: PrismaService) {}
 
   create(dto: CreateGameAssessmentDto, schoolId: string, userId: string) {
+    if (!['HOME', 'SCHOOL'].includes(String(dto.assessmentMode || '').toUpperCase())) {
+      throw new BadRequestException('Assessment mode must be HOME or SCHOOL.');
+    }
     const { templateIds = [], ...assessment } = dto;
     return this.prisma.gameAssessment.create({
       data: {
@@ -48,6 +52,9 @@ export class GameAssessmentService {
     dto: CreateGameAssessmentDto,
     schoolId: string,
   ) {
+    if (!['HOME', 'SCHOOL'].includes(String(dto.assessmentMode || '').toUpperCase())) {
+      throw new BadRequestException('Assessment mode must be HOME or SCHOOL.');
+    }
     await this.requireAssessment(id, schoolId);
     const { templateIds = [], ...assessment } = dto;
     return this.prisma.gameAssessment.update({

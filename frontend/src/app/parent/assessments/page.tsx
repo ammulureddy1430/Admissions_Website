@@ -27,10 +27,16 @@ import {
   Sparkles,
   Mic,
   Square,
-  Calendar
+  Calendar,
+  CalendarClock
 } from "lucide-react";
 
 const PENDING_EXIT_SUBMISSION_KEY = "pendingAssessmentExitSubmission";
+// Presentation-only demo cleanup: keep the assessment and all related records,
+// but do not show this legacy result card in the Parent Portal list.
+const HIDDEN_PARENT_DEMO_ASSESSMENT_IDS = new Set([
+  "1de0443d-026b-4f18-84e6-635cd64282c7",
+]);
 const displaySlot = (slot: { slotName?: string; startTime?: string; endTime?: string }) => {
   const name = slot.slotName || "";
   if (/mid[- ]morning/i.test(name)) {
@@ -1755,6 +1761,10 @@ export default function ParentAssessments() {
   const writtenQuestions = takingExam?.questions?.filter((q: any) => !q.isListening) || [];
   const listeningQuestions = takingExam?.questions?.filter((q: any) => q.isListening) || [];
 
+  const visibleAssessments = assessments.filter(
+    (assessment) => !HIDDEN_PARENT_DEMO_ASSESSMENT_IDS.has(assessment.id),
+  );
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       {/* Title Header */}
@@ -2595,14 +2605,14 @@ export default function ParentAssessments() {
               <Loader2 className="h-8 w-8 animate-spin text-[#007f70] mx-auto" />
               <p className="text-xs text-[#71818d] mt-2">Loading student assigned assessments...</p>
             </div>
-          ) : assessments.length === 0 ? (
+          ) : visibleAssessments.length === 0 ? (
             <div className="col-span-full text-center py-20 bg-white border border-[#dceae6] rounded-2xl space-y-2">
               <ClipboardList className="h-10 w-10 text-[#71818d] mx-auto opacity-40" />
               <p className="text-xs text-[#71818d] font-bold">No assigned assessments found.</p>
               <p className="text-[11px] text-[#71818d]">When the school assigns assessment tests to your candidates, they will appear here.</p>
             </div>
           ) : (
-            assessments.map((a) => {
+            visibleAssessments.map((a) => {
               const submission = a.submissions?.[0];
               const result = a.results?.[0];
               const reassignmentRequest = a.reassignmentRequests?.[0];
@@ -2674,16 +2684,29 @@ export default function ParentAssessments() {
                           </>
                         )}
                       </p>
-                      <p className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-[#526a77]">
-                        <Calendar className="h-3.5 w-3.5 text-[#008f80]" />
-                        <span className="font-bold text-[#344054]">Assessment Date:</span>
-                        {(() => {
-                          const dateValue = a.slotBookings?.[0]?.slot?.schedule?.assessmentDate || a.dueDate;
-                          return dateValue
-                            ? new Date(dateValue).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-                            : 'Not scheduled';
-                        })()}
-                      </p>
+                      <div className="mt-3 grid grid-cols-2 overflow-hidden rounded-xl border border-[#dce8e5] bg-[#f8fbfa] text-[#526a77]">
+                        <div className="flex min-w-0 items-center gap-2.5 p-3">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-[#008f80] shadow-sm ring-1 ring-[#dce8e5]"><Calendar className="h-4 w-4" /></div>
+                          <div className="min-w-0">
+                            <span className="block text-[8px] font-extrabold uppercase tracking-wider text-[#71818d]">Assessment Date</span>
+                            <span className="mt-0.5 block text-[11px] font-extrabold text-[#344054]">{(() => {
+                            const dateValue = a.slotBookings?.[0]?.slot?.schedule?.assessmentDate || a.scheduledAssessmentDate || a.dueDate;
+                            return dateValue
+                              ? new Date(dateValue).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                              : 'Not scheduled';
+                          })()}</span>
+                          </div>
+                        </div>
+                        <div className="flex min-w-0 items-center gap-2.5 border-l border-[#dce8e5] p-3">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-[#008f80] shadow-sm ring-1 ring-[#dce8e5]"><CalendarClock className="h-4 w-4" /></div>
+                          <div className="min-w-0">
+                            <span className="block text-[8px] font-extrabold uppercase tracking-wider text-[#71818d]">Due Date</span>
+                            <span className="mt-0.5 block text-[11px] font-extrabold text-[#344054]">{a.dueDate
+                            ? new Date(a.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                            : 'Not set'}</span>
+                          </div>
+                        </div>
+                      </div>
 
                       {result ? (
                         <div className="grid grid-cols-2 gap-2 pt-4">

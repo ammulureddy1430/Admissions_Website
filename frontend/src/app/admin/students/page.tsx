@@ -465,7 +465,7 @@ export default function AdminStudents() {
                   </p>
                 </div>
                 <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[9px] font-extrabold text-emerald-700">
-                  {row.assessmentStatus}
+                  {(row.assessmentStatus === "NOT_STARTED" ? "IN PROGRESS" : row.assessmentStatus).replaceAll("_", " ")}
                 </span>
               </div>
 

@@ -240,7 +240,7 @@ export class ApplicationService {
     });
 
     const normalizedSearch = query.search?.trim().toLowerCase();
-    let rows = assessments.flatMap((assessment) => {
+    let rows: any[] = assessments.flatMap((assessment) => {
       if (!assessment.application) return [];
       const student = assessment.application;
       const booking = assessment.slotBookings.find(
@@ -324,6 +324,82 @@ export class ApplicationService {
       return [row];
     });
 
+    const schoolGameAssignments = await this.prisma.gameAssignment.findMany({
+      where: { gameAssessment: { schoolId }, targetType: 'STUDENT', status: 'ASSIGNED' },
+      include: { generatedGame: true, gameAssessment: true, results: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    const atSchoolGameAssignments = schoolGameAssignments.filter(
+      assignment => String((assignment.assignmentSettings as any)?.deliveryMode || 'HOME').toUpperCase() === 'SCHOOL',
+    );
+    const gameStudentIds = Array.from(new Set(atSchoolGameAssignments.flatMap(assignment => assignment.targetIds)));
+    const gameStudents = await this.prisma.application.findMany({
+      where: {
+        id: { in: gameStudentIds }, schoolId,
+        status: { notIn: ['DRAFT', 'REJECTED', 'WITHDRAWN'] },
+        ...(query.grade ? { grade: query.grade } : {}),
+        ...(query.section ? { section: query.section } : {}),
+      },
+      include: { parent: { select: { firstName: true, lastName: true, phone: true, email: true } } },
+    });
+    const gameStudentMap = new Map(gameStudents.map(student => [student.id, student]));
+    for (const assignment of atSchoolGameAssignments) {
+      if (query.assessmentId && query.assessmentId !== assignment.id) continue;
+      // At-school games use the same active venue and slot configuration as
+      // the school's written assessment for that grade.
+      const writtenSchedule = await this.prisma.assessmentSchedule.findFirst({
+        where: {
+          assessment: {
+            schoolId,
+            applicationId: null,
+            grade: assignment.gameAssessment.grade,
+            assessmentMode: { in: ['SCHOOL', 'BOTH'] },
+            status: { not: 'ARCHIVED' },
+          },
+        },
+        include: { slots: { orderBy: { startTime: 'asc' } } },
+        orderBy: { assessmentDate: 'asc' },
+      });
+      const savedLocation = ((assignment.assignmentSettings as any)?.location || {}) as Record<string, any>;
+      const gameSlot = writtenSchedule?.slots?.[0];
+      for (const studentId of assignment.targetIds) {
+        const student = gameStudentMap.get(studentId);
+        if (!student) continue;
+        const result = assignment.results.find(item => item.studentId === studentId);
+        const accessCode = student.accessCode || '';
+        const row = {
+          id: `game:${assignment.id}:${student.id}`,
+          studentId: student.id,
+          studentName: `${student.studentFirstName} ${student.studentLastName}`.trim(),
+          applicationId: student.id,
+          admissionNumber: student.admissionNumber || '',
+          grade: assignment.gameAssessment.grade || student.grade,
+          section: student.section || '',
+          assessmentId: assignment.id,
+          assessmentName: `${assignment.generatedGame?.title || assignment.gameAssessment.name} (Game)`,
+          assessmentDate: savedLocation.assessmentDate || (writtenSchedule?.assessmentDate || assignment.scheduledAt || assignment.startDate || assignment.createdAt).toISOString().slice(0, 10),
+          assessmentMode: 'SCHOOL', venueChoice: 'SCHOOL', venueChoiceDeadline: '', requiresAccessCode: true,
+          assessmentTime: savedLocation.startTime
+            ? `${savedLocation.startTime} - ${savedLocation.endTime}`
+            : gameSlot ? `${gameSlot.startTime} - ${gameSlot.endTime}` : '',
+          slotId: savedLocation.slotId || gameSlot?.id || '',
+          slotName: savedLocation.slotName || gameSlot?.slotName || 'At-school game',
+          campus: savedLocation.campus || writtenSchedule?.campus || '',
+          building: savedLocation.building || writtenSchedule?.building || '',
+          roomNumber: savedLocation.roomNumber || writtenSchedule?.roomNumber || '',
+          seatNumber: '',
+          accessCode, assessmentAccessEnabled: student.assessmentAccessEnabled,
+          parentName: `${student.parent.firstName || ''} ${student.parent.lastName || ''}`.trim(),
+          parentMobileNumber: student.parent.phone || '', emergencyContact: '', attendanceStatus: 'PENDING',
+          assessmentStatus: !result || result.status === 'NOT_STARTED' ? 'IN_PROGRESS' : result.status,
+          invigilatorRemarks: '',
+        };
+        if (query.assessmentStatus && row.assessmentStatus !== query.assessmentStatus) continue;
+        if (normalizedSearch && ![row.studentName, row.applicationId, row.admissionNumber, row.accessCode].some(value => value.toLowerCase().includes(normalizedSearch))) continue;
+        rows.push(row);
+      }
+    }
+
     const sortableFields: Record<string, keyof (typeof rows)[number]> = {
       studentName: 'studentName',
       applicationId: 'applicationId',
@@ -349,20 +425,20 @@ export class ApplicationService {
     const options = {
       assessments: Array.from(
         new Map(
-          assessments.map((assessment) => [
+          [...assessments.map((assessment) => [
             assessment.id,
             { id: assessment.id, name: assessment.title },
-          ]),
+          ] as const), ...atSchoolGameAssignments.map(assignment => [assignment.id, { id: assignment.id, name: `${assignment.generatedGame?.title || assignment.gameAssessment.name} (Game)` }] as const)],
         ).values(),
       ).sort((a, b) => a.name.localeCompare(b.name)),
       grades: Array.from(
-        new Set(assessments.map((assessment) => assessment.grade)),
+        new Set([...assessments.map((assessment) => assessment.grade), ...gameStudents.map(student => student.grade)]),
       ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
       sections: Array.from(
         new Set(
-          assessments
+          [...assessments
             .map((assessment) => assessment.application?.section)
-            .filter((value): value is string => Boolean(value)),
+            .filter((value): value is string => Boolean(value)), ...gameStudents.map(student => student.section).filter((value): value is string => Boolean(value))],
         ),
       ).sort(),
       slots: Array.from(
