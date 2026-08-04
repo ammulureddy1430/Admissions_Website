@@ -106,6 +106,10 @@ export class ApplicationService {
     query: StudentRosterQuery,
     generatedBy = 'School Administrator',
   ) {
+    const selectedSlotDisplay = query.slotId?.startsWith('display:')
+      ? query.slotId.slice('display:'.length).split('|')
+      : null;
+    const [selectedSlotName, selectedSlotStart, selectedSlotEnd] = selectedSlotDisplay || [];
     const selectedDate = query.assessmentDate
       ? new Date(`${query.assessmentDate}T00:00:00.000Z`)
       : null;
@@ -147,7 +151,15 @@ export class ApplicationService {
           ? {
               slotBookings: {
                 some: {
-                  slotId: query.slotId,
+                  ...(selectedSlotDisplay
+                    ? {
+                        slot: {
+                          slotName: selectedSlotName,
+                          startTime: selectedSlotStart,
+                          endTime: selectedSlotEnd,
+                        },
+                      }
+                    : { slotId: query.slotId }),
                   bookingStatus: { not: 'CANCELLED' },
                 },
               },
@@ -394,6 +406,11 @@ export class ApplicationService {
           assessmentStatus: !result || result.status === 'NOT_STARTED' ? 'IN_PROGRESS' : result.status,
           invigilatorRemarks: '',
         };
+        if (selectedSlotDisplay && !(
+          row.slotName === selectedSlotName &&
+          row.assessmentTime === `${selectedSlotStart} - ${selectedSlotEnd}`
+        )) continue;
+        if (query.slotId && !selectedSlotDisplay && row.slotId !== query.slotId) continue;
         if (query.assessmentStatus && row.assessmentStatus !== query.assessmentStatus) continue;
         if (normalizedSearch && ![row.studentName, row.applicationId, row.admissionNumber, row.accessCode].some(value => value.toLowerCase().includes(normalizedSearch))) continue;
         rows.push(row);
@@ -451,16 +468,19 @@ export class ApplicationService {
                 (booking) => booking.slot.schedule.slots,
               ),
             ]),
-          ].map((slot) => [
-              slot.id,
+          ].map((slot) => {
+            const displayKey = `${slot.slotName}|${slot.startTime}|${slot.endTime}`;
+            return [
+              displayKey,
               {
-                id: slot.id,
+                id: `display:${displayKey}`,
                 name: slot.slotName,
                 time: `${slot.startTime} - ${slot.endTime}`,
               },
-            ]),
+            ];
+          }),
         ).values(),
-      ),
+      ).sort((a, b) => a.time.localeCompare(b.time) || a.name.localeCompare(b.name)),
     };
 
     return {

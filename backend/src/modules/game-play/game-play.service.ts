@@ -339,7 +339,14 @@ export class GamePlayService {
     if (!assignment.generatedGame) throw new BadRequestException('The assigned game is unavailable.');
     let result = await this.prisma.gameResult.upsert({ where: { gameAssignmentId_studentId: { gameAssignmentId: assignmentId, studentId } }, create: { gameAssignmentId: assignmentId, studentId }, update: {} });
     const attempts = await this.prisma.gameAttempt.count({ where: { gameResultId: result.id } });
-    const active = await this.prisma.gameRuntimeSession.findFirst({ where: { gameResultId: result.id, status: { in: ['READY','RUNNING','PAUSED'] } }, orderBy: { createdAt: 'desc' } });
+    const active = await this.prisma.gameRuntimeSession.findFirst({
+      where: {
+        gameResultId: result.id,
+        userId: studentId,
+        status: { in: ['READY', 'RUNNING', 'PAUSED'] },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
     if (active && !restart) return this.runtime.state(active.id, schoolId, { id: studentId, role: 'STUDENT' as any });
     if (restart && !assignment.allowRestart) throw new ForbiddenException('Restart is not permitted for this assignment.');
     if (attempts >= assignment.maxAttempts) throw new BadRequestException('Maximum attempts reached.');
@@ -360,7 +367,14 @@ export class GamePlayService {
     const assignment = await this.assignmentForStudent(assignmentId, schoolId, studentId);
     const result = assignment.results[0];
     if (!result) throw new NotFoundException('No saved gameplay exists.');
-    const session = await this.prisma.gameRuntimeSession.findFirst({ where: { gameResultId: result.id, status: { in: ['READY','RUNNING','PAUSED'] } }, orderBy: { updatedAt: 'desc' } });
+    const session = await this.prisma.gameRuntimeSession.findFirst({
+      where: {
+        gameResultId: result.id,
+        userId: studentId,
+        status: { in: ['READY', 'RUNNING', 'PAUSED'] },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
     if (!session) throw new NotFoundException('No resumable gameplay session exists.');
     return this.runtime.state(session.id, schoolId, { id: studentId, role: 'STUDENT' as any });
   }

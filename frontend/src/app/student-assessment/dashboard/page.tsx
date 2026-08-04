@@ -23,6 +23,7 @@ import {
   Gamepad2,
   Play
 } from "lucide-react";
+import { GameRuntimePlayer } from "@/components/game-runtime-player";
 
 type SlotAvailability = "BEFORE" | "ACTIVE" | "AFTER" | "INVALID";
 
@@ -95,6 +96,10 @@ export default function StudentDashboard() {
   const [profile, setProfile] = useState<any>(null);
   const [assessments, setAssessments] = useState<any[]>([]);
   const [assignedGames, setAssignedGames] = useState<any[]>([]);
+  const [gameRuntime, setGameRuntime] = useState<any | null>(null);
+  const [runtimeTutorial, setRuntimeTutorial] = useState<any | null>(null);
+  const [activeGameAssignment, setActiveGameAssignment] = useState<any | null>(null);
+  const [gameBusy, setGameBusy] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"PENDING" | "SUBMITTED">("PENDING");
   
   // Loading & error
@@ -110,6 +115,75 @@ export default function StudentDashboard() {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [isRescheduling, setIsRescheduling] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+
+  const studentGameRequest = async (path: string, init: RequestInit = {}) => {
+    const response = await fetch(`http://localhost:5001/${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("studentToken") || ""}`,
+        "x-tenant-id": localStorage.getItem("studentSchoolId") || localStorage.getItem("schoolId") || "",
+        ...(init.headers || {}),
+      },
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(Array.isArray(payload?.message) ? payload.message.join(", ") : payload?.message || "Game request failed.");
+    return payload;
+  };
+
+  const openGameTutorial = async (assignment: any) => {
+    try {
+      if (!document.fullscreenElement) {
+        const root = document.documentElement as HTMLElement & {
+          webkitRequestFullscreen?: () => Promise<void> | void;
+        };
+        if (root.requestFullscreen) {
+          await root.requestFullscreen({ navigationUI: "hide" });
+        } else if (root.webkitRequestFullscreen) {
+          await Promise.resolve(root.webkitRequestFullscreen());
+        }
+        if (!document.fullscreenElement && !(document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement) {
+          throw new Error("Chrome did not enter fullscreen. Allow fullscreen for localhost, then try again.");
+        }
+      }
+      setGameBusy(assignment.id);
+      setError(null);
+      const tutorial = await studentGameRequest(`game-assessments/student/games/${assignment.id}/tutorial`);
+      await studentGameRequest(`game-assessments/student/games/${assignment.id}/tutorial/progress`, {
+        method: "POST",
+        body: JSON.stringify({ tutorialViewed: true }),
+      });
+      const session = await studentGameRequest(`game-assessments/student/games/${assignment.id}/start`, {
+        method: "POST",
+        body: "{}",
+      });
+      setActiveGameAssignment(assignment);
+      setRuntimeTutorial(tutorial);
+      setGameRuntime({ ...session, status: "READY" });
+    } catch (gameRequestError) {
+      setError(gameRequestError instanceof Error ? gameRequestError.message : "The tutorial could not be opened.");
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+    } finally {
+      setGameBusy(null);
+    }
+  };
+
+  const completeAssignedGame = async (session: any) => {
+    if (!activeGameAssignment) return;
+    try {
+      const result = await studentGameRequest(`game-assessments/student/games/${activeGameAssignment.id}/submit`, {
+        method: "POST",
+        body: JSON.stringify({ sessionId: session.id }),
+      });
+      setGameRuntime(null);
+      setRuntimeTutorial(null);
+      setActiveGameAssignment(null);
+      setAssignedGames(await studentGameRequest("game-assessments/student/games"));
+      window.alert(`Game complete! Score ${result.score}. ${result.rewards?.xpEarned || 0} XP earned.`);
+    } catch (gameRequestError) {
+      setError(gameRequestError instanceof Error ? gameRequestError.message : "The game result could not be submitted.");
+    }
+  };
 
   const fetchBookingInfo = async (assessmentId: string) => {
     const token = localStorage.getItem("studentToken");
@@ -763,11 +837,12 @@ export default function StudentDashboard() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => router.push("/student-assessment/games")}
-                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#008f80] px-4 py-3 text-xs font-extrabold !text-white shadow-[0_10px_22px_rgba(0,143,128,0.18)] transition hover:bg-[#007d70]"
+                    disabled={!game.availability?.available}
+                    onClick={() => void openGameTutorial(game)}
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#008f80] px-4 py-3 text-xs font-extrabold !text-white shadow-[0_10px_22px_rgba(0,143,128,0.18)] transition hover:bg-[#007d70] disabled:cursor-not-allowed disabled:bg-[#91c2bb] disabled:shadow-none"
                   >
-                    <Play className="h-4 w-4" />
-                    {game.result?.status === "COMPLETED" ? "View Game Result" : game.result?.status === "IN_PROGRESS" ? "Resume Game" : "Open Game"}
+                    {gameBusy === game.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                    View tutorial
                   </button>
                 </div>
               ))}
@@ -831,6 +906,16 @@ export default function StudentDashboard() {
             </button>
           </div>
         </div>
+      )}
+      {gameRuntime && (
+        <GameRuntimePlayer
+          initial={gameRuntime}
+          tutorial={runtimeTutorial}
+          request={studentGameRequest}
+          onClose={() => { setGameRuntime(null); setRuntimeTutorial(null); setActiveGameAssignment(null); }}
+          onComplete={completeAssignedGame}
+          secureMode
+        />
       )}
       {/* At-School Slot Booking Modal */}
       {bookingAssessment && bookingData && typeof window !== "undefined" && createPortal(

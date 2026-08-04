@@ -28,6 +28,7 @@ export function GameRuntimePlayer({ initial, request, onClose, onComplete, secur
   const [fishingBoatPosition, setFishingBoatPosition] = useState(50);
   const [fishingCaughtFish, setFishingCaughtFish] = useState<string[]>([]);
   const [securityWarning, setSecurityWarning] = useState<"fullscreen_exit" | "tab_switch" | null>(null);
+  const [fullscreenRequired, setFullscreenRequired] = useState(false);
   const totalGameSeconds = Number(initial.configuration?.timeLimitMinutes)
     ? Number(initial.configuration.timeLimitMinutes) * 60
     : Number(initial.configuration?.gameTimeSeconds || (Number(initial.configuration?.timerSeconds || 30) * Number(initial.questionCount || 1)));
@@ -55,10 +56,10 @@ export function GameRuntimePlayer({ initial, request, onClose, onComplete, secur
   };
 
   const enterFullscreen = async (element: HTMLDivElement | null) => {
-    if (!element) return;
+    if (!element) return false;
     try {
       if (element.requestFullscreen) {
-        await element.requestFullscreen();
+        await element.requestFullscreen({ navigationUI: "hide" });
       } else if ((element as any).webkitRequestFullscreen) {
         await (element as any).webkitRequestFullscreen();
       } else if ((element as any).mozRequestFullScreen) {
@@ -66,8 +67,10 @@ export function GameRuntimePlayer({ initial, request, onClose, onComplete, secur
       } else if ((element as any).msRequestFullscreen) {
         await (element as any).msRequestFullscreen();
       }
+      return checkFullscreenState();
     } catch (err) {
       console.warn("Fullscreen request prevented:", err);
+      return false;
     }
   };
 
@@ -106,10 +109,35 @@ export function GameRuntimePlayer({ initial, request, onClose, onComplete, secur
     }
     onClose();
   };
-  const startGame = () => {
+  const forcePlayerFullscreen = async () => {
     const element = playerRef.current;
-    if (element && !checkFullscreenState()) void enterFullscreen(element);
-    void action("START");
+    if (!element) return;
+    try {
+      if (document.fullscreenElement === element || (document as any).webkitFullscreenElement === element) {
+        setFullscreenRequired(false);
+        return;
+      }
+      if (element.requestFullscreen) {
+        await element.requestFullscreen({ navigationUI: "hide" });
+      } else if ((element as any).webkitRequestFullscreen) {
+        await (element as any).webkitRequestFullscreen();
+      }
+      if (checkFullscreenState()) setFullscreenRequired(false);
+    } catch (err) {
+      console.warn("Fullscreen request prevented:", err);
+    }
+  };
+  const startGame = async () => {
+    const element = playerRef.current;
+    if (!checkFullscreenState()) {
+      const entered = await enterFullscreen(element);
+      if (!entered) {
+        setFullscreenRequired(true);
+        return;
+      }
+    }
+    setFullscreenRequired(false);
+    await action("START");
   };
   const action = async (actionName: string, payload?: any, visualDelay = 0) => {
     if (state.demo) {
@@ -234,13 +262,14 @@ export function GameRuntimePlayer({ initial, request, onClose, onComplete, secur
   const isDragDropGame = state.engine?.engineKey === "DRAG_DROP";
   const isTreasureHunt = state.engine?.engineKey === "TREASURE_HUNT";
   const showGameIntro = state.status === "READY";
-  const introTutorial = tutorial || defaultRuntimeTutorial(state.engine?.engineKey || "QUIZ_CHALLENGE", state.engine?.name || "Assessment game");
+  const assignedGameName = state.generatedGame?.title || tutorial?.game?.name || state.engine?.name || "Assessment game";
+  const introTutorial = tutorial || defaultRuntimeTutorial(state.engine?.engineKey || "QUIZ_CHALLENGE", assignedGameName);
   const isFsGame = isAdventure || isBoardGame || isDragDropGame || isLogicGame || isMazeGame || isRacingGame || isSortingGame || isTreasureHunt || isBuildingGame || isFishingGame || isMemoryGame;
   const player = <div ref={playerRef} data-engine={state.engine?.engineKey || "QUIZ_CHALLENGE"} onPointerMove={(event) => { if (!isAdventure) return; const bounds = event.currentTarget.getBoundingClientRect(); event.currentTarget.style.setProperty("--adventure-x", `${((event.clientX - bounds.left) / bounds.width - .5) * 2}`); event.currentTarget.style.setProperty("--adventure-y", `${((event.clientY - bounds.top) / bounds.height - .5) * 2}`); }} className={`game-runtime-player fixed inset-0 z-[9999] flex h-[100dvh] w-screen flex-col bg-gradient-to-br from-[#071633] via-[#123b5a] to-[#007f70] text-white ${isAdventure ? "is-adventure-game" : ""} ${isBoardGame ? "is-board-game" : ""} ${isBuildingGame ? "is-building-game" : ""} ${isDragDropGame ? "is-drag-drop-game" : ""} ${isFishingGame ? "is-fishing-game" : ""} ${isLogicGame ? "is-logic-game" : ""} ${isMazeGame ? "is-maze-game" : ""} ${isMemoryGame ? "is-memory-game" : ""} ${isRacingGame ? "is-racing-game" : ""} ${isSortingGame ? "is-sorting-game" : ""} ${isTreasureHunt ? "is-treasure-hunt" : ""}`}>
-    <header className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3"><div><p className="keep-white text-[9px] font-black uppercase tracking-widest opacity-80">{state.engine?.name}</p><p className="keep-white text-xs font-bold">{showGameIntro ? `${state.questionCount} challenges await` : `Question ${Math.min(state.currentIndex + 1, state.questionCount)} of ${state.questionCount}`}</p></div><div className="flex items-center gap-2"><Pill><Timer /> {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</Pill><button onClick={() => setSound(!sound)} aria-label="Toggle sound" className="game-icon keep-white">{sound ? <Volume2 /> : <VolumeX />}</button><button onClick={closePlayer} aria-label="Close game" className="game-icon keep-white"><X /></button></div></header>
+    <header className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3"><div><p className="keep-white text-[9px] font-black uppercase tracking-widest opacity-80">{assignedGameName}</p><p className="keep-white text-xs font-bold">{showGameIntro ? `${state.questionCount} challenges await` : `Question ${Math.min(state.currentIndex + 1, state.questionCount)} of ${state.questionCount}`}</p></div><div className="flex items-center gap-2"><Pill><Timer /> {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</Pill><button onClick={forcePlayerFullscreen} aria-label="Enter fullscreen" title="Enter fullscreen" className="game-icon keep-white"><Maximize2 /></button><button onClick={() => setSound(!sound)} aria-label="Toggle sound" className="game-icon keep-white">{sound ? <Volume2 /> : <VolumeX />}</button><button onClick={closePlayer} aria-label="Close game" className="game-icon keep-white"><X /></button></div></header>
     <div className="h-1 bg-white/10"><div className="h-full bg-cyan-300 transition-all" style={{width:`${state.progress}%`}} /></div>
     <main className={`relative flex min-h-0 flex-1 overflow-hidden ${isFsGame ? "p-0 items-stretch" : "p-4 items-center justify-center"}`}>{!isFsGame && <><div className="game-orb left-[8%] top-[15%]" /><div className="game-orb bottom-[12%] right-[10%]" /></>}<section className={`relative z-10 my-auto w-full ${isFsGame ? "h-full max-w-none flex flex-col" : `${isMemoryGame ? "max-w-5xl" : "max-w-3xl"} rounded-[2rem] border border-white/25 bg-[#173f59]/95 p-5 shadow-2xl backdrop-blur-xl sm:p-8`} ${isBuildingGame ? "construction-site-game-panel" : ""} ${isFishingGame ? "fishing-world-panel" : ""} ${isMemoryGame ? "memory-world-panel" : ""}`}>
-      {showGameIntro ? <AssessmentTutorialIntro tutorial={introTutorial} preview={state} gameName={state.engine?.name || "Assessment game"} onStart={startGame} /> : q ? (
+      {showGameIntro ? <AssessmentTutorialIntro tutorial={introTutorial} preview={state} gameName={assignedGameName} onStart={startGame} /> : q ? (
         state.engine?.engineKey === "BOARD_GAME" ? (
           <BoardGame
             key={q.id}
@@ -356,6 +385,7 @@ export function GameRuntimePlayer({ initial, request, onClose, onComplete, secur
       ) : <div className="py-12 text-center"><h1 className="keep-white text-3xl font-black">Assessment submitted!</h1></div>}
     </section></main>
     {secureMode && securityWarning && state.status === "RUNNING" && <div className="absolute inset-0 z-50 grid place-items-center bg-slate-950/90 p-4 backdrop-blur-md"><section role="alertdialog" aria-modal="true" aria-label="Security violation warning" className="w-full max-w-md rounded-3xl border border-rose-400/30 bg-white p-6 text-center shadow-2xl sm:p-8"><div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-rose-600 text-white"><AlertTriangle className="h-8 w-8" /></div><h2 className="mt-5 text-xl font-black text-[#071633]">Security violation detected</h2><p className="mt-2 text-sm font-semibold text-rose-700">{securityWarning === "fullscreen_exit" ? "You exited fullscreen mode." : "You switched tabs or moved away from the assessment window."}</p><p className="mt-3 text-xs leading-5 text-slate-600">Warning {Math.min(warningCount, MAX_SECURITY_WARNINGS)} of {MAX_SECURITY_WARNINGS}. On the third violation, your assessment is automatically submitted.</p><button type="button" onClick={resumeSecureAssessment} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#007f70] px-4 py-3 text-sm font-black text-white"><Maximize2 className="h-4 w-4" /> Resume secure assessment</button><div className="mt-4 flex items-center justify-center gap-2 text-[10px] font-bold text-slate-500"><Shield className="h-3.5 w-3.5" /> Security events are recorded for school review.</div></section></div>}
+    {secureMode && fullscreenRequired && state.status === "READY" && <div className="absolute inset-0 z-[60] grid place-items-center bg-slate-950/95 p-4 backdrop-blur-md"><section role="alertdialog" aria-modal="true" aria-label="Fullscreen required" className="w-full max-w-md rounded-3xl border border-cyan-300/30 bg-white p-6 text-center shadow-2xl sm:p-8"><div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#007f70] text-white"><Maximize2 className="h-8 w-8" /></div><h2 className="mt-5 text-xl font-black text-[#071633]">Fullscreen is required</h2><p className="mt-2 text-sm leading-6 text-slate-600">This is a secure assessment. You cannot begin until the game is in fullscreen mode.</p><button type="button" onClick={forcePlayerFullscreen} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#007f70] px-4 py-3 text-sm font-black text-white"><Maximize2 className="h-4 w-4" /> Enter fullscreen</button><p className="mt-4 text-[10px] font-bold text-slate-500">Switching tabs or exiting fullscreen during the assessment is recorded.</p></section></div>}
   </div>;
   return typeof document === "undefined" ? null : createPortal(player, document.body);
 }

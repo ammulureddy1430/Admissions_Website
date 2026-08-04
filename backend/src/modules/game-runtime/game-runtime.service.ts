@@ -548,9 +548,37 @@ export class GameRuntimeService {
   }
 
   private async owned(id: string, schoolId: string, user: { id: string; role: Role }) {
-    const session = await this.prisma.gameRuntimeSession.findFirst({ where: { id, schoolId }, include: { engine: true } });
+    const session = await this.prisma.gameRuntimeSession.findFirst({
+      where: { id, schoolId },
+      include: {
+        engine: true,
+        generatedGame: {
+          select: { id: true, title: true, description: true, engineKey: true },
+        },
+      },
+    });
     if (!session) throw new NotFoundException('Game runtime session not found.');
-    if (user.role === Role.STUDENT && session.userId !== user.id) throw new ForbiddenException('This game session belongs to another student.');
+    if (user.role === Role.STUDENT && session.userId !== user.id) {
+      const account = await this.prisma.user.findUnique({
+        where: { id: user.id },
+        select: { email: true, firstName: true, lastName: true },
+      });
+      const studentApplication = account
+        ? await this.prisma.application.findFirst({
+            where: {
+              id: session.userId,
+              schoolId,
+              status: { not: 'DRAFT' },
+              OR: [
+                { studentEmail: account.email },
+                { studentFirstName: account.firstName, studentLastName: account.lastName },
+              ],
+            },
+            select: { id: true },
+          })
+        : null;
+      if (!studentApplication) throw new ForbiddenException('This game session belongs to another student.');
+    }
     if (user.role === Role.PARENT) {
       const child = await this.prisma.application.findFirst({ where: { id: session.userId, schoolId, parentId: user.id }, select: { id: true } });
       if (!child) throw new ForbiddenException('This game session does not belong to your child.');

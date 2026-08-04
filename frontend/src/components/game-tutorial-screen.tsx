@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
 import {
   AlertTriangle,
   ArrowRight,
@@ -82,30 +83,36 @@ export function GameTutorialScreen({ tutorial, busy, practiceReady, onClose, onP
   return createPortal((
     <div className={`${highContrast ? "bg-black text-white" : "bg-[#f3f7f6] text-[#071633]"} fixed inset-0 z-[9998] overflow-y-auto ${largeText ? "text-[115%]" : ""}`}>
       <header className={`${highContrast ? "border-white/30 bg-black" : "border-[#d9e8e4] bg-white/95"} sticky top-0 z-20 border-b backdrop-blur-xl`}>
-        <div className="flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6">
+        <div className="flex min-h-[88px] w-full items-center justify-between gap-4 px-5 py-3 sm:px-8">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e3f6f1] text-2xl">{tutorial.icon || "🎮"}</span>
-            <div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#008f80]">Game tutorial</p><h1 className="truncate text-base font-black sm:text-lg">{tutorial.game?.name}</h1></div>
+            <span className="relative grid h-[62px] w-[62px] shrink-0 place-items-center overflow-hidden rounded-2xl bg-[#e3f6f1] text-[#008f80]">
+              {tutorial.game?.engineKey === "BALLOON_POP" ? (
+                <Image src="/game-assets/balloon-popper-tutorial.png" alt="" fill sizes="62px" className="object-cover object-[32%_70%]" />
+              ) : (
+                <Gamepad2 className="h-7 w-7" aria-hidden="true" />
+              )}
+            </span>
+            <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#008f80]">Game tutorial</p><h1 className="truncate text-lg font-black sm:text-[24px]">{tutorial.game?.name}</h1></div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setLargeText(v => !v)} aria-pressed={largeText} aria-label="Toggle large text" className="rounded-lg border p-2"><Type className="h-4 w-4" /></button>
-            <button onClick={() => setHighContrast(v => !v)} aria-pressed={highContrast} aria-label="Toggle high contrast" className="rounded-lg border p-2"><Contrast className="h-4 w-4" /></button>
-            <button onClick={onClose} aria-label="Close tutorial" className="rounded-lg border p-2"><X className="h-4 w-4" /></button>
+            <button onClick={() => setLargeText(v => !v)} aria-pressed={largeText} aria-label="Toggle large text" className="grid h-12 w-12 place-items-center rounded-full border-2 border-[#173349]"><Type className="h-5 w-5" /></button>
+            <button onClick={() => setHighContrast(v => !v)} aria-pressed={highContrast} aria-label="Toggle high contrast" className="grid h-12 w-12 place-items-center rounded-full border-2 border-[#173349]"><Contrast className="h-5 w-5" /></button>
+            <button onClick={onClose} aria-label="Close tutorial" className="grid h-12 w-12 place-items-center rounded-full border-2 border-[#173349]"><X className="h-5 w-5" /></button>
           </div>
         </div>
       </header>
 
-      <main className="w-full space-y-5 p-4 sm:p-6">
+      <main className="w-full space-y-7 p-4 pb-8 sm:p-8 sm:pb-10">
         {practiceReady && <div role="status" className="flex items-center gap-3 rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-900"><CheckCircle2 className="h-6 w-6" /><div><b>Great! You are ready.</b><p className="text-xs">Replay practice or begin the scored assessment.</p></div></div>}
 
-        <section className="grid overflow-hidden rounded-3xl bg-gradient-to-br from-[#08213d] via-[#0b5962] to-[#008f80] !text-white shadow-xl lg:grid-cols-[1.3fr_.7fr]" style={{ color: "#ffffff" }}>
-          <div className="p-6 sm:p-8">
+        <section className="grid min-h-[490px] overflow-hidden rounded-[32px] bg-gradient-to-br from-[#08213d] via-[#075c63] to-[#008f80] !text-white shadow-[0_18px_38px_rgba(7,54,63,.16)] lg:grid-cols-[1.3fr_.7fr]" style={{ color: "#ffffff" }}>
+          <div className="flex flex-col justify-start p-7 sm:p-11 lg:p-12">
             <div className="flex flex-wrap gap-2"><Tag>{tutorial.category}</Tag><Tag>{assessment.difficulty}</Tag><Tag>{assessment.grade}</Tag></div>
-            <h2 className="mt-5 text-3xl font-black tracking-tight !text-white sm:text-4xl" style={{ color: "#ffffff" }}>{tutorial.tutorialTitle}</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 !text-white/75" style={{ color: "rgba(255,255,255,.78)" }}>{tutorial.tutorialDescription}</p>
-            <div className="mt-6 flex flex-wrap gap-2">{(tutorial.skills || []).map((skill: string) => <span key={skill} className="rounded-full bg-white/10 px-3 py-1.5 text-[10px] font-bold">{skill}</span>)}</div>
+            <h2 className="mt-8 max-w-4xl text-4xl font-black leading-[1.05] tracking-[-0.035em] !text-white sm:text-5xl" style={{ color: "#ffffff" }}>{tutorial.tutorialTitle}</h2>
+            <p className="mt-5 max-w-3xl text-base leading-7 !text-white/75 sm:text-lg" style={{ color: "rgba(255,255,255,.78)" }}>{tutorial.tutorialDescription}</p>
+            <div className="mt-8 flex flex-wrap gap-3">{(tutorial.skills || []).map((skill: string) => <span key={skill} className="rounded-full bg-white/10 px-4 py-2 text-xs font-bold">{skill}</span>)}</div>
           </div>
-          <div className="grid min-h-72 place-items-center border-t border-white/10 bg-white/5 p-4 lg:border-l lg:border-t-0">
+          <div className="grid min-h-80 place-items-center border-t border-white/10 bg-[#2b8c91]/35 p-5 lg:border-l lg:border-t-0 lg:p-6">
             <BuiltInVideoTutorial icon={tutorial.icon} steps={steps} engineKey={tutorial.game?.engineKey} />
           </div>
         </section>
@@ -148,7 +155,10 @@ function AdventureTutorialScene({ scene, sceneCount, playing }: { scene: number;
   </div>;
 }
 
-function RacingTutorialScene({ icon, scene, sceneCount, playing }: { icon?: string; scene: number; sceneCount: number; playing: boolean }) {
+function RacingTutorialScene({ icon, scene, sceneCount, playing, engineKey }: { icon?: string; scene: number; sceneCount: number; playing: boolean; engineKey?: string }) {
+  if (engineKey === "BALLOON_POP") {
+    return <Image src="/game-assets/balloon-popper-tutorial.png" alt="Red balloon moving toward a finish flag" fill sizes="(min-width: 1024px) 34vw, 100vw" className="object-cover" priority />;
+  }
   return <>
     <div className="absolute inset-x-0 bottom-0 h-[48%] bg-slate-700 [clip-path:polygon(12%_0,88%_0,100%_100%,0_100%)]"><div className="absolute left-1/2 top-0 h-full w-1 -translate-x-1/2 bg-[repeating-linear-gradient(to_bottom,#fff_0_12px,transparent_12px_25px)] opacity-80" /></div>
     <div className="absolute bottom-[12%] text-5xl drop-shadow-xl transition-[left,transform] duration-700 sm:text-6xl" style={{ left: `${18 + (scene / Math.max(sceneCount - 1, 1)) * 58}%`, transform: `translateX(-50%) ${playing ? "scale(1.08)" : "scale(1)"}` }}>{icon || "🏎️"}</div>
@@ -183,26 +193,26 @@ export function BuiltInVideoTutorial({ icon, steps, engineKey }: { icon?: string
   };
 
   return (
-    <div className="w-full overflow-hidden rounded-2xl bg-[#041728] shadow-2xl" aria-label="Game video tutorial">
-      <div className={`relative aspect-video overflow-hidden ${engineKey === "ADVENTURE_GAME" ? "bg-gradient-to-b from-sky-300 via-emerald-100 to-emerald-600" : "bg-gradient-to-b from-sky-300 via-sky-100 to-emerald-400"}`}>
-        <div className="absolute left-[6%] right-[6%] top-[8%] rounded-xl border border-white/20 bg-[#071633] px-4 py-3 text-left shadow-xl">
+    <div className="w-full overflow-hidden rounded-[22px] border border-white/10 bg-[#041728] shadow-2xl" aria-label="Game video tutorial">
+      <div className={`relative aspect-video overflow-hidden ${engineKey === "ADVENTURE_GAME" ? "bg-emerald-600" : "bg-sky-200"}`}>
+        {engineKey === "ADVENTURE_GAME" ? <AdventureTutorialScene scene={scene} sceneCount={steps.length} playing={playing} /> : <RacingTutorialScene icon={icon} scene={scene} sceneCount={steps.length} playing={playing} engineKey={engineKey} />}
+        <div className="absolute left-[6%] right-[6%] top-[7%] rounded-2xl border border-white/20 bg-[#071633] px-5 py-4 text-left shadow-xl">
           <p className="text-[10px] font-black uppercase tracking-[.18em] !text-cyan-200" style={{ color: "#a5f3fc" }}>Video tutorial · Step {scene + 1}</p>
-          <p className="mt-1.5 text-sm font-black leading-5 !text-white sm:text-base" style={{ color: "#ffffff" }}>{steps[scene] || "Learn how to play the game."}</p>
+          <p className="mt-2 text-sm font-black leading-5 !text-white sm:text-base lg:text-lg" style={{ color: "#ffffff" }}>{steps[scene] || "Learn how to play the game."}</p>
         </div>
-        {engineKey === "ADVENTURE_GAME" ? <AdventureTutorialScene scene={scene} sceneCount={steps.length} playing={playing} /> : <RacingTutorialScene icon={icon} scene={scene} sceneCount={steps.length} playing={playing} />}
         {!playing && time >= duration && <button onClick={() => seek(0)} className="absolute inset-0 grid place-items-center bg-[#041728]/45" aria-label="Replay tutorial"><span className="grid h-16 w-16 place-items-center rounded-full bg-white text-[#008f80] shadow-xl"><RotateCcw className="h-7 w-7" /></span></button>}
       </div>
-      <div className="flex items-center gap-3 px-4 py-3">
-        <button onClick={() => time >= duration ? seek(0) : setPlaying(value => !value)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#00a995] text-white" aria-label={playing ? "Pause tutorial" : "Play tutorial"}>{playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}</button>
+      <div className="flex items-center gap-4 px-5 py-4">
+        <button onClick={() => time >= duration ? seek(0) : setPlaying(value => !value)} className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#00b7a4] text-white" aria-label={playing ? "Pause tutorial" : "Play tutorial"}>{playing ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}</button>
         <input aria-label="Tutorial progress" type="range" min={0} max={duration} step={0.1} value={time} onChange={event => seek(Number(event.target.value))} className="h-1.5 w-full accent-[#30d5c8]" />
-        <span className="w-20 text-right text-[10px] font-bold tabular-nums !text-white" style={{ color: "#ffffff" }}>{Math.floor(time)}s / {duration}s</span>
+        <span className="w-20 text-right text-xs font-bold tabular-nums !text-white" style={{ color: "#ffffff" }}>{Math.floor(time)}s / {duration}s</span>
       </div>
     </div>
   );
 }
 
-function Tag({ children }: { children: React.ReactNode }) { return <span className="rounded-full bg-white/10 px-3 py-1 text-[9px] font-black uppercase tracking-wider !text-white" style={{ color: "#ffffff" }}>{children || "—"}</span>; }
-function InfoCard({ icon: Icon, title, children }: { icon: LucideIcon; title: string; children: React.ReactNode }) { return <article className="rounded-2xl border border-[#dce8e5] bg-white p-5 text-[#173349] shadow-sm"><h3 className="mb-4 flex items-center gap-2 text-sm font-black"><span className="grid h-8 w-8 place-items-center rounded-lg bg-[#e5f6f2] text-[#008f80]"><Icon className="h-4 w-4" /></span>{title}</h3>{children}</article>; }
+function Tag({ children }: { children: React.ReactNode }) { return <span className="rounded-full bg-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-[.12em] !text-white" style={{ color: "#ffffff" }}>{children || "—"}</span>; }
+function InfoCard({ icon: Icon, title, children }: { icon: LucideIcon; title: string; children: React.ReactNode }) { return <article className="rounded-[24px] border border-[#dce8e5] bg-white p-7 text-base leading-7 text-[#173349] shadow-[0_8px_22px_rgba(7,54,63,.06)]"><h3 className="mb-5 flex items-center gap-3 text-lg font-black"><span className="grid h-11 w-11 place-items-center rounded-full bg-[#e5f6f2] text-[#008f80]"><Icon className="h-5 w-5" /></span>{title}</h3>{children}</article>; }
 function ControlGroup({ title, values, icon: Icon }: { title: string; values: string[]; icon: LucideIcon }) { return <div className="mb-3"><p className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase text-slate-500"><Icon className="h-3.5 w-3.5" />{title}</p><div className="flex flex-wrap gap-2">{values.map(value => <span key={value} className="rounded-lg border bg-slate-50 px-2.5 py-1.5 text-xs font-bold">{value}</span>)}</div></div>; }
 function Line({ label, value }: { label: string; value?: string | number | null }) { return <div className="flex justify-between gap-3"><dt className="text-slate-500">{label}</dt><dd className="text-right font-bold">{value || "—"}</dd></div>; }
 function Metric({ label, value }: { label: string; value: string | number }) { return <div className="rounded-xl bg-[#f3f8f7] p-3"><p className="text-[9px] font-bold uppercase text-slate-500">{label}</p><p className="mt-1 text-lg font-black text-[#087466]">{value}</p></div>; }
