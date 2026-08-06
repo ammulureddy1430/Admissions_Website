@@ -17,6 +17,8 @@ const ENGINES = [
   ['BASKETBALL_CHALLENGE','Basketball Challenge'],['FOOTBALL_GOAL_QUIZ','Football Goal Quiz'],
   ['FOLLOW_THE_LIGHTS','Follow the Lights'],
   ['BALL_STACK','Ball Stack'],
+  ['SOUND_DETECTIVE','Sound Detective'],
+  ['COLOR_PATH','Color Path'],
 ] as const;
 
 @Injectable()
@@ -111,6 +113,9 @@ export class GameRuntimeService {
   async action(id: string, dto: RuntimeActionDto, schoolId: string, user: { id: string; role: Role }) {
     const session = await this.owned(id, schoolId, user);
     const action = dto.action.toUpperCase();
+    if (session.engine.engineKey === 'COLOR_PATH' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) {
+      throw new BadRequestException('Color Path does not allow pause, hints, retries, skips, or question answers.');
+    }
     if (action === 'START') return this.transition(session.id, 'RUNNING', { startedAt: session.startedAt || new Date(), pausedAt: null }, 'STARTED', dto.payload, schoolId, user);
     if (action === 'PAUSE') {
       if (session.status !== 'RUNNING') throw new BadRequestException('Only a running game can be paused.');
@@ -134,6 +139,8 @@ export class GameRuntimeService {
     if (action === 'MEMORY_COMPLETE') return this.memoryComplete(session, dto.payload, schoolId, user);
     if (action === 'FOLLOW_LIGHTS_COMPLETE') return this.followLightsComplete(session, dto.payload, schoolId, user);
     if (action === 'BALL_STACK_COMPLETE') return this.ballStackComplete(session, dto.payload, schoolId, user);
+    if (action === 'SOUND_DETECTIVE_COMPLETE') return this.soundDetectiveComplete(session, dto.payload, schoolId, user);
+    if (action === 'COLOR_PATH_COMPLETE') return this.colorPathComplete(session, dto.payload, schoolId, user);
     if (action === 'SECURITY_VIOLATION') return this.securityViolation(session, dto.payload, schoolId, user);
     if (action === 'COMPLETE') return this.transition(id, 'COMPLETED', { completedAt: new Date() }, 'COMPLETED', dto.payload, schoolId, user);
     throw new BadRequestException('Unsupported runtime action.');
@@ -203,6 +210,87 @@ export class GameRuntimeService {
     await this.event(session.id, 'BALL_STACK_COMPLETED', cognitiveAnalytics);
     return { state: await this.state(session.id, schoolId, user) };
   }
+
+  private async soundDetectiveComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
+    if (session.engine.engineKey !== 'SOUND_DETECTIVE' || session.status !== 'RUNNING') {
+      throw new BadRequestException('Sound Detective metrics require an active Sound Detective session.');
+    }
+    const input = (payload || {}) as Record<string, any>;
+    const number = (key: string, maximum = 100000) => Math.max(0, Math.min(maximum, Number(input[key]) || 0));
+    const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 10) / 10));
+
+    const roundsPlayed = number('roundsPlayed', 1000);
+    const correctResponses = Math.min(roundsPlayed, number('correctResponses', 1000));
+    const incorrectResponses = number('incorrectResponses', 1000);
+    const averageResponseTime = number('averageResponseTime', 60000);
+    const highestDifficulty = Math.min(5, Math.max(1, number('highestDifficulty', 5)));
+    const elapsedSeconds = Math.min(120, number('elapsedSeconds', 120));
+
+    const totalResponses = correctResponses + incorrectResponses;
+    const accuracy = totalResponses ? (correctResponses / totalResponses) * 100 : 0;
+    const completionPercentage = clamp((elapsedSeconds / 120) * 100);
+
+    const auditoryRecognitionScore = clamp(accuracy * 0.7 + (highestDifficulty / 5) * 30);
+    const listeningScore = clamp(accuracy * 0.6 + completionPercentage * 0.4);
+    const overallScore = clamp(auditoryRecognitionScore * 0.5 + listeningScore * 0.5);
+    const completionStatus = String(input.endReason || 'COMPLETED');
+
+    const cognitiveAnalytics = {
+      roundsPlayed,
+      correctResponses,
+      incorrectResponses,
+      averageResponseTime,
+      listeningScore,
+      auditoryRecognitionScore,
+      completionPercentage,
+      overallScore,
+      highestDifficulty,
+      completionStatus,
+    };
+
+    await this.prisma.gameRuntimeSession.update({
+      where: { id: session.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        score: overallScore,
+        elapsedSeconds,
+        runtimeState: {
+          ...((session.runtimeState || {}) as Record<string, unknown>),
+          cognitiveAnalytics,
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    await this.event(session.id, 'SOUND_DETECTIVE_COMPLETED', cognitiveAnalytics);
+    return { state: await this.state(session.id, schoolId, user) };
+  }
+
+  private async colorPathComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
+    if (session.engine.engineKey !== 'COLOR_PATH' || session.status !== 'RUNNING') throw new BadRequestException('Color Path metrics require an active Color Path session.');
+    const input = (payload || {}) as Record<string, any>;
+    const number = (key: string, maximum = 100000) => Math.max(0, Math.min(maximum, Number(input[key]) || 0));
+    const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 10) / 10));
+    const roundsPlayed = number('roundsPlayed', 1000);
+    const correctSelections = Math.min(roundsPlayed, number('correctSelections', 1000));
+    const incorrectSelections = Math.min(roundsPlayed, number('incorrectSelections', 1000));
+    const averageResponseTime = number('averageResponseTime', 60000);
+    const highestDifficulty = Math.min(4, Math.max(1, number('highestDifficulty', 4)));
+    const elapsedSeconds = Math.min(60, number('elapsedSeconds', 60));
+    const totalSelections = correctSelections + incorrectSelections;
+    const observationAccuracy = clamp(totalSelections ? correctSelections / totalSelections * 100 : 0);
+    const difficultyProgress = highestDifficulty / 4 * 100;
+    const completionPercentage = clamp(roundsPlayed / 4 * 100);
+    const visualRecognitionScore = clamp(observationAccuracy * .82 + difficultyProgress * .18);
+    const observationScore = clamp(observationAccuracy * .72 + difficultyProgress * .18 + completionPercentage * .1);
+    const overallScore = clamp((visualRecognitionScore + observationScore) / 2);
+    const completionStatus = roundsPlayed >= 4 ? 'COMPLETED' : 'INCOMPLETE';
+    const cognitiveAnalytics = { roundsPlayed, correctSelections, incorrectSelections, averageResponseTime, observationAccuracy, observationScore, visualRecognitionScore, highestDifficulty, completionPercentage, overallScore, completionStatus };
+    await this.prisma.gameRuntimeSession.update({ where: { id: session.id }, data: { status: 'COMPLETED', completedAt: new Date(), score: overallScore, elapsedSeconds, runtimeState: { ...((session.runtimeState || {}) as Record<string, unknown>), cognitiveAnalytics } as Prisma.InputJsonValue } });
+    await this.event(session.id, 'COLOR_PATH_COMPLETED', cognitiveAnalytics);
+    return { state: await this.state(session.id, schoolId, user) };
+  }
+
 
   private async securityViolation(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
     if (session.status !== 'RUNNING') throw new BadRequestException('Security violations can only be logged during an active assessment.');

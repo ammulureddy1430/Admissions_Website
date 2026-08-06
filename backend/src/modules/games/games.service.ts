@@ -16,6 +16,107 @@ export class GamesService implements OnModuleInit {
         update: { name: game.name, description: game.description, category: game.category, ageGroup: game.ageGroup, difficulty: game.difficulty, durationSeconds: game.durationSeconds, componentName: game.componentName, gameType: game.gameType, thumbnail: game.thumbnail, status: 'ACTIVE', isActive: true },
       }),
     ));
+
+    const schools = await this.prisma.school.findMany({ select: { id: true } });
+    for (const school of schools) {
+      const admin = await this.prisma.user.findFirst({
+        where: { schoolId: school.id, role: 'SCHOOL_ADMIN' },
+        select: { id: true }
+      });
+      if (!admin) continue;
+
+      let categorySound = await this.prisma.gameCategory.findFirst({
+        where: { name: 'Auditory Recognition', schoolId: school.id }
+      });
+      if (!categorySound) {
+        categorySound = await this.prisma.gameCategory.create({
+          data: {
+            schoolId: school.id,
+            name: 'Auditory Recognition',
+            status: 'ACTIVE'
+          }
+        });
+      }
+
+      await this.prisma.gameTemplate.upsert({
+        where: {
+          schoolId_templateId: {
+            schoolId: school.id,
+            templateId: 'GT-SOUND'
+          }
+        },
+        create: {
+          templateId: 'GT-SOUND',
+          schoolId: school.id,
+          name: 'Sound Detective Template',
+          description: 'A standard Auditory Recognition template.',
+          categoryId: categorySound.id,
+          difficulty: 'EASY',
+          estimatedDuration: 2,
+          minimumQuestions: 1,
+          maximumQuestions: 10,
+          supportedDevices: ['Desktop', 'Tablet', 'Mobile'],
+          status: 'ACTIVE',
+          createdById: admin.id
+        },
+        update: {
+          status: 'ACTIVE'
+        }
+      });
+
+      let categoryColorPath = await this.prisma.gameCategory.findFirst({ where: { name: 'Visual Recognition', schoolId: school.id } });
+      if (!categoryColorPath) categoryColorPath = await this.prisma.gameCategory.create({ data: { schoolId: school.id, name: 'Visual Recognition', status: 'ACTIVE' } });
+      await this.prisma.gameTemplate.upsert({
+        where: { schoolId_templateId: { schoolId: school.id, templateId: 'GT-COLOR-PATH' } },
+        create: {
+          templateId: 'GT-COLOR-PATH', schoolId: school.id, name: 'Color Path Template',
+          description: 'A one-minute, four-round visual recognition and observation assessment for ages 3–4.',
+          categoryId: categoryColorPath.id, difficulty: 'EASY', estimatedDuration: 1,
+          minimumQuestions: 1, maximumQuestions: 10, supportedDevices: ['Desktop', 'Tablet', 'Mobile'],
+          status: 'ACTIVE', createdById: admin.id,
+        },
+        update: { status: 'ACTIVE', estimatedDuration: 1 },
+      });
+
+      let categorySpot = await this.prisma.gameCategory.findFirst({
+        where: { name: 'Observation & Visual Recognition', schoolId: school.id }
+      });
+      if (!categorySpot) {
+        categorySpot = await this.prisma.gameCategory.create({
+          data: {
+            schoolId: school.id,
+            name: 'Observation & Visual Recognition',
+            status: 'ACTIVE'
+          }
+        });
+      }
+
+      await this.prisma.gameTemplate.upsert({
+        where: {
+          schoolId_templateId: {
+            schoolId: school.id,
+            templateId: 'GT-SPOT'
+          }
+        },
+        create: {
+          templateId: 'GT-SPOT',
+          schoolId: school.id,
+          name: 'Spot the Change Template',
+          description: 'A standard Observation & Visual Recognition template.',
+          categoryId: categorySpot.id,
+          difficulty: 'EASY',
+          estimatedDuration: 2,
+          minimumQuestions: 1,
+          maximumQuestions: 10,
+          supportedDevices: ['Desktop', 'Tablet', 'Mobile'],
+          status: 'ACTIVE',
+          createdById: admin.id
+        },
+        update: {
+          status: 'ACTIVE'
+        }
+      });
+    }
   }
 
   async list(schoolId: string, query: Record<string, string>) {
@@ -103,6 +204,34 @@ export class GamesService implements OnModuleInit {
 
   async reports(id: string, schoolId: string) {
     const game = await this.one(id, schoolId);
+    if (game.componentName === 'COLOR_PATH') {
+      const reports = await this.prisma.colorPathAnalytics.findMany({
+        where: { gameId: id, gameResult: { assessment: { schoolId } } },
+        select: {
+          id: true, studentId: true, assessmentId: true, createdAt: true,
+          visualRecognitionScore: true, observationScore: true, correctSelections: true,
+          incorrectSelections: true, averageResponseTime: true, highestDifficulty: true,
+          completionStatus: true, overallScore: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      return reports.map((report) => ({ ...report, ageGroup: game.ageGroup }));
+    }
+    if (game.componentName === 'SOUND_DETECTIVE') {
+      const reports = await this.prisma.soundDetectiveAnalytics.findMany({
+        where: { gameId: id, gameResult: { assessment: { schoolId } } },
+        select: {
+          id: true, studentId: true, assessmentId: true, createdAt: true,
+          roundsPlayed: true, correctResponses: true, incorrectResponses: true,
+          averageResponseTime: true, listeningScore: true, auditoryRecognitionScore: true,
+          completionPercentage: true, overallScore: true, highestDifficulty: true,
+          completionStatus: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      return reports.map((report) => ({ ...report, ageGroup: game.ageGroup }));
+    }
+
     if (game.componentName === 'BALL_STACK') {
       const reports = await this.prisma.ballStackAnalytics.findMany({
         where: { gameId: id, gameResult: { assessment: { schoolId } } },

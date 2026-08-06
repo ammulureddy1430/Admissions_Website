@@ -18,6 +18,8 @@ registerGame({ componentName: "MAZE", load: () => import("@/components/maze-game
 registerGame({ componentName: "MEMORY_MATCH", load: () => import("@/components/memory-game/MemoryGame").then((module) => ({ default: module.MemoryGame })) });
 registerGame({ componentName: "FOLLOW_THE_LIGHTS", load: () => import("./follow-the-lights/Game") });
 registerGame({ componentName: "BALL_STACK", load: () => import("./ball-stack/Game") });
+registerGame({ componentName: "SOUND_DETECTIVE", load: () => import("./sound-detective/Game") });
+registerGame({ componentName: "COLOR_PATH", load: () => import("./color-path/Game") });
 registerGame({ componentName: "RACING_GAME", load: () => import("@/components/racing-game/RacingGame").then((module) => ({ default: module.RacingGame })) });
 registerGame({ componentName: "SORTING_GAME", load: () => import("@/components/sorting-game/SortingGame").then((module) => ({ default: module.SortingGame })) });
 registerGame({ componentName: "TREASURE_HUNT", load: () => import("@/components/treasure-hunt-game/TreasureHuntGame").then((module) => ({ default: module.TreasureHuntGame })) });

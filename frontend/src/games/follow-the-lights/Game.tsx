@@ -239,7 +239,7 @@ export default function FollowTheLightsGame({
           }}
         />
       ))}
-      <div className="absolute left-4 top-4 rounded-2xl bg-white/80 px-4 py-2 shadow-lg backdrop-blur sm:left-7 sm:top-6">
+      <div className="follow-progress-card absolute left-4 top-20 rounded-2xl bg-white/90 px-4 py-2.5 shadow-lg backdrop-blur sm:left-7">
         <p className="text-[9px] font-black uppercase tracking-widest text-[#648097]">
           Progress
         </p>
@@ -266,6 +266,7 @@ export default function FollowTheLightsGame({
         <p className="mt-2 text-xs font-black uppercase tracking-[0.22em] text-violet-600">
           Round {round || 1}
         </p>
+        <div className="mt-2 flex justify-center gap-2" aria-label={`Round ${round || 1} of 3`}>{[1,2,3].map(item => <i key={item} className={`h-1.5 rounded-full transition-all ${item <= (round || 1) ? "w-7 bg-violet-500" : "w-3 bg-[#cbd9e5]"}`} />)}</div>
         <div
           aria-live="assertive"
           className={`follow-phase mt-2 ${phase === "watch" ? "is-watch" : ""} ${phase === "repeat" && !tapLocked ? "is-turn" : ""}`}
@@ -299,18 +300,19 @@ export default function FollowTheLightsGame({
           )}
         </div>
       </div>
-      <div className="follow-lights-grid relative z-10">
-        {COLORS.map((color) => (
-          <LightButton
-            key={color}
-            color={color}
-            active={active === color}
-            ready={phase === "repeat" && !tapLocked}
-            disabled={phase !== "repeat" || disabled || tapLocked}
-            onPress={(value) => void press(value)}
-          />
-        ))}
-      </div>
+      <div className="follow-lights-board relative z-10">
+        <div className="follow-lights-grid">
+          {COLORS.map((color) => (
+            <LightButton
+              key={color}
+              color={color}
+              active={active === color}
+              ready={phase === "repeat" && !tapLocked}
+              disabled={phase !== "repeat" || disabled || tapLocked}
+              onPress={(value) => void press(value)}
+            />
+          ))}
+        </div>
       {phase === "repeat" && (
         <div
           className="relative z-10 mt-4 flex items-center gap-2"
@@ -325,13 +327,14 @@ export default function FollowTheLightsGame({
         </div>
       )}
       <div
-        className="relative z-10 mt-5 flex items-center gap-2"
+        className="relative z-10 mt-4 flex items-center justify-center gap-2"
         aria-label={`Round ${round}`}
       >
         <span className="h-2 w-2 rounded-full bg-violet-500" />
         <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#72879a]">
           Round {round} · {sequenceLength} lights
         </span>
+      </div>
       </div>
     </div>
   );

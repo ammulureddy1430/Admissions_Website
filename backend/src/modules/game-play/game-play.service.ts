@@ -230,13 +230,13 @@ export class GamePlayService {
       strategy: copy.strategy,
       timer: {
         minutes: assignment.timeLimitMinutes || assignment.gameAssessment?.timeLimit || null,
-        pauses: true,
+        pauses: game.engineKey !== 'COLOR_PATH',
         expiry: 'The practice or assessment ends when the timer reaches zero.',
       },
       scoring: {
         correctAction: correctPoints,
         wrongAction: incorrectPoints,
-        hintPenalty: 2,
+        hintPenalty: game.engineKey === 'COLOR_PATH' ? 0 : 2,
         timeBonus: Number(configuration?.scoringRules?.timeBonus ?? 0),
         completionBonus: Number(configuration?.scoringRules?.completionBonus ?? 0),
         maximumScore: maxScore,
@@ -399,10 +399,12 @@ export class GamePlayService {
     const runtime = session.runtimeState as any;
     const followLights = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'FOLLOW_THE_LIGHTS' ? runtime.cognitiveAnalytics : null;
     const ballStack = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'BALL_STACK' ? runtime.cognitiveAnalytics : null;
-    const cognitive = followLights || ballStack;
-    const answered = followLights ? Number(followLights.correctTaps || 0) + Number(followLights.wrongTaps || 0) : ballStack ? Number(ballStack.totalBallsDropped || 0) : runtime?.answers?.length || 0;
+    const soundDetective = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'SOUND_DETECTIVE' ? runtime.cognitiveAnalytics : null;
+    const colorPath = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'COLOR_PATH' ? runtime.cognitiveAnalytics : null;
+    const cognitive = followLights || ballStack || soundDetective || colorPath;
+    const answered = followLights ? Number(followLights.correctTaps || 0) + Number(followLights.wrongTaps || 0) : ballStack ? Number(ballStack.totalBallsDropped || 0) : soundDetective ? Number(soundDetective.roundsPlayed || 0) : colorPath ? Number(colorPath.roundsPlayed || 0) : runtime?.answers?.length || 0;
     const total = cognitive ? Math.max(1, answered) : session.questionIds.length;
-    const percentage = followLights ? Number(followLights.overallScore || 0) : ballStack ? Number(ballStack.overallCognitiveScore || 0) : total ? (Number(runtime?.correct || 0) / total) * 100 : 0;
+    const percentage = followLights ? Number(followLights.overallScore || 0) : ballStack ? Number(ballStack.overallCognitiveScore || 0) : soundDetective ? Number(soundDetective.overallScore || 0) : colorPath ? Number(colorPath.overallScore || 0) : total ? (Number(runtime?.correct || 0) / total) * 100 : 0;
     const passed = percentage >= assignment.passingScore;
     const attempt = await this.prisma.gameAttempt.findFirst({ where: { gameResultId: result.id, submittedAt: null }, orderBy: { attemptNumber: 'desc' } });
     await this.prisma.$transaction(async (tx) => {
@@ -440,6 +442,30 @@ export class GamePlayService {
           timingAccuracyScore: Number(ballStack.timingAccuracyScore || 0), overallCognitiveScore: Number(ballStack.overallCognitiveScore || 0), completionStatus: String(ballStack.completionStatus || 'COMPLETED'),
         };
         await tx.ballStackAnalytics.upsert({ where: { gameResultId: result.id }, create: { ...data, gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId }, update: data });
+      }
+      if (soundDetective && result.gameId) {
+        const data = {
+          roundsPlayed: Number(soundDetective.roundsPlayed || 0),
+          correctResponses: Number(soundDetective.correctResponses || 0),
+          incorrectResponses: Number(soundDetective.incorrectResponses || 0),
+          averageResponseTime: Number(soundDetective.averageResponseTime || 0),
+          listeningScore: Number(soundDetective.listeningScore || 0),
+          auditoryRecognitionScore: Number(soundDetective.auditoryRecognitionScore || 0),
+          completionPercentage: Number(soundDetective.completionPercentage || 0),
+          overallScore: Number(soundDetective.overallScore || 0),
+          highestDifficulty: Number(soundDetective.highestDifficulty || 1),
+          completionStatus: String(soundDetective.completionStatus || 'COMPLETED'),
+        };
+        await tx.soundDetectiveAnalytics.upsert({ where: { gameResultId: result.id }, create: { ...data, gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId }, update: data });
+      }
+      if (colorPath && result.gameId) {
+        const data = {
+          roundsPlayed: Number(colorPath.roundsPlayed || 0), correctSelections: Number(colorPath.correctSelections || 0), incorrectSelections: Number(colorPath.incorrectSelections || 0),
+          averageResponseTime: Number(colorPath.averageResponseTime || 0), observationAccuracy: Number(colorPath.observationAccuracy || 0), observationScore: Number(colorPath.observationScore || 0),
+          visualRecognitionScore: Number(colorPath.visualRecognitionScore || 0), highestDifficulty: Number(colorPath.highestDifficulty || 1), completionPercentage: Number(colorPath.completionPercentage || 0),
+          overallScore: Number(colorPath.overallScore || 0), completionStatus: String(colorPath.completionStatus || 'COMPLETED'),
+        };
+        await tx.colorPathAnalytics.upsert({ where: { gameResultId: result.id }, create: { ...data, gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId }, update: data });
       }
       if (attempt) {
         await tx.gameAttempt.update({ where: { id: attempt.id }, data: { submittedAt: new Date(), state: session.runtimeState as Prisma.InputJsonValue } });

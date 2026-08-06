@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import FollowTheLightsGame from "@/games/follow-the-lights/Game";
 import BallStackGame from "@/games/ball-stack/Game";
+import SoundDetectiveGame from "@/games/sound-detective/Game";
+import ColorPathGame from "@/games/color-path/Game";
 
 type Game = {
   id: string;
@@ -35,6 +37,8 @@ type Game = {
   isActive: boolean;
   updatedAt: string;
   assignmentCount?: number;
+  thumbnail?: string;
+  cognitiveSkill?: string;
 };
 type Student = {
   id: string;
@@ -225,32 +229,22 @@ export default function GamesPage() {
   };
 
   return (
-    <div className="mx-auto max-w-[1400px] space-y-5 pb-10">
-      <header className="flex flex-col justify-between gap-4 border-b border-[#dceae6] pb-5 sm:flex-row sm:items-end">
-        <div>
-          <div className="mb-2 flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.18em] text-[#008f7d]">
-            <Gamepad2 className="h-3.5 w-3.5" /> Standalone games
+    <div className="mx-auto max-w-[1440px] space-y-6 pb-12">
+      <header className="relative overflow-hidden rounded-[28px] border border-[#cfe9e2] bg-gradient-to-br from-[#073c42] via-[#006f68] to-[#00a68e] px-6 py-7 shadow-[0_18px_50px_rgba(0,93,82,.16)] sm:px-8 sm:py-8">
+        <div className="absolute -right-16 -top-28 h-72 w-72 rounded-full border-[42px] border-white/5" />
+        <div className="absolute bottom-[-90px] right-[22%] h-56 w-56 rounded-full bg-cyan-300/10 blur-2xl" />
+        <div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
+          <div>
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-[#a7fff0]">
+              <Gamepad2 className="h-3.5 w-3.5" /> Cognitive game library
+            </div>
+            <h1 className="keep-white text-3xl font-black tracking-[-0.035em] text-white sm:text-4xl">Real-time Games</h1>
+            <p className="keep-white mt-2 max-w-xl text-xs font-medium leading-5 text-white/85">Preview assessment experiences, review eligible age groups, and assign games to matched students.</p>
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-[#071633] sm:text-3xl">
-            Real-time Games
-          </h1>
-          <p className="mt-1.5 max-w-2xl text-xs leading-5 text-[#607080]">
-            Assign live games to students who match each game’s eligible age group.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-[9px] font-bold">
-          <span className="rounded-full border border-[#cae7df] bg-white px-3 py-1.5 text-[#526574]">
-            <b className="mr-1 text-[#071633]">{games.length}</b> games
-          </span>
-          <span className="rounded-full border border-[#cae7df] bg-white px-3 py-1.5 text-[#526574]">
-            <b className="mr-1 text-[#071633]">
-              {games.reduce(
-                (sum, game) => sum + (game.assignmentCount || 0),
-                0,
-              )}
-            </b>{" "}
-            assignments
-          </span>
+          <div className="flex gap-2">
+            <DashboardStat value={games.length} label="Active games" />
+            <DashboardStat value={games.reduce((sum, game) => sum + (game.assignmentCount || 0), 0)} label="Assignments" />
+          </div>
         </div>
       </header>
 
@@ -264,26 +258,26 @@ export default function GamesPage() {
         </div>
       )}
 
-      <section className="overflow-visible rounded-2xl border border-[#dceae6] bg-white shadow-sm">
-        <div className="flex flex-col justify-between gap-3 border-b border-[#e5efec] px-5 py-4 sm:flex-row sm:items-center">
+      <section className="overflow-visible rounded-[24px] border border-[#d8e9e5] bg-white shadow-[0_12px_40px_rgba(7,40,45,.06)]">
+        <div className="flex flex-col justify-between gap-4 border-b border-[#e5efec] px-5 py-5 sm:flex-row sm:items-center sm:px-6">
           <div>
-            <p className="text-sm font-black text-[#071633]">Available games</p>
-            <p className="mt-1 text-[9px] text-[#7b8d98]">
-              Developer-registered games ready for school assignment
+            <p className="text-base font-black tracking-tight text-[#071633]">Available assessments</p>
+            <p className="mt-1 text-[10px] text-[#7b8d98]">
+              {visible.length} of {games.length} games shown
             </p>
           </div>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-          <select value={ageGroupFilter} onChange={(event) => setAgeGroupFilter(event.target.value)} className="rounded-xl border border-[#dceae6] bg-[#f9fcfb] px-3 py-2.5 text-xs outline-none focus:border-[#009b87]">
+          <select value={ageGroupFilter} onChange={(event) => setAgeGroupFilter(event.target.value)} className="min-h-11 rounded-xl border border-[#d5e7e2] bg-white px-3 py-2.5 text-xs font-bold text-[#304754] shadow-sm outline-none focus:border-[#009b87] focus:ring-4 focus:ring-[#009b87]/10">
             <option value="">All Age Groups</option>
             {AGE_GROUPS.map((ageGroup) => <option key={ageGroup} value={ageGroup}>{ageGroup}</option>)}
           </select>
-          <label className="relative w-full sm:w-64">
+          <label className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#82939e]" />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search"
-              className="w-full rounded-xl border border-[#dceae6] bg-[#f9fcfb] py-2.5 pl-9 pr-3 text-xs outline-none focus:border-[#009b87]"
+              placeholder="Search games or skills"
+              className="min-h-11 w-full rounded-xl border border-[#d5e7e2] bg-white py-2.5 pl-9 pr-3 text-xs shadow-sm outline-none focus:border-[#009b87] focus:ring-4 focus:ring-[#009b87]/10"
             />
           </label>
           </div>
@@ -310,107 +304,52 @@ export default function GamesPage() {
             </div>
           </div>
         ) : (
-          <div className="divide-y divide-[#e8f0ee]">
+          <div className="grid gap-4 bg-[#f7faf9] p-4 sm:p-5 lg:grid-cols-2">
             {visible.map((game) => (
               <article
                 key={game.id}
-                className="relative flex flex-col gap-4 px-5 py-5 transition hover:bg-[#fbfdfc] lg:flex-row lg:items-center"
+                className="group relative overflow-visible rounded-[22px] border border-[#dce9e6] bg-white p-4 shadow-[0_4px_18px_rgba(7,35,42,.04)] transition duration-300 hover:-translate-y-1 hover:border-[#a7d8cd] hover:shadow-[0_18px_38px_rgba(7,75,68,.12)] sm:p-5"
               >
-                <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#e3f8f2] to-[#d8efff] text-[#008f7d]">
-                    <Gamepad2 className="h-5 w-5" />
-                  </span>
+                <div className={`relative mb-4 flex h-28 items-center overflow-hidden rounded-2xl bg-gradient-to-br ${gameCardTheme(game.componentName)}`}>
+                  <div className="absolute -right-8 -top-10 h-36 w-36 rounded-full border-[24px] border-white/20" />
+                  <div className="absolute bottom-[-42px] left-[24%] h-24 w-40 rotate-[-8deg] rounded-[50%] bg-white/15" />
+                  <GameArtwork componentName={game.componentName} />
+                  <div className="relative z-10 ml-4 min-w-0 pr-4">
+                    <p className="keep-white text-[9px] font-black uppercase tracking-[.16em] text-white/80">{game.category}</p>
+                    <p className="keep-white mt-1 text-sm font-black leading-tight text-white">{game.cognitiveSkill || game.category}</p>
+                  </div>
+                  <span className={`absolute right-3 top-3 z-20 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[8px] font-black uppercase backdrop-blur ${game.isActive ? "border-white/30 bg-white/90 text-emerald-700" : "border-white/20 bg-slate-900/50 text-white"}`}><span className={`h-1.5 w-1.5 rounded-full ${game.isActive ? "bg-emerald-500" : "bg-slate-400"}`} />{game.isActive ? "Active" : "Disabled"}</span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-sm font-black text-[#071633]">
-                        {game.name}
-                      </h2>
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[7px] font-black uppercase ${game.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
-                      >
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full ${game.isActive ? "bg-emerald-500" : "bg-slate-400"}`}
-                        />
-                        {game.isActive ? "Live" : "Disabled"}
-                      </span>
-                    </div>
-                    <p className="mt-1 truncate text-[10px] text-[#81919c]">
-                      {game.description || game.componentName}
-                    </p>
-                    <p className="mt-2 text-[8px] font-black uppercase tracking-wider text-[#8fa0aa]">
-                      {game.category} · {Math.round(game.durationSeconds / 60)}{" "}
-                      minute session
-                    </p>
+                    <h2 className="text-base font-black tracking-tight text-[#071633]">{game.name}</h2>
+                    <p className="mt-1 line-clamp-2 min-h-9 text-[10px] font-medium leading-[18px] text-[#526b78]">{game.description || game.componentName}</p>
+                  </div>
+                  <div className="relative shrink-0">
+                    <button aria-label={`More options for ${game.name}`} disabled={busy === game.id} onClick={() => setMenu(menu === game.id ? "" : game.id)} className="grid h-9 w-9 place-items-center rounded-xl border border-[#e0ebe8] text-[#607080] transition hover:border-[#b9dcd4] hover:bg-[#eaf7f3] hover:text-[#007f70]">{busy === game.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}</button>
+                    {menu === game.id && <div className="absolute right-0 top-11 z-30 w-44 overflow-hidden rounded-xl border border-[#dceae6] bg-white p-1.5 shadow-xl"><MenuButton icon={<Pencil />} label="Edit details" onClick={() => { setEditing({ ...game }); setMenu(""); }} /><MenuButton icon={<Power />} label={game.isActive ? "Disable" : "Enable"} onClick={() => void toggle(game)} /><MenuButton danger icon={<Trash2 />} label="Remove" onClick={() => void remove(game)} /></div>}
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:w-[540px]">
-                  <div className="rounded-xl bg-[#f7faf9] px-3 py-2">
-                    <p className="text-[7px] font-black uppercase tracking-wide text-[#95a3ac]">
-                      Age Group
-                    </p>
-                    <p className="mt-1 flex items-center gap-1 text-[10px] font-black text-violet-700">
-                      <Users className="h-3 w-3" />
-                      {game.ageGroup}
-                    </p>
-                  </div>
-                  <div className="rounded-xl bg-[#f7faf9] px-3 py-2">
-                    <p className="text-[7px] font-black uppercase tracking-wide text-[#95a3ac]">
-                      Assigned
-                    </p>
-                    <p className="mt-1 text-[10px] font-black text-[#071633]">
-                      {game.assignmentCount || 0} batches
-                    </p>
-                  </div>
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  <GameMeta label="Age group" value={game.ageGroup} icon={<Users />} accent />
+                  <GameMeta label="Duration" value={`${Math.round(game.durationSeconds / 60)} min`} />
+                  <GameMeta label="Assigned" value={`${game.assignmentCount || 0} batches`} />
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[#e8f0ee] pt-4">
                   <button
                     disabled={!game.isActive}
                     onClick={() => setPreviewing(game)}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#b9dcd4] bg-white px-4 py-2.5 text-[10px] font-black text-[#007f70] transition hover:bg-[#f0f8f5] disabled:opacity-40"
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#b9dcd4] bg-white px-4 py-2.5 text-[10px] font-black text-[#007f70] transition hover:border-[#008f7d] hover:bg-[#f0f8f5] disabled:opacity-40"
                   >
                     <Eye className="h-3.5 w-3.5" /> Preview
                   </button>
                   <button
                     disabled={!game.isActive}
                     onClick={() => void openAssignment(game)}
-                    className="keep-white inline-flex items-center justify-center gap-2 rounded-xl bg-[#007f70] px-4 py-2.5 text-[10px] font-black transition hover:bg-[#006b5e] disabled:opacity-40"
+                    className="keep-white inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#007f70] px-4 py-2.5 text-[10px] font-black shadow-md shadow-[#007f70]/15 transition hover:bg-[#006b5e] disabled:opacity-40"
                   >
                     <Send className="keep-white h-3.5 w-3.5" /> Assign
                   </button>
-                </div>
-                <div className="relative">
-                  <button
-                    disabled={busy === game.id}
-                    onClick={() => setMenu(menu === game.id ? "" : game.id)}
-                    className="grid h-9 w-9 place-items-center rounded-lg text-[#607080] hover:bg-[#eaf7f3] hover:text-[#007f70]"
-                  >
-                    {busy === game.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <MoreHorizontal className="h-4 w-4" />
-                    )}
-                  </button>
-                  {menu === game.id && (
-                    <div className="absolute right-0 top-11 z-20 w-44 overflow-hidden rounded-xl border border-[#dceae6] bg-white p-1.5 shadow-xl">
-                      <MenuButton
-                        icon={<Pencil />}
-                        label="Edit details"
-                        onClick={() => {
-                          setEditing({ ...game });
-                          setMenu("");
-                        }}
-                      />
-                      <MenuButton
-                        icon={<Power />}
-                        label={game.isActive ? "Disable" : "Enable"}
-                        onClick={() => void toggle(game)}
-                      />
-                      <MenuButton
-                        danger
-                        icon={<Trash2 />}
-                        label="Remove"
-                        onClick={() => void remove(game)}
-                      />
-                    </div>
-                  )}
                 </div>
               </article>
             ))}
@@ -647,6 +586,10 @@ export default function GamesPage() {
               />
             ) : previewing.componentName === "BALL_STACK" ? (
               <BallStackGame sound durationSeconds={previewing.durationSeconds} onComplete={() => setPreviewing(null)} />
+            ) : previewing.componentName === "SOUND_DETECTIVE" ? (
+              <SoundDetectiveGame sound durationSeconds={previewing.durationSeconds} onComplete={() => setPreviewing(null)} />
+            ) : previewing.componentName === "COLOR_PATH" ? (
+              <ColorPathGame sound durationSeconds={previewing.durationSeconds} onComplete={() => setPreviewing(null)} />
             ) : (
               <div className="grid h-full place-items-center text-center text-white">
                 <div>
@@ -662,6 +605,31 @@ export default function GamesPage() {
         )}
     </div>
   );
+}
+
+function DashboardStat({ value, label }: { value: number; label: string }) {
+  return <div className="keep-white min-w-28 rounded-2xl border border-white/25 bg-[#064f50]/45 px-4 py-3 text-white shadow-sm backdrop-blur-sm"><p className="keep-white text-xl font-black leading-none text-white">{value}</p><p className="keep-white mt-1.5 text-[8px] font-black uppercase tracking-[.14em] text-white/80">{label}</p></div>;
+}
+
+function GameArtwork({ componentName }: { componentName: string }) {
+  const common = "relative z-10 ml-5 grid h-24 w-40 shrink-0 overflow-hidden rounded-xl border border-white/60 bg-white/90 shadow-lg transition duration-300 group-hover:scale-[1.04]";
+  if (componentName === "BALL_STACK") return <div className={`${common} place-items-center`} aria-hidden><span className="absolute inset-x-0 top-2.5 text-center text-[8px] font-black tracking-[.16em] text-[#37616a]">BALANCE • PLACE</span><div className="absolute bottom-2.5 left-1/2 flex -translate-x-1/2 flex-col-reverse items-center drop-shadow-md"><i className="h-4 w-20 rounded-full bg-[#27b99d] ring-2 ring-white"/><i className="-mb-0.5 h-4 w-16 rounded-full bg-[#f3c84b] ring-2 ring-white"/><i className="-mb-0.5 h-4 w-12 rounded-full bg-[#f27668] ring-2 ring-white"/><i className="-mb-0.5 h-4 w-8 rounded-full bg-[#6b5bd2] ring-2 ring-white"/></div></div>;
+  if (componentName === "FOLLOW_THE_LIGHTS") return <div className={`${common} place-items-center bg-[#101d45]/90`} aria-hidden><div className="grid grid-cols-2 gap-3">{["#ffcf4a","#64d9be","#ed6f79","#738dff"].map((color,index)=><i key={color} className={`h-8 w-8 rounded-full border-4 border-white/80 shadow-[0_0_18px_currentColor] ${index===1 ? "scale-110" : "opacity-75"}`} style={{backgroundColor:color,color}}/>)}</div><span className="keep-white absolute bottom-2 text-[8px] font-black tracking-widest text-white">WATCH • REMEMBER</span></div>;
+  if (componentName === "SOUND_DETECTIVE") return <div className={`${common} place-items-center bg-[#fff8e8]`} aria-hidden><div className="flex h-12 items-center gap-1">{[18,34,48,28,42,22,38].map((height,index)=><i key={index} className="w-2 rounded-full bg-gradient-to-t from-[#d85d31] to-[#f3b83f]" style={{height}}/>)}</div><span className="absolute left-3 top-3 text-2xl">🎧</span><span className="absolute bottom-2 text-[8px] font-black tracking-widest text-[#8b4a2a]">LISTEN • IDENTIFY</span></div>;
+  if (componentName === "COLOR_PATH") return <div className={`${common} bg-gradient-to-b from-[#ddf7ff] to-[#b7e995]`} aria-hidden><span className="absolute left-[18px] top-[30px] text-3xl">🐻</span>{["#ef4444","#22c55e","#3b82f6","#facc15"].map((color,index)=><i key={color} className="absolute bottom-5 h-5 w-9 rounded-[50%] border-2 border-white shadow" style={{backgroundColor:color,left:50+index*25,transform:`translateY(${index%2 ? -12 : 0}px)`}}/>)}<span className="absolute inset-x-0 bottom-1 text-center text-[8px] font-black tracking-widest text-[#31555c]">COLOR PATH</span></div>;
+  return <div className={`${common} place-items-center`} aria-hidden><Gamepad2 className="h-9 w-9 text-[#007f70]"/></div>;
+}
+
+function GameMeta({ label, value, icon, accent = false }: { label: string; value: string; icon?: React.ReactNode; accent?: boolean }) {
+  return <div className="rounded-xl border border-[#edf2f1] bg-[#f7faf9] px-3 py-2.5"><p className="text-[7px] font-black uppercase tracking-[.12em] text-[#96a5ad]">{label}</p><p className={`mt-1 flex items-center gap-1 text-[10px] font-black ${accent ? "text-violet-700" : "text-[#173044]"}`}>{icon && <span className="[&_svg]:h-3 [&_svg]:w-3">{icon}</span>}{value}</p></div>;
+}
+
+function gameCardTheme(componentName: string) {
+  if (componentName === "COLOR_PATH") return "from-[#5a3cc8] via-[#8c55df] to-[#d56eb4]";
+  if (componentName === "BALL_STACK") return "from-[#096e79] via-[#12a18f] to-[#6fc486]";
+  if (componentName === "FOLLOW_THE_LIGHTS") return "from-[#122655] via-[#324b98] to-[#6377d7]";
+  if (componentName === "SOUND_DETECTIVE") return "from-[#9b4d21] via-[#dd7b35] to-[#f1b84b]";
+  return "from-[#0b6870] via-[#168e84] to-[#54baa5]";
 }
 
 function MenuButton({

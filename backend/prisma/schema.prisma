@@ -149,26 +149,28 @@ model GameAssessment {
 /// Global, tenant-independent game definitions. This is the master library;
 /// assessment configuration and student results live in their own tables.
 model Game {
-  id                    String                   @id @default(uuid())
-  name                  String
-  slug                  String                   @unique
-  description           String?                  @db.Text
-  category              String
-  ageGroup              String                   @map("age_group")
-  difficulty            String
-  durationSeconds       Int                      @map("duration_seconds")
-  thumbnail             String?
-  componentName         String                   @unique @map("component_name")
-  gameType              String                   @map("game_type")
-  status                String                   @default("ACTIVE")
-  isActive              Boolean                  @default(true) @map("is_active")
-  assessments           GameAssessmentGame[]
-  results               GameResult[]
-  followLightsAnalytics FollowLightsAnalytics[]
-  ballStackAnalytics    BallStackAnalytics[]
-  realTimeAssignments   RealTimeGameAssignment[]
-  createdAt             DateTime                 @default(now()) @map("created_at")
-  updatedAt             DateTime                 @updatedAt @map("updated_at")
+  id                      String                    @id @default(uuid())
+  name                    String
+  slug                    String                    @unique
+  description             String?                   @db.Text
+  category                String
+  ageGroup                String                    @map("age_group")
+  difficulty              String
+  durationSeconds         Int                       @map("duration_seconds")
+  thumbnail               String?
+  componentName           String                    @unique @map("component_name")
+  gameType                String                    @map("game_type")
+  status                  String                    @default("ACTIVE")
+  isActive                Boolean                   @default(true) @map("is_active")
+  assessments             GameAssessmentGame[]
+  results                 GameResult[]
+  followLightsAnalytics   FollowLightsAnalytics[]
+  ballStackAnalytics      BallStackAnalytics[]
+  soundDetectiveAnalytics SoundDetectiveAnalytics[]
+  colorPathAnalytics      ColorPathAnalytics[]
+  realTimeAssignments     RealTimeGameAssignment[]
+  createdAt               DateTime                  @default(now()) @map("created_at")
+  updatedAt               DateTime                  @updatedAt @map("updated_at")
 
   @@index([status, isActive])
   @@index([category, ageGroup])
@@ -278,28 +280,30 @@ model GameAssignment {
 }
 
 model GameResult {
-  id                    String                 @id @default(uuid())
-  gameAssignmentId      String
-  gameAssignment        GameAssignment         @relation(fields: [gameAssignmentId], references: [id], onDelete: Cascade)
-  studentId             String
-  gameId                String?
-  game                  Game?                  @relation(fields: [gameId], references: [id], onDelete: SetNull)
-  assessmentId          String?
-  assessment            GameAssessment?        @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
-  status                String                 @default("NOT_STARTED")
-  totalScore            Float                  @default(0)
-  percentage            Float                  @default(0)
-  passed                Boolean?
-  startedAt             DateTime?
-  completedAt           DateTime?
-  attempts              GameAttempt[]
-  runtimeSessions       GameRuntimeSession[]
-  rewards               GameReward[]
-  certificate           GameCertificate?
-  followLightsAnalytics FollowLightsAnalytics?
-  ballStackAnalytics    BallStackAnalytics?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
+  id                      String                   @id @default(uuid())
+  gameAssignmentId        String
+  gameAssignment          GameAssignment           @relation(fields: [gameAssignmentId], references: [id], onDelete: Cascade)
+  studentId               String
+  gameId                  String?
+  game                    Game?                    @relation(fields: [gameId], references: [id], onDelete: SetNull)
+  assessmentId            String?
+  assessment              GameAssessment?          @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+  status                  String                   @default("NOT_STARTED")
+  totalScore              Float                    @default(0)
+  percentage              Float                    @default(0)
+  passed                  Boolean?
+  startedAt               DateTime?
+  completedAt             DateTime?
+  attempts                GameAttempt[]
+  runtimeSessions         GameRuntimeSession[]
+  rewards                 GameReward[]
+  certificate             GameCertificate?
+  followLightsAnalytics   FollowLightsAnalytics?
+  ballStackAnalytics      BallStackAnalytics?
+  soundDetectiveAnalytics SoundDetectiveAnalytics?
+  colorPathAnalytics      ColorPathAnalytics?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
 
   @@unique([gameAssignmentId, studentId])
   @@index([studentId, status])
@@ -3006,4 +3010,57 @@ model StudentSlotBooking {
   @@index([slotId])
   @@index([studentId])
   @@map("StudentSlotBookings")
+}
+
+model SoundDetectiveAnalytics {
+  id                       String     @id @default(uuid())
+  studentId                String
+  assessmentId             String
+  gameId                   String
+  gameResultId             String     @unique
+  gameResult               GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
+  game                     Game       @relation(fields: [gameId], references: [id])
+  roundsPlayed             Int
+  correctResponses         Int
+  incorrectResponses       Int
+  averageResponseTime      Float
+  listeningScore           Float
+  auditoryRecognitionScore Float
+  completionPercentage     Float
+  overallScore             Float
+  highestDifficulty        Int
+  completionStatus         String
+  createdAt                DateTime   @default(now())
+  updatedAt                DateTime   @updatedAt
+
+  @@index([gameId, assessmentId])
+  @@index([studentId, assessmentId])
+  @@map("SoundDetectiveAnalytics")
+}
+
+model ColorPathAnalytics {
+  id                     String     @id @default(uuid())
+  studentId              String
+  assessmentId           String
+  gameId                 String
+  gameResultId           String     @unique
+  gameResult             GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
+  game                   Game       @relation(fields: [gameId], references: [id])
+  roundsPlayed           Int
+  correctSelections      Int
+  incorrectSelections    Int
+  averageResponseTime    Float
+  observationAccuracy    Float
+  observationScore       Float
+  visualRecognitionScore Float
+  highestDifficulty      Int
+  completionPercentage   Float
+  overallScore           Float
+  completionStatus       String
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+
+  @@index([gameId, assessmentId])
+  @@index([studentId, assessmentId])
+  @@map("ColorPathAnalytics")
 }
