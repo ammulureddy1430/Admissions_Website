@@ -103,6 +103,20 @@ export class GamesService implements OnModuleInit {
 
   async reports(id: string, schoolId: string) {
     const game = await this.one(id, schoolId);
+    if (game.componentName === 'BALL_STACK') {
+      const reports = await this.prisma.ballStackAnalytics.findMany({
+        where: { gameId: id, gameResult: { assessment: { schoolId } } },
+        select: {
+          id: true, studentId: true, assessmentId: true, createdAt: true,
+          handEyeCoordinationScore: true, fineMotorScore: true, precisionScore: true,
+          concentrationScore: true, patienceScore: true, reactionSpeedScore: true,
+          overallCognitiveScore: true, highestTowerHeight: true, perfectPlacements: true,
+          averageAlignment: true, averageReactionTime: true, completionStatus: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      return reports.map((report) => ({ ...report, ageGroup: game.ageGroup }));
+    }
     const reports = await this.prisma.followLightsAnalytics.findMany({
       where: { gameId: id, gameResult: { assessment: { schoolId } } },
       select: {

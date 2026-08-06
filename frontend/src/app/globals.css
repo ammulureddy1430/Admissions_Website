@@ -2099,6 +2099,21 @@ body [class*="text-purple-"] {
   color: #008f7d !important;
 }
 
+/* Games errors must remain legible despite the broad palette normalizers above. */
+.games-error-alert {
+  border: 1px solid #fca5a5 !important;
+  background: #fff1f2 !important;
+  color: #991b1b !important;
+  box-shadow: 0 8px 24px rgba(153, 27, 27, 0.08);
+}
+.games-error-alert svg { color: #dc2626 !important; }
+.games-error-retry {
+  border: 1px solid #fecaca !important;
+  background: #ffffff !important;
+  color: #991b1b !important;
+}
+.games-error-retry:hover { background: #fee2e2 !important; }
+
 body input,
 body textarea {
   border-color: #d4e4df !important;
@@ -4268,4 +4283,16 @@ html body .template-action--danger svg {
 .racing-obstacles i:nth-child(2)::before {
   top: -13px;
   content: "CONE";
+}
+
+body .games-error-alert {
+  border-color: #fca5a5 !important;
+  background: #fff1f2 !important;
+  color: #991b1b !important;
+}
+body .games-error-alert svg { color: #dc2626 !important; }
+body .games-error-alert .games-error-retry {
+  border-color: #fecaca !important;
+  background: #ffffff !important;
+  color: #991b1b !important;
 }

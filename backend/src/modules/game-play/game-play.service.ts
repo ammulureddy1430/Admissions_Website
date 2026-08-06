@@ -398,9 +398,11 @@ export class GamePlayService {
     if (!session) throw new ForbiddenException('Invalid gameplay session.');
     const runtime = session.runtimeState as any;
     const followLights = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'FOLLOW_THE_LIGHTS' ? runtime.cognitiveAnalytics : null;
-    const answered = followLights ? Number(followLights.correctTaps || 0) + Number(followLights.wrongTaps || 0) : runtime?.answers?.length || 0;
-    const total = followLights ? Math.max(1, answered) : session.questionIds.length;
-    const percentage = followLights ? Number(followLights.overallScore || 0) : total ? (Number(runtime?.correct || 0) / total) * 100 : 0;
+    const ballStack = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'BALL_STACK' ? runtime.cognitiveAnalytics : null;
+    const cognitive = followLights || ballStack;
+    const answered = followLights ? Number(followLights.correctTaps || 0) + Number(followLights.wrongTaps || 0) : ballStack ? Number(ballStack.totalBallsDropped || 0) : runtime?.answers?.length || 0;
+    const total = cognitive ? Math.max(1, answered) : session.questionIds.length;
+    const percentage = followLights ? Number(followLights.overallScore || 0) : ballStack ? Number(ballStack.overallCognitiveScore || 0) : total ? (Number(runtime?.correct || 0) / total) * 100 : 0;
     const passed = percentage >= assignment.passingScore;
     const attempt = await this.prisma.gameAttempt.findFirst({ where: { gameResultId: result.id, submittedAt: null }, orderBy: { attemptNumber: 'desc' } });
     await this.prisma.$transaction(async (tx) => {
@@ -428,9 +430,20 @@ export class GamePlayService {
           },
         });
       }
+      if (ballStack && result.gameId) {
+        const data = {
+          totalBallsDropped: Number(ballStack.totalBallsDropped || 0), successfulPlacements: Number(ballStack.successfulPlacements || 0), failedPlacements: Number(ballStack.failedPlacements || 0),
+          highestTowerHeight: Number(ballStack.highestTowerHeight || 0), averageAlignment: Number(ballStack.averageAlignment || 0), perfectPlacements: Number(ballStack.perfectPlacements || 0),
+          averageReactionTime: Number(ballStack.averageReactionTime || 0), towerStabilityScore: Number(ballStack.towerStabilityScore || 0), handEyeCoordinationScore: Number(ballStack.handEyeCoordinationScore || 0),
+          fineMotorScore: Number(ballStack.fineMotorScore || 0), precisionScore: Number(ballStack.precisionScore || 0), concentrationScore: Number(ballStack.concentrationScore || 0),
+          patienceScore: Number(ballStack.patienceScore || 0), reactionSpeedScore: Number(ballStack.reactionSpeedScore || 0), consistencyScore: Number(ballStack.consistencyScore || 0),
+          timingAccuracyScore: Number(ballStack.timingAccuracyScore || 0), overallCognitiveScore: Number(ballStack.overallCognitiveScore || 0), completionStatus: String(ballStack.completionStatus || 'COMPLETED'),
+        };
+        await tx.ballStackAnalytics.upsert({ where: { gameResultId: result.id }, create: { ...data, gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId }, update: data });
+      }
       if (attempt) {
         await tx.gameAttempt.update({ where: { id: attempt.id }, data: { submittedAt: new Date(), state: session.runtimeState as Prisma.InputJsonValue } });
-        await tx.gameScore.create({ data: { gameAttemptId: attempt.id, gameKey: assignment.generatedGame?.engineKey || 'GAME', score: session.score, maxScore: followLights ? 100 : total * 10, timeTaken: session.elapsedSeconds, details: followLights || { answered, correct: runtime?.correct || 0, incorrect: runtime?.incorrect || 0 } } });
+        await tx.gameScore.create({ data: { gameAttemptId: attempt.id, gameKey: assignment.generatedGame?.engineKey || 'GAME', score: session.score, maxScore: cognitive ? 100 : total * 10, timeTaken: session.elapsedSeconds, details: cognitive || { answered, correct: runtime?.correct || 0, incorrect: runtime?.incorrect || 0 } } });
       }
     });
     const rewards = await this.insights.processResult(result.id, schoolId);

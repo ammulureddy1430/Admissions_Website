@@ -165,6 +165,7 @@ model Game {
   assessments           GameAssessmentGame[]
   results               GameResult[]
   followLightsAnalytics FollowLightsAnalytics[]
+  ballStackAnalytics    BallStackAnalytics[]
   realTimeAssignments   RealTimeGameAssignment[]
   createdAt             DateTime                 @default(now()) @map("created_at")
   updatedAt             DateTime                 @updatedAt @map("updated_at")
@@ -296,6 +297,7 @@ model GameResult {
   rewards               GameReward[]
   certificate           GameCertificate?
   followLightsAnalytics FollowLightsAnalytics?
+  ballStackAnalytics    BallStackAnalytics?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 
@@ -336,6 +338,40 @@ model FollowLightsAnalytics {
   @@index([gameId, assessmentId])
   @@index([studentId, assessmentId])
   @@map("FollowLightsAnalytics")
+}
+
+model BallStackAnalytics {
+  id                       String     @id @default(uuid())
+  studentId                String
+  assessmentId             String
+  gameId                   String
+  gameResultId             String     @unique
+  gameResult               GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
+  game                     Game       @relation(fields: [gameId], references: [id])
+  totalBallsDropped        Int
+  successfulPlacements     Int
+  failedPlacements         Int
+  highestTowerHeight       Int
+  averageAlignment         Float
+  perfectPlacements        Int
+  averageReactionTime      Float
+  towerStabilityScore      Float
+  handEyeCoordinationScore Float
+  fineMotorScore           Float
+  precisionScore           Float
+  concentrationScore       Float
+  patienceScore            Float
+  reactionSpeedScore       Float
+  consistencyScore         Float
+  timingAccuracyScore      Float
+  overallCognitiveScore    Float
+  completionStatus         String
+  createdAt                DateTime   @default(now())
+  updatedAt                DateTime   @updatedAt
+
+  @@index([gameId, assessmentId])
+  @@index([studentId, assessmentId])
+  @@map("BallStackAnalytics")
 }
 
 model GameAttempt {

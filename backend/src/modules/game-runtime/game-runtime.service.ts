@@ -16,6 +16,7 @@ const ENGINES = [
   ['SEQUENCE_GAME','Sequence Game'],['ENDLESS_RUNNER','Endless Runner'],['SPIN_WHEEL','Spin Wheel'],
   ['BASKETBALL_CHALLENGE','Basketball Challenge'],['FOOTBALL_GOAL_QUIZ','Football Goal Quiz'],
   ['FOLLOW_THE_LIGHTS','Follow the Lights'],
+  ['BALL_STACK','Ball Stack'],
 ] as const;
 
 @Injectable()
@@ -132,6 +133,7 @@ export class GameRuntimeService {
     if (action === 'MAZE_COMPLETE') return this.mazeComplete(session, dto.payload, schoolId, user);
     if (action === 'MEMORY_COMPLETE') return this.memoryComplete(session, dto.payload, schoolId, user);
     if (action === 'FOLLOW_LIGHTS_COMPLETE') return this.followLightsComplete(session, dto.payload, schoolId, user);
+    if (action === 'BALL_STACK_COMPLETE') return this.ballStackComplete(session, dto.payload, schoolId, user);
     if (action === 'SECURITY_VIOLATION') return this.securityViolation(session, dto.payload, schoolId, user);
     if (action === 'COMPLETE') return this.transition(id, 'COMPLETED', { completedAt: new Date() }, 'COMPLETED', dto.payload, schoolId, user);
     throw new BadRequestException('Unsupported runtime action.');
@@ -169,6 +171,36 @@ export class GameRuntimeService {
       runtimeState: { ...((session.runtimeState || {}) as Record<string, unknown>), cognitiveAnalytics } as Prisma.InputJsonValue,
     } });
     await this.event(session.id, 'FOLLOW_LIGHTS_COMPLETED', cognitiveAnalytics);
+    return { state: await this.state(session.id, schoolId, user) };
+  }
+
+  private async ballStackComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
+    if (session.engine.engineKey !== 'BALL_STACK' || session.status !== 'RUNNING') throw new BadRequestException('Ball Stack metrics require an active Ball Stack session.');
+    const input = (payload || {}) as Record<string, any>;
+    const number = (key: string, maximum = 100000) => Math.max(0, Math.min(maximum, Number(input[key]) || 0));
+    const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 10) / 10));
+    const totalBallsDropped = number('totalBallsDropped', 1000);
+    const successfulPlacements = Math.min(totalBallsDropped, number('successfulPlacements', 1000));
+    const failedPlacements = Math.min(totalBallsDropped - successfulPlacements, number('failedPlacements', 1000));
+    const highestTowerHeight = Math.min(successfulPlacements, number('highestTowerHeight', 1000));
+    const perfectPlacements = Math.min(successfulPlacements, number('perfectPlacements', 1000));
+    const averageAlignment = clamp(number('averageAlignment', 100));
+    const averageReactionTime = number('averageReactionTime', 60000);
+    const towerStabilityScore = clamp(number('towerStabilityScore', 100));
+    const successRate = totalBallsDropped ? successfulPlacements / totalBallsDropped * 100 : 0;
+    const reactionSpeedScore = clamp(100 - Math.max(0, averageReactionTime - 650) / 22);
+    const consistencyScore = clamp(number('consistencyScore', 100));
+    const handEyeCoordinationScore = clamp(successRate * .45 + averageAlignment * .35 + reactionSpeedScore * .2);
+    const fineMotorScore = clamp(averageAlignment * .52 + towerStabilityScore * .3 + consistencyScore * .18);
+    const precisionScore = clamp(averageAlignment * .7 + perfectPlacements / Math.max(1, totalBallsDropped) * 30);
+    const concentrationScore = clamp(successRate * .45 + consistencyScore * .35 + Math.min(100, highestTowerHeight * 8) * .2);
+    const patienceScore = clamp(Math.min(100, averageReactionTime / 18) * .35 + towerStabilityScore * .65);
+    const timingAccuracyScore = clamp(reactionSpeedScore * .4 + averageAlignment * .6);
+    const overallCognitiveScore = clamp(handEyeCoordinationScore * .23 + fineMotorScore * .2 + precisionScore * .18 + concentrationScore * .14 + patienceScore * .1 + reactionSpeedScore * .08 + consistencyScore * .07);
+    const completionStatus = String(input.endReason) === 'TOWER_COLLAPSED' ? 'TOWER_COLLAPSED' : 'COMPLETED';
+    const cognitiveAnalytics = { totalBallsDropped, successfulPlacements, failedPlacements, highestTowerHeight, averageAlignment, perfectPlacements, averageReactionTime, towerStabilityScore, handEyeCoordinationScore, fineMotorScore, precisionScore, concentrationScore, patienceScore, reactionSpeedScore, consistencyScore, timingAccuracyScore, overallCognitiveScore, completionStatus };
+    await this.prisma.gameRuntimeSession.update({ where: { id: session.id }, data: { status: 'COMPLETED', completedAt: new Date(), score: overallCognitiveScore, elapsedSeconds: Math.min(90, number('elapsedSeconds', 90)), runtimeState: { ...((session.runtimeState || {}) as Record<string, unknown>), cognitiveAnalytics } as Prisma.InputJsonValue } });
+    await this.event(session.id, 'BALL_STACK_COMPLETED', cognitiveAnalytics);
     return { state: await this.state(session.id, schoolId, user) };
   }
 

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
+  AlertCircle,
   CheckCircle2,
   Eye,
   Gamepad2,
@@ -17,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import FollowTheLightsGame from "@/games/follow-the-lights/Game";
+import BallStackGame from "@/games/ball-stack/Game";
 
 type Game = {
   id: string;
@@ -253,8 +255,12 @@ export default function GamesPage() {
       </header>
 
       {error && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700">
-          {error}
+        <div className="games-error-alert flex items-center justify-between gap-4 rounded-xl px-4 py-3" role="alert">
+          <span className="flex min-w-0 items-center gap-2.5">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span className="text-xs font-bold">{error === "Failed to fetch" ? "Unable to connect to the Games service. Please try again." : error}</span>
+          </span>
+          <button type="button" onClick={() => void load()} className="games-error-retry shrink-0 rounded-lg px-3 py-1.5 text-[10px] font-black">Retry</button>
         </div>
       )}
 
@@ -639,6 +645,8 @@ export default function GamesPage() {
                 durationSeconds={previewing.durationSeconds}
                 onComplete={() => setPreviewing(null)}
               />
+            ) : previewing.componentName === "BALL_STACK" ? (
+              <BallStackGame sound durationSeconds={previewing.durationSeconds} onComplete={() => setPreviewing(null)} />
             ) : (
               <div className="grid h-full place-items-center text-center text-white">
                 <div>
