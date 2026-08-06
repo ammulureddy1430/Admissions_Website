@@ -65,6 +65,7 @@ model School {
   aiSourceLibrary                SchoolAiSourceLibrary?
   gameAssessments                GameAssessment[]
   gameTemplates                  GameTemplate[]
+  realTimeGameAssignments        RealTimeGameAssignment[]
   curriculumBoards               CurriculumBoard[]
   curriculumGrades               CurriculumGrade[]
   curriculumSubjects             CurriculumSubject[]
@@ -101,7 +102,7 @@ model GameAssessment {
   assessmentType     String
   assessmentMode     String
   subject            String
-  grade              String
+  ageGroup           String                   @map("age_group")
   section            String?
   chapter            String?
   topics             String[]
@@ -132,6 +133,8 @@ model GameAssessment {
   topicId            String?
   learningOutcomeId  String?
   templateSelections GameAssessmentTemplate[]
+  gameSelections     GameAssessmentGame[]
+  gameResults        GameResult[]
   textbookId         String?
   textbookVersionId  String?
   aiQuestions        GameAIQuestion[]
@@ -140,7 +143,54 @@ model GameAssessment {
   updatedAt          DateTime                 @updatedAt
 
   @@index([schoolId, status])
-  @@index([schoolId, grade, subject])
+  @@index([schoolId, ageGroup, subject])
+}
+
+/// Global, tenant-independent game definitions. This is the master library;
+/// assessment configuration and student results live in their own tables.
+model Game {
+  id                    String                   @id @default(uuid())
+  name                  String
+  slug                  String                   @unique
+  description           String?                  @db.Text
+  category              String
+  ageGroup              String                   @map("age_group")
+  difficulty            String
+  durationSeconds       Int                      @map("duration_seconds")
+  thumbnail             String?
+  componentName         String                   @unique @map("component_name")
+  gameType              String                   @map("game_type")
+  status                String                   @default("ACTIVE")
+  isActive              Boolean                  @default(true) @map("is_active")
+  assessments           GameAssessmentGame[]
+  results               GameResult[]
+  followLightsAnalytics FollowLightsAnalytics[]
+  realTimeAssignments   RealTimeGameAssignment[]
+  createdAt             DateTime                 @default(now()) @map("created_at")
+  updatedAt             DateTime                 @updatedAt @map("updated_at")
+
+  @@index([status, isActive])
+  @@index([category, ageGroup])
+  @@map("games")
+}
+
+model RealTimeGameAssignment {
+  id           String    @id @default(uuid())
+  schoolId     String
+  school       School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  gameId       String
+  game         Game      @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  assignedById String
+  ageGroup     String    @map("age_group")
+  studentIds   String[]
+  startsAt     DateTime?
+  endsAt       DateTime?
+  status       String    @default("ASSIGNED")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([schoolId, gameId, ageGroup, status])
+  @@map("RealTimeGameAssignments")
 }
 
 model GameTemplate {
@@ -227,25 +277,65 @@ model GameAssignment {
 }
 
 model GameResult {
-  id               String               @id @default(uuid())
-  gameAssignmentId String
-  gameAssignment   GameAssignment       @relation(fields: [gameAssignmentId], references: [id], onDelete: Cascade)
-  studentId        String
-  status           String               @default("NOT_STARTED")
-  totalScore       Float                @default(0)
-  percentage       Float                @default(0)
-  passed           Boolean?
-  startedAt        DateTime?
-  completedAt      DateTime?
-  attempts         GameAttempt[]
-  runtimeSessions  GameRuntimeSession[]
-  rewards          GameReward[]
-  certificate      GameCertificate?
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
+  id                    String                 @id @default(uuid())
+  gameAssignmentId      String
+  gameAssignment        GameAssignment         @relation(fields: [gameAssignmentId], references: [id], onDelete: Cascade)
+  studentId             String
+  gameId                String?
+  game                  Game?                  @relation(fields: [gameId], references: [id], onDelete: SetNull)
+  assessmentId          String?
+  assessment            GameAssessment?        @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+  status                String                 @default("NOT_STARTED")
+  totalScore            Float                  @default(0)
+  percentage            Float                  @default(0)
+  passed                Boolean?
+  startedAt             DateTime?
+  completedAt           DateTime?
+  attempts              GameAttempt[]
+  runtimeSessions       GameRuntimeSession[]
+  rewards               GameReward[]
+  certificate           GameCertificate?
+  followLightsAnalytics FollowLightsAnalytics?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
 
   @@unique([gameAssignmentId, studentId])
   @@index([studentId, status])
+  @@index([gameId, studentId])
+  @@index([assessmentId, studentId])
+}
+
+model FollowLightsAnalytics {
+  id                   String     @id @default(uuid())
+  studentId            String
+  assessmentId         String
+  gameId               String
+  gameResultId         String     @unique
+  gameResult           GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
+  game                 Game       @relation(fields: [gameId], references: [id])
+  totalSequences       Int
+  completedSequences   Int
+  longestSequence      Int
+  mistakes             Int
+  correctTaps          Int
+  wrongTaps            Int
+  averageReactionTime  Float
+  averageTapDelay      Float
+  completionPercentage Float
+  memoryScore          Float
+  focusScore           Float
+  processingSpeed      Float
+  learningPotential    Float
+  accuracy             Float
+  attention            Float
+  visualMemory         Float
+  overallScore         Float
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  @@index([gameId, assessmentId])
+  @@index([studentId, assessmentId])
+  @@map("FollowLightsAnalytics")
 }
 
 model GameAttempt {
@@ -707,6 +797,18 @@ model GameAssessmentTemplate {
   createdAt        DateTime       @default(now())
 
   @@unique([gameAssessmentId, templateId])
+}
+
+model GameAssessmentGame {
+  id               String         @id @default(uuid())
+  gameAssessmentId String
+  gameAssessment   GameAssessment @relation(fields: [gameAssessmentId], references: [id], onDelete: Cascade)
+  gameId           String
+  game             Game           @relation(fields: [gameId], references: [id])
+  createdAt        DateTime       @default(now())
+
+  @@unique([gameAssessmentId, gameId])
+  @@index([gameId])
 }
 
 model CurriculumAuditLog {
@@ -1207,14 +1309,14 @@ model GameTutorial {
 }
 
 model GameTutorialProgress {
-  id                String   @id @default(uuid())
+  id                String    @id @default(uuid())
   studentId         String
   assessmentId      String
-  tutorialViewed    Boolean  @default(false)
-  practiceCompleted Boolean  @default(false)
+  tutorialViewed    Boolean   @default(false)
+  practiceCompleted Boolean   @default(false)
   viewedAt          DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@unique([studentId, assessmentId])
   @@index([assessmentId, tutorialViewed])
@@ -2523,49 +2625,49 @@ model StorageUsage {
 }
 
 model Assessment {
-  id                    String                          @id @default(uuid())
-  schoolId              String
-  school                School                          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  applicationId         String?
-  application           Application?                    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  title                 String
-  description           String?                         @db.Text
-  instructions          String?                         @db.Text
-  grade                 String
-  subject               String
-  difficulty            String // EASY, MEDIUM, HARD
-  questionCount         Int
-  timeLimit             Int // in minutes
-  totalMarks            Float
-  passingMarks          Float
-  dueDate               DateTime?
-  allowCalculator       Boolean                         @default(false)
-  shuffleQuestions      Boolean                         @default(false)
-  shuffleOptions        Boolean                         @default(false)
-  showResultImmediately Boolean                         @default(false)
-  allowRetake           Boolean                         @default(false)
-  retakeCount           Int                             @default(1)
-  status                String                          @default("DRAFT") // DRAFT, PUBLISHED
-  assessmentMode        String                          @default("HOME") // HOME, SCHOOL, BOTH
-  venueChoice           String?                         // HOME or SCHOOL; required for BOTH assignments
+  id                     String                          @id @default(uuid())
+  schoolId               String
+  school                 School                          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  applicationId          String?
+  application            Application?                    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  title                  String
+  description            String?                         @db.Text
+  instructions           String?                         @db.Text
+  grade                  String
+  subject                String
+  difficulty             String // EASY, MEDIUM, HARD
+  questionCount          Int
+  timeLimit              Int // in minutes
+  totalMarks             Float
+  passingMarks           Float
+  dueDate                DateTime?
+  allowCalculator        Boolean                         @default(false)
+  shuffleQuestions       Boolean                         @default(false)
+  shuffleOptions         Boolean                         @default(false)
+  showResultImmediately  Boolean                         @default(false)
+  allowRetake            Boolean                         @default(false)
+  retakeCount            Int                             @default(1)
+  status                 String                          @default("DRAFT") // DRAFT, PUBLISHED
+  assessmentMode         String                          @default("HOME") // HOME, SCHOOL, BOTH
+  venueChoice            String? // HOME or SCHOOL; required for BOTH assignments
   venueChoiceSubmittedAt DateTime?
-  proctoringEnabled     Boolean                         @default(false)
-  attemptNumber         Int                             @default(1)
-  assessmentVersion     Int                             @default(1)
-  previousAssessmentId  String?
-  previousAssessment    Assessment?                     @relation("AssessmentVersions", fields: [previousAssessmentId], references: [id], onDelete: SetNull)
-  reassignedAssessments Assessment[]                    @relation("AssessmentVersions")
-  archivedAt            DateTime?
-  createdAt             DateTime                        @default(now())
-  updatedAt             DateTime                        @updatedAt
-  questions             AssessmentQuestion[]
-  submissions           AssessmentSubmission[]
-  results               AssessmentResult[]
-  notifications         AssessmentNotification[]
-  reassignmentRequests  AssessmentReassignmentRequest[] @relation("RequestedAssessment")
-  generatedByRequest    AssessmentReassignmentRequest?  @relation("GeneratedAssessment")
-  textbookId            String?
-  textbookVersionId     String?
+  proctoringEnabled      Boolean                         @default(false)
+  attemptNumber          Int                             @default(1)
+  assessmentVersion      Int                             @default(1)
+  previousAssessmentId   String?
+  previousAssessment     Assessment?                     @relation("AssessmentVersions", fields: [previousAssessmentId], references: [id], onDelete: SetNull)
+  reassignedAssessments  Assessment[]                    @relation("AssessmentVersions")
+  archivedAt             DateTime?
+  createdAt              DateTime                        @default(now())
+  updatedAt              DateTime                        @updatedAt
+  questions              AssessmentQuestion[]
+  submissions            AssessmentSubmission[]
+  results                AssessmentResult[]
+  notifications          AssessmentNotification[]
+  reassignmentRequests   AssessmentReassignmentRequest[] @relation("RequestedAssessment")
+  generatedByRequest     AssessmentReassignmentRequest?  @relation("GeneratedAssessment")
+  textbookId             String?
+  textbookVersionId      String?
 
   hasWritten   Boolean @default(true)
   hasReading   Boolean @default(false)
@@ -2606,8 +2708,8 @@ model Assessment {
   listeningPassingMarks Float?
   listeningTimeLimit    Int? // Time limit for answering in minutes/seconds
 
-  schedule              AssessmentSchedule?
-  slotBookings          StudentSlotBooking[]
+  schedule     AssessmentSchedule?
+  slotBookings StudentSlotBooking[]
 
   @@index([schoolId, status])
 }
@@ -2810,39 +2912,39 @@ model AssessmentSecurityLog {
 }
 
 model AssessmentSchedule {
-  id                String            @id @default(uuid())
-  assessmentId      String            @unique
-  assessment        Assessment        @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  assessmentDate    DateTime
-  campus            String
-  building          String
-  floor             String
-  roomNumber        String
-  venue             String?           @db.Text
-  instructions      String?           @db.Text
-  contactPerson     String
-  contactPhone      String
-  contactEmail      String
-  documentsRequired String[]
-  allowStudentRescheduling Boolean           @default(false)
-  createdBy         String?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  slots             AssessmentSlot[]
+  id                       String           @id @default(uuid())
+  assessmentId             String           @unique
+  assessment               Assessment       @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  assessmentDate           DateTime
+  campus                   String
+  building                 String
+  floor                    String
+  roomNumber               String
+  venue                    String?          @db.Text
+  instructions             String?          @db.Text
+  contactPerson            String
+  contactPhone             String
+  contactEmail             String
+  documentsRequired        String[]
+  allowStudentRescheduling Boolean          @default(false)
+  createdBy                String?
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
+  slots                    AssessmentSlot[]
 
   @@map("AssessmentSchedules")
 }
 
 model AssessmentSlot {
-  id                   String                 @id @default(uuid())
+  id                   String               @id @default(uuid())
   assessmentScheduleId String
-  schedule             AssessmentSchedule     @relation(fields: [assessmentScheduleId], references: [id], onDelete: Cascade)
+  schedule             AssessmentSchedule   @relation(fields: [assessmentScheduleId], references: [id], onDelete: Cascade)
   slotName             String
   startTime            String
   endTime              String
   capacity             Int
-  bookedCount          Int                    @default(0)
-  status               String                 @default("AVAILABLE") // AVAILABLE, FULL
+  bookedCount          Int                  @default(0)
+  status               String               @default("AVAILABLE") // AVAILABLE, FULL
   bookings             StudentSlotBooking[]
 
   @@index([assessmentScheduleId])

@@ -15,7 +15,7 @@ export class CreateGameAssessmentDto {
   @IsString() assessmentType: string;
   @IsString() assessmentMode: string;
   @IsString() subject: string;
-  @IsString() grade: string;
+  @IsString() ageGroup: string;
   @IsOptional() @IsString() section?: string;
   @IsOptional() @IsString() chapter?: string;
   @IsArray() @IsString({ each: true }) topics: string[];
@@ -32,6 +32,7 @@ export class CreateGameAssessmentDto {
   @IsOptional() @IsString() topicId?: string;
   @IsOptional() @IsString() learningOutcomeId?: string;
   @IsOptional() @IsArray() @IsString({ each: true }) templateIds?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) gameIds?: string[];
   @IsOptional() @IsString() textbookId?: string;
   @IsOptional() @IsString() textbookVersionId?: string;
   @IsInt() @Min(1) @Max(200) numberOfQuestions: number;

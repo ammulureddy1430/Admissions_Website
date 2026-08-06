@@ -35,6 +35,7 @@ const adminLinks = [
   { href: "/admin/reports", label: "Reports & Exports" },
   { href: "/admin/assessments", label: "Assessments" },
   { href: "/admin/game-assessments", label: "Game-Based Assessments" },
+  { href: "/admin/games", label: "Games" },
   { href: "/admin/settings", label: "Settings" },
 ];
 
@@ -186,13 +187,14 @@ export default function AdminPortalLayout({ children }: { children: React.ReactN
               { href: "/admin/reports", label: "Reports & Exports", icon: <Globe className="h-4 w-4" /> },
               { href: "/admin/assessments", label: "Assessments", icon: <ClipboardList className="h-4 w-4" /> },
               { href: "/admin/game-assessments", label: "Game-Based Assessments", icon: <Gamepad2 className="h-4 w-4" /> },
+              { href: "/admin/games", label: "Games", icon: <Gamepad2 className="h-4 w-4" /> },
             ].map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${pathname === link.href ? "bg-[#e6f7f2] text-[#007f70] border border-[#cceae3]" : "text-[#607080] border border-transparent hover:text-[#007f70] hover:bg-[#f1f8f5]"}`}
+                className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${(link.href === "/admin/games" ? pathname.startsWith("/admin/games") : pathname === link.href) ? "bg-[#e6f7f2] text-[#007f70] border border-[#cceae3]" : "text-[#607080] border border-transparent hover:text-[#007f70] hover:bg-[#f1f8f5]"}`}
               >
-                {pathname === link.href && <span className="absolute -left-4 h-5 w-1 rounded-r-full bg-[#009b87]" />}
+                {(link.href === "/admin/games" ? pathname.startsWith("/admin/games") : pathname === link.href) && <span className="absolute -left-4 h-5 w-1 rounded-r-full bg-[#009b87]" />}
                 {link.icon} {link.label}
               </Link>
             ))}

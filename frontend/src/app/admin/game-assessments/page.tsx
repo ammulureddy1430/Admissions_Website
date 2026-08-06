@@ -32,6 +32,7 @@ const defaultSettings = {
   rewards: false,
   certificates: false,
 };
+const AGE_GROUPS = ["3–4 Years", "4–5 Years", "5–7 Years", "7–9 Years", "9–11 Years", "11–13 Years", "13–16 Years"];
 
 export default function GameAssessmentsPage() {
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>("textbooks");
@@ -63,7 +64,7 @@ export default function GameAssessmentsPage() {
     assessmentType: "Practice",
     assessmentMode: "HOME",
     subject: "Mathematics",
-    grade: "Grade 1",
+    ageGroup: "3–4 Years",
     section: "",
     chapter: "",
     topics: "",
@@ -143,7 +144,7 @@ export default function GameAssessmentsPage() {
       [form.name.trim(), "assessment name"],
       [form.boardId, "board"],
       [form.academicYearId, "academic year"],
-      [form.gradeId, "grade"],
+      [form.ageGroup, "age group"],
       [form.subjectId, "subject"],
       [form.textbookId, "textbook"],
     ].filter(([value]) => !value).map(([, label]) => label);
@@ -404,7 +405,7 @@ export default function GameAssessmentsPage() {
             timerSeconds: Math.max(15, Math.round((form.timeLimit * 60) / form.numberOfQuestions)),
             lives: 3,
             hints: 0,
-            grade: form.grade,
+            ageGroup: form.ageGroup,
             difficulty: form.difficulty,
           },
         }),
@@ -461,15 +462,15 @@ export default function GameAssessmentsPage() {
         <div className="space-y-6">
           <section className="rounded-2xl border border-[#dceae6] bg-white p-5 shadow-sm">
             <h2 className="mb-1 text-sm font-extrabold text-[#071633]">Step 1 — Select content</h2>
-            <p className="mb-4 text-[10px] text-[#71818d]">Name the assessment, select the class, and choose the source textbook.</p>
+            <p className="mb-4 text-[10px] text-[#71818d]">Name the assessment, select the age group, and choose the source textbook.</p>
             {curriculumError && <div className="game-assessment-alert game-assessment-alert--error mb-4 flex items-center justify-between rounded-xl border p-3 text-xs font-semibold"><span>{curriculumError}</span>{curriculumError.includes("sign in") ? <Link href="/login" className="font-black underline">Sign in</Link> : <button onClick={() => void loadCurriculum()} className="font-black underline">Retry</button>}</div>}
-            {!curriculumLoading && !curriculumError && (curriculum.boards || []).length === 0 && <div className="mb-4 flex flex-col justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center"><div><p className="text-xs font-black text-amber-900">Curriculum setup required</p><p className="mt-1 text-[11px] text-amber-700">Add a board, academic year, grade, and subject before creating an assessment.</p></div><Link href="/admin/curriculum" className="shrink-0 rounded-lg bg-white px-3 py-2 text-xs font-black text-amber-800 shadow-sm">Set up curriculum</Link></div>}
+            {!curriculumLoading && !curriculumError && (curriculum.boards || []).length === 0 && <div className="mb-4 flex flex-col justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center"><div><p className="text-xs font-black text-amber-900">Curriculum setup required</p><p className="mt-1 text-[11px] text-amber-700">Add a board, academic year, and subject before creating an assessment.</p></div><Link href="/admin/curriculum" className="shrink-0 rounded-lg bg-white px-3 py-2 text-xs font-black text-amber-800 shadow-sm">Set up curriculum</Link></div>}
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Assessment name" hint="Example: Grade 6 Fractions Challenge" required><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Grade 6 Fractions Challenge" className="input" /></Field>
+              <Field label="Assessment name" hint="Example: Fractions Challenge" required><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Fractions Challenge" className="input" /></Field>
               <Field label="Board" hint="Your school curriculum board" required><select value={form.boardId} disabled={curriculumLoading || !(curriculum.boards || []).length} onChange={(e) => setForm({ ...form, boardId: e.target.value, academicYearId: "", gradeId: "", subjectId: "", chapterId: "", topicId: "", learningOutcomeId: "" })} className="input"><option value="">{curriculumLoading ? "Loading boards…" : (curriculum.boards || []).length ? "Select board" : "No boards configured"}</option>{(curriculum.boards || []).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></Field>
               <Field label="Academic year" hint="Example: 2026–2027" required><select value={form.academicYearId} disabled={!form.boardId} onChange={(e) => setForm({ ...form, academicYearId: e.target.value, academicYear: curriculum.years?.find((x) => x.id === e.target.value)?.name || "", gradeId: "", subjectId: "", chapterId: "", topicId: "", learningOutcomeId: "" })} className="input"><option value="">{form.boardId ? "Select year" : "Select board first"}</option>{(curriculum.years || []).filter((x) => form.boardId && (!x.boardId || x.boardId === form.boardId)).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></Field>
-              <Field label="Grade" hint="Students who will receive the game" required><select value={form.gradeId} disabled={!form.boardId || !form.academicYearId} onChange={(e) => setForm({ ...form, gradeId: e.target.value, grade: curriculum.grades?.find((x) => x.id === e.target.value)?.name || "", subjectId: "", chapterId: "", topicId: "", learningOutcomeId: "" })} className="input"><option value="">{!form.boardId ? "Select board first" : !form.academicYearId ? "Select academic year first" : "Select grade"}</option>{(curriculum.grades || []).filter((x) => x.boardId === form.boardId && x.academicYearId === form.academicYearId && !["Grade 11", "Grade 12"].includes(x.name)).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></Field>
-              <Field label="Subject" hint="Example: Mathematics" required><select value={form.subjectId} disabled={!form.gradeId} onChange={(e) => setForm({ ...form, subjectId: e.target.value, subject: curriculum.subjects?.find((x) => x.id === e.target.value)?.name || "", chapterId: "", topicId: "", learningOutcomeId: "" })} className="input"><option value="">{form.gradeId ? "Select subject" : "Select grade first"}</option>{(curriculum.subjects || []).filter((x) => x.gradeId === form.gradeId).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></Field>
+              <Field label="Age Group" hint="Students who will receive the game" required><select value={form.ageGroup} onChange={(e) => setForm({ ...form, ageGroup: e.target.value })} className="input">{AGE_GROUPS.map((ageGroup) => <option key={ageGroup} value={ageGroup}>{ageGroup}</option>)}</select></Field>
+              <Field label="Subject" hint="Example: Mathematics" required><select value={form.subjectId} disabled={!form.academicYearId} onChange={(e) => { const subject = curriculum.subjects?.find((x) => x.id === e.target.value); setForm({ ...form, subjectId: e.target.value, subject: subject?.name || "", gradeId: subject?.gradeId || "", chapterId: "", topicId: "", learningOutcomeId: "" }); }} className="input"><option value="">{form.academicYearId ? "Select subject" : "Select academic year first"}</option>{Array.from(new Map((curriculum.subjects || []).filter((x) => (curriculum.grades || []).some((grade) => grade.id === x.gradeId && grade.boardId === form.boardId && grade.academicYearId === form.academicYearId)).map((row) => [row.name, row])).values()).map((row: any) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></Field>
               <Field label="Textbook" hint="The active edition is selected automatically" required><select value={form.textbookId} onChange={(e) => { const book = curriculum.textbooks?.find((x) => x.id === e.target.value); setForm({ ...form, textbookId: e.target.value, textbookVersionId: book?.activeVersionId || book?.versions?.find((version: { isActive?: boolean }) => version.isActive)?.id || book?.versions?.[0]?.id || "" }); }} className="input"><option value="">Select textbook</option>{(curriculum.textbooks || []).filter((x) => (!form.boardId || x.boardId === form.boardId) && (!form.academicYearId || x.academicYearId === form.academicYearId) && (!form.gradeId || x.gradeId === form.gradeId) && (!form.subjectId || x.subjectId === form.subjectId)).map((row) => <option key={row.id} value={row.id}>{row.title}</option>)}</select></Field>
               {showOptionalFilters && <Field label="Chapter" hint="Optional"><select value={form.chapterId} onChange={(e) => setForm({ ...form, chapterId: e.target.value, chapter: curriculum.chapters?.find((x) => x.id === e.target.value)?.name || "", topicId: "", learningOutcomeId: "" })} className="input"><option value="">All chapters</option>{(curriculum.chapters || []).filter((x) => !form.subjectId || x.subjectId === form.subjectId).map((row) => <option key={row.id} value={row.id}>{row.chapterNumber}. {row.name}</option>)}</select></Field>}
               {showOptionalFilters && <Field label="Topic" hint="Optional"><select value={form.topicId} onChange={(e) => { const topic = curriculum.topics?.find((x) => x.id === e.target.value); setForm({ ...form, topicId: e.target.value, topics: topic?.name || "", learningOutcomeId: "" }); }} className="input"><option value="">All topics</option>{(curriculum.topics || []).filter((x) => !form.chapterId || x.chapterId === form.chapterId).map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></Field>}
@@ -498,7 +499,7 @@ export default function GameAssessmentsPage() {
             )}
             <div className="mt-5 rounded-2xl border border-[#cfe6e0] bg-[#f5faf8] p-4">
               <p className="text-xs font-extrabold text-[#071633]">Step 3 — Generate with AI and assign</p>
-              <p className="mt-1 text-[10px] text-[#71818d]">AI generates questions only from the selected grade, subject, textbook, and optional chapter or topic, then prepares the game for assignment.</p>
+              <p className="mt-1 text-[10px] text-[#71818d]">AI generates questions for the selected age group, subject, textbook, and optional chapter or topic, then prepares the game for assignment.</p>
               <fieldset className="mt-4">
                 <legend className="text-[10px] font-extrabold text-[#344054]">Question types <span className="text-rose-500">*</span></legend>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -589,7 +590,7 @@ export default function GameAssessmentsPage() {
                       )}
                       <div className="mt-3 text-[10px] leading-5 text-[#607080]">
                         <p><b className="text-[#071633]">Correct answer:</b> {question.correctAnswer}</p>
-                        <p><b className="text-[#071633]">Grade & subject:</b> {form.grade} · {form.subject}</p>
+                        <p><b className="text-[#071633]">Age Group & subject:</b> {form.ageGroup} · {form.subject}</p>
                         <p><b className="text-[#071633]">Textbook page:</b> {question.pageNumber || "—"}</p>
                         <p><b className="text-[#071633]">Explanation:</b> {question.explanation || "No explanation provided."}</p>
                       </div>
@@ -609,16 +610,14 @@ export default function GameAssessmentsPage() {
           <section className="rounded-2xl border border-[#dceae6] bg-white p-5">
             <div className="flex items-start justify-between"><div><h2 className="text-sm font-extrabold text-[#071633]">Step 2 — Choose one game <span className="text-rose-500">*</span></h2><p className="mt-1 text-[10px] text-[#71818d]">Click a game card to select it.</p></div><span className="rounded-full bg-[#e6f7f2] px-2 py-1 text-[9px] font-bold text-[#007f70]">{selectedTemplates.length ? "Selected" : "Not selected"}</span></div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {templates.filter((template) => {
-                return template.status === "ACTIVE";
-              }).map((template) => {
+              {templates.filter((template) => template.status === "ACTIVE").map((template) => {
                 const selected = selectedTemplates.includes(template.id);
                 return <div key={template.id} role="radio" aria-checked={selected} tabIndex={0} onClick={() => setSelectedTemplates([template.id])} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setSelectedTemplates([template.id]); }} className={`cursor-pointer rounded-xl border p-3 transition ${selected ? "border-2 border-[#009b87] bg-[#edfaf6] shadow-sm" : "border-[#dceae6] bg-[#fafdfc] hover:border-[#79bdb0]"}`}>
                   <div className="flex items-start justify-between"><Gamepad2 className="h-5 w-5 text-[#009b87]" /><input type="radio" name="game-template" checked={selected} onChange={() => setSelectedTemplates([template.id])} className="accent-[#007f70]" /></div>
                   <p className="mt-2 text-xs font-bold text-[#071633]">{template.name}</p><p className="mt-1 text-[9px] text-[#71818d]">{template.category?.name} · {template.difficulty} · {template.estimatedDuration} min</p>
                 </div>;
               })}
-              {templates.filter((template) => template.status === "ACTIVE").length === 0 && <p className="col-span-full rounded-xl bg-amber-50 p-3 text-[11px] text-amber-800">No active games are available. Open <button type="button" onClick={() => setWorkspaceTab("templates")} className="font-black underline">Game Templates</button> and activate at least one.</p>}
+              {templates.filter((template) => template.status === "ACTIVE").length === 0 && <p className="col-span-full rounded-xl bg-amber-50 p-3 text-[11px] text-amber-800">No active game assessment templates are available.</p>}
             </div>
           </section>
 
@@ -637,7 +636,7 @@ export default function GameAssessmentsPage() {
                       {assessment.status === "DRAFT" && <button type="button" onClick={() => void deleteDraft(assessment)} disabled={!!deletingDraft} aria-label={`Delete ${assessment.name} draft`} title="Delete draft" className="draft-delete-button grid h-7 w-7 place-items-center rounded-full transition disabled:opacity-50">{deletingDraft === assessment.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}</button>}
                     </div>
                   </div>
-                  <p className="mt-1 text-[10px] text-[#71818d]">{assessment.grade} · {assessment.subject} · {assessment.numberOfQuestions} questions</p>
+                  <p className="mt-1 text-[10px] text-[#71818d]">{assessment.ageGroup} · {assessment.subject} · {assessment.numberOfQuestions} questions</p>
                 </div>
               ))}
             </div>

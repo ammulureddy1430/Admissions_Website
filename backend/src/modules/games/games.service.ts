@@ -1,0 +1,155 @@
+import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { PrismaService } from '../../prisma.service';
+import { AssignRealTimeGameDto, CreateGameDto, UpdateGameDto } from './dto/game.dto';
+import { GAME_CATALOG } from './game.catalog';
+import { birthDateMatchesAgeGroup, normalizeGameAgeGroup } from './age-groups';
+
+@Injectable()
+export class GamesService implements OnModuleInit {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async onModuleInit() {
+    await Promise.all(GAME_CATALOG.map(({ templateCode: _templateCode, cognitiveSkill: _skill, ...game }) =>
+      this.prisma.game.upsert({
+        where: { slug: game.slug },
+        create: game,
+        update: { name: game.name, description: game.description, category: game.category, ageGroup: game.ageGroup, difficulty: game.difficulty, durationSeconds: game.durationSeconds, componentName: game.componentName, gameType: game.gameType, thumbnail: game.thumbnail, status: 'ACTIVE', isActive: true },
+      }),
+    ));
+  }
+
+  async list(schoolId: string, query: Record<string, string>) {
+    const games = await this.prisma.game.findMany({
+      where: {
+        gameType: { not: 'ASSESSMENT_ENGINE' },
+        ...(query.status && { status: query.status }),
+        ...(query.active === 'true' && { isActive: true }),
+        ...(query.ageGroup && { ageGroup: query.ageGroup }),
+        ...(query.search && { OR: [
+          { name: { contains: query.search, mode: 'insensitive' } },
+          { category: { contains: query.search, mode: 'insensitive' } },
+        ] }),
+      },
+      orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
+    });
+    const templateCodes = GAME_CATALOG.map((game) => game.templateCode);
+    const templates = await this.prisma.gameTemplate.findMany({
+      where: { schoolId, templateId: { in: templateCodes }, status: 'ACTIVE' },
+      select: { id: true, templateId: true, estimatedDuration: true },
+    });
+    const assignmentCounts = await this.prisma.realTimeGameAssignment.groupBy({
+      by: ['gameId'], where: { schoolId, status: 'ASSIGNED' }, _count: { _all: true },
+    });
+    return games.map((game) => {
+      const registration = GAME_CATALOG.find((item) => item.slug === game.slug);
+      const template = templates.find((item) => item.templateId === registration?.templateCode);
+      return {
+        ...game,
+        cognitiveSkill: registration?.cognitiveSkill || 'Cognitive Skills',
+        assignmentTemplateId: template?.id || null,
+        availableForAssignment: game.isActive && game.status === 'ACTIVE' && Boolean(template),
+        assignmentCount: assignmentCounts.find((item) => item.gameId === game.id)?._count._all || 0,
+      };
+    });
+  }
+
+  async one(id: string, schoolId: string) {
+    const games = await this.list(schoolId, {});
+    const game = games.find((item) => item.id === id);
+    if (!game) throw new NotFoundException('Game not found.');
+    return game;
+  }
+
+  create(dto: CreateGameDto) {
+    return this.prisma.game.create({ data: {
+      ...dto,
+      slug: dto.slug.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+      componentName: dto.componentName.toUpperCase().trim().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, ''),
+      gameType: dto.gameType || 'REAL_TIME', status: 'ACTIVE', isActive: true,
+    } });
+  }
+
+  async update(id: string, dto: UpdateGameDto, schoolId: string) {
+    await this.one(id, schoolId);
+    return this.prisma.game.update({ where: { id }, data: dto });
+  }
+
+  async toggle(id: string, schoolId: string) {
+    const game = await this.one(id, schoolId);
+    return this.prisma.game.update({
+      where: { id },
+      data: { isActive: !game.isActive, status: game.isActive ? 'DISABLED' : 'ACTIVE' },
+    });
+  }
+
+  async remove(id: string, schoolId: string) {
+    await this.one(id, schoolId);
+    await this.prisma.game.delete({ where: { id } });
+    return { deleted: true, id };
+  }
+
+  async analytics(id: string, schoolId: string) {
+    await this.one(id, schoolId);
+    const [results, completed] = await Promise.all([
+      this.prisma.gameResult.count({ where: { gameId: id, assessment: { schoolId } } }),
+      this.prisma.gameResult.findMany({ where: { gameId: id, assessment: { schoolId }, status: 'COMPLETED' }, select: { totalScore: true, percentage: true } }),
+    ]);
+    return {
+      attempts: results,
+      completions: completed.length,
+      averageScore: completed.length ? completed.reduce((sum, item) => sum + item.percentage, 0) / completed.length : 0,
+    };
+  }
+
+  async reports(id: string, schoolId: string) {
+    const game = await this.one(id, schoolId);
+    const reports = await this.prisma.followLightsAnalytics.findMany({
+      where: { gameId: id, gameResult: { assessment: { schoolId } } },
+      select: {
+        id: true, studentId: true, assessmentId: true, createdAt: true,
+        memoryScore: true, attention: true, focusScore: true, visualMemory: true,
+        processingSpeed: true, learningPotential: true, accuracy: true, overallScore: true,
+        longestSequence: true, averageReactionTime: true, mistakes: true, completionPercentage: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return reports.map((report) => ({ ...report, ageGroup: game.ageGroup }));
+  }
+
+  async eligibleStudents(id: string, schoolId: string, ageGroup?: string) {
+    const game = await this.one(id, schoolId);
+    const targetAgeGroup = normalizeGameAgeGroup(ageGroup || game.ageGroup);
+    if (!targetAgeGroup) throw new NotFoundException('Select a valid age group.');
+    const students = await this.prisma.application.findMany({
+      where: {
+        schoolId,
+        assessmentRequired: { not: false },
+        status: { notIn: ['DRAFT', 'REJECTED', 'WITHDRAWN'] },
+      },
+      select: { id: true, studentFirstName: true, studentLastName: true, studentDob: true, status: true },
+      orderBy: [{ studentFirstName: 'asc' }, { studentLastName: 'asc' }],
+    });
+    return students
+      .filter((student) => birthDateMatchesAgeGroup(student.studentDob, targetAgeGroup))
+      .map(({ studentDob: _studentDob, ...student }) => ({ ...student, ageGroup: targetAgeGroup }));
+  }
+
+  async assign(id: string, dto: AssignRealTimeGameDto, schoolId: string, userId: string) {
+    const game = await this.one(id, schoolId);
+    if (!game.isActive) throw new NotFoundException('This game is not active.');
+    const eligible = await this.eligibleStudents(id, schoolId, dto.ageGroup);
+    const eligibleIds = new Set(eligible.map((student) => student.id));
+    const studentIds = [...new Set(dto.studentIds)];
+    if (!studentIds.length) throw new NotFoundException('Select at least one eligible student.');
+    if (studentIds.some((studentId) => !eligibleIds.has(studentId))) throw new NotFoundException('One or more selected students do not match the assigned age group.');
+    return this.prisma.realTimeGameAssignment.create({ data: {
+      schoolId, gameId: id, assignedById: userId, ageGroup: dto.ageGroup, studentIds,
+      startsAt: dto.startsAt ? new Date(dto.startsAt) : null,
+      endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
+    } });
+  }
+
+  assignments(id: string, schoolId: string) {
+    return this.prisma.realTimeGameAssignment.findMany({ where: { gameId: id, schoolId }, orderBy: { createdAt: 'desc' } });
+  }
+}

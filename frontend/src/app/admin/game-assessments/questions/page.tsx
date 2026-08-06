@@ -94,7 +94,7 @@ export default function AIQuestionsPage({ embedded = false }: { embedded?: boole
               <h2 className="mt-4 text-sm font-extrabold leading-6 text-[#071633]">{question.questionText}</h2>
               {question.options?.length > 0 && <div className="mt-4 grid gap-2 sm:grid-cols-2">{question.options.map((option: Row) => <div key={option.id} className={`rounded-xl border p-3 text-xs font-bold ${option.isCorrect ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-[#e0ece8] bg-[#fafdfc] text-[#526474]"}`}><span className="mr-2 font-black">{option.optionKey}.</span>{option.optionText}{option.isCorrect && <span className="ml-2 text-[9px] uppercase">Correct</span>}</div>)}</div>}
               <div className="mt-4 rounded-xl bg-[#f5faf8] p-3 text-[10px] leading-5 text-[#607080]">
-                <p><b className="text-[#071633]">Grade & subject:</b> {question.gameAssessment?.grade || "—"} · {question.gameAssessment?.subject || "—"}</p>
+                <p><b className="text-[#071633]">Age Group & subject:</b> {question.gameAssessment?.ageGroup || "—"} · {question.gameAssessment?.subject || "—"}</p>
                 <p><b className="text-[#071633]">Correct answer:</b> {question.correctAnswer}</p>
                 <p><b className="text-[#071633]">Source:</b> {question.processedTextbook?.textbookVersion?.textbook?.title || "Textbook"} · Page {question.pageNumber || "—"}</p>
                 <p><b className="text-[#071633]">Explanation:</b> {question.explanation || "No explanation provided."}</p>

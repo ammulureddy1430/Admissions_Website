@@ -16,6 +16,7 @@ import { SortingGame } from "./sorting-game/SortingGame";
 import { TreasureHuntGame } from "./treasure-hunt-game/TreasureHuntGame";
 import { DragDropGame } from "./drag-drop-game/DragDropGame";
 import { BuiltInVideoTutorial } from "./game-tutorial-screen";
+import FollowTheLightsGame from "@/games/follow-the-lights/Game";
 
 
 const MAX_SECURITY_WARNINGS = 3;
@@ -176,7 +177,7 @@ export function GameRuntimePlayer({ initial, request, onClose, onComplete, secur
       setState(next);
       if (actionName === "ANSWER") {
         if (next.status === "COMPLETED") onComplete?.(next);
-      } else if ((actionName === "COMPLETE" || actionName === "MAZE_COMPLETE") && next.status === "COMPLETED") {
+      } else if ((actionName === "COMPLETE" || actionName === "MAZE_COMPLETE" || actionName === "FOLLOW_LIGHTS_COMPLETE") && next.status === "COMPLETED") {
         onComplete?.(next);
       } else if (actionName === "SECURITY_VIOLATION" && next.status === "COMPLETED") {
         suppressSecurityRef.current = true;
@@ -261,15 +262,15 @@ export function GameRuntimePlayer({ initial, request, onClose, onComplete, secur
   const isSortingGame = state.engine?.engineKey === "SORTING_GAME";
   const isDragDropGame = state.engine?.engineKey === "DRAG_DROP";
   const isTreasureHunt = state.engine?.engineKey === "TREASURE_HUNT";
+  const isFollowTheLights = state.engine?.engineKey === "FOLLOW_THE_LIGHTS";
   const showGameIntro = state.status === "READY";
   const assignedGameName = state.generatedGame?.title || tutorial?.game?.name || state.engine?.name || "Assessment game";
   const introTutorial = tutorial || defaultRuntimeTutorial(state.engine?.engineKey || "QUIZ_CHALLENGE", assignedGameName);
-  const isFsGame = isAdventure || isBoardGame || isDragDropGame || isLogicGame || isMazeGame || isRacingGame || isSortingGame || isTreasureHunt || isBuildingGame || isFishingGame || isMemoryGame;
+  const isFsGame = isAdventure || isBoardGame || isDragDropGame || isLogicGame || isMazeGame || isRacingGame || isSortingGame || isTreasureHunt || isBuildingGame || isFishingGame || isMemoryGame || isFollowTheLights;
   const player = <div ref={playerRef} data-engine={state.engine?.engineKey || "QUIZ_CHALLENGE"} onPointerMove={(event) => { if (!isAdventure) return; const bounds = event.currentTarget.getBoundingClientRect(); event.currentTarget.style.setProperty("--adventure-x", `${((event.clientX - bounds.left) / bounds.width - .5) * 2}`); event.currentTarget.style.setProperty("--adventure-y", `${((event.clientY - bounds.top) / bounds.height - .5) * 2}`); }} className={`game-runtime-player fixed inset-0 z-[9999] flex h-[100dvh] w-screen flex-col bg-gradient-to-br from-[#071633] via-[#123b5a] to-[#007f70] text-white ${isAdventure ? "is-adventure-game" : ""} ${isBoardGame ? "is-board-game" : ""} ${isBuildingGame ? "is-building-game" : ""} ${isDragDropGame ? "is-drag-drop-game" : ""} ${isFishingGame ? "is-fishing-game" : ""} ${isLogicGame ? "is-logic-game" : ""} ${isMazeGame ? "is-maze-game" : ""} ${isMemoryGame ? "is-memory-game" : ""} ${isRacingGame ? "is-racing-game" : ""} ${isSortingGame ? "is-sorting-game" : ""} ${isTreasureHunt ? "is-treasure-hunt" : ""}`}>
-    <header className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3"><div><p className="keep-white text-[9px] font-black uppercase tracking-widest opacity-80">{assignedGameName}</p><p className="keep-white text-xs font-bold">{showGameIntro ? `${state.questionCount} challenges await` : `Question ${Math.min(state.currentIndex + 1, state.questionCount)} of ${state.questionCount}`}</p></div><div className="flex items-center gap-2"><Pill><Timer /> {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</Pill><button onClick={forcePlayerFullscreen} aria-label="Enter fullscreen" title="Enter fullscreen" className="game-icon keep-white"><Maximize2 /></button><button onClick={() => setSound(!sound)} aria-label="Toggle sound" className="game-icon keep-white">{sound ? <Volume2 /> : <VolumeX />}</button><button onClick={closePlayer} aria-label="Close game" className="game-icon keep-white"><X /></button></div></header>
-    <div className="h-1 bg-white/10"><div className="h-full bg-cyan-300 transition-all" style={{width:`${state.progress}%`}} /></div>
+    {!isFollowTheLights && <><header className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3"><div><p className="keep-white text-[9px] font-black uppercase tracking-widest opacity-80">{assignedGameName}</p><p className="keep-white text-xs font-bold">{showGameIntro ? `${state.questionCount} challenges await` : `Question ${Math.min(state.currentIndex + 1, state.questionCount)} of ${state.questionCount}`}</p></div><div className="flex items-center gap-2"><Pill><Timer /> {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</Pill><button onClick={forcePlayerFullscreen} aria-label="Enter fullscreen" title="Enter fullscreen" className="game-icon keep-white"><Maximize2 /></button><button onClick={() => setSound(!sound)} aria-label="Toggle sound" className="game-icon keep-white">{sound ? <Volume2 /> : <VolumeX />}</button><button onClick={closePlayer} aria-label="Close game" className="game-icon keep-white"><X /></button></div></header><div className="h-1 bg-white/10"><div className="h-full bg-cyan-300 transition-all" style={{width:`${state.progress}%`}} /></div></>}
     <main className={`relative flex min-h-0 flex-1 overflow-hidden ${isFsGame ? "p-0 items-stretch" : "p-4 items-center justify-center"}`}>{!isFsGame && <><div className="game-orb left-[8%] top-[15%]" /><div className="game-orb bottom-[12%] right-[10%]" /></>}<section className={`relative z-10 my-auto w-full ${isFsGame ? "h-full max-w-none flex flex-col" : `${isMemoryGame ? "max-w-5xl" : "max-w-3xl"} rounded-[2rem] border border-white/25 bg-[#173f59]/95 p-5 shadow-2xl backdrop-blur-xl sm:p-8`} ${isBuildingGame ? "construction-site-game-panel" : ""} ${isFishingGame ? "fishing-world-panel" : ""} ${isMemoryGame ? "memory-world-panel" : ""}`}>
-      {showGameIntro ? <AssessmentTutorialIntro tutorial={introTutorial} preview={state} gameName={assignedGameName} onStart={startGame} /> : q ? (
+      {showGameIntro ? <AssessmentTutorialIntro tutorial={introTutorial} preview={state} gameName={assignedGameName} onStart={startGame} /> : isFollowTheLights ? <FollowTheLightsGame disabled={state.status !== "RUNNING"} sound={sound} durationSeconds={120} onComplete={(metrics) => action("FOLLOW_LIGHTS_COMPLETE", metrics)} /> : q ? (
         state.engine?.engineKey === "BOARD_GAME" ? (
           <BoardGame
             key={q.id}

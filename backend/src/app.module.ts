@@ -29,6 +29,7 @@ import { GameRuntimeModule } from './modules/game-runtime/game-runtime.module';
 import { GeneratedGamesModule } from './modules/generated-games/generated-games.module';
 import { GamePlayModule } from './modules/game-play/game-play.module';
 import { GameInsightsModule } from './modules/game-insights/game-insights.module';
+import { GamesModule } from './modules/games/games.module';
 import { TenantMiddleware } from './core/tenant.middleware';
 
 @Module({
@@ -60,6 +61,7 @@ import { TenantMiddleware } from './core/tenant.middleware';
     GeneratedGamesModule,
     GamePlayModule,
     GameInsightsModule,
+    GamesModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

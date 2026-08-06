@@ -15,6 +15,7 @@ const ENGINES = [
   ['WORD_GAME','Word Game'],['WORD_SEARCH','Word Search'],['CROSSWORD','Crossword'],
   ['SEQUENCE_GAME','Sequence Game'],['ENDLESS_RUNNER','Endless Runner'],['SPIN_WHEEL','Spin Wheel'],
   ['BASKETBALL_CHALLENGE','Basketball Challenge'],['FOOTBALL_GOAL_QUIZ','Football Goal Quiz'],
+  ['FOLLOW_THE_LIGHTS','Follow the Lights'],
 ] as const;
 
 @Injectable()
@@ -130,9 +131,45 @@ export class GameRuntimeService {
     if (action === 'MAZE_ANSWER') return this.mazeAnswer(session, dto.payload, schoolId, user);
     if (action === 'MAZE_COMPLETE') return this.mazeComplete(session, dto.payload, schoolId, user);
     if (action === 'MEMORY_COMPLETE') return this.memoryComplete(session, dto.payload, schoolId, user);
+    if (action === 'FOLLOW_LIGHTS_COMPLETE') return this.followLightsComplete(session, dto.payload, schoolId, user);
     if (action === 'SECURITY_VIOLATION') return this.securityViolation(session, dto.payload, schoolId, user);
     if (action === 'COMPLETE') return this.transition(id, 'COMPLETED', { completedAt: new Date() }, 'COMPLETED', dto.payload, schoolId, user);
     throw new BadRequestException('Unsupported runtime action.');
+  }
+
+  private async followLightsComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
+    if (session.engine.engineKey !== 'FOLLOW_THE_LIGHTS' || session.status !== 'RUNNING') {
+      throw new BadRequestException('Follow the Lights metrics require an active Follow the Lights session.');
+    }
+    const input = (payload || {}) as Record<string, any>;
+    const number = (key: string, maximum = 100000) => Math.max(0, Math.min(maximum, Number(input[key]) || 0));
+    const totalSequences = number('totalSequences', 1000);
+    const completedSequences = Math.min(totalSequences, number('completedSequences', 1000));
+    const correctTaps = number('correctTaps', 10000);
+    const wrongTaps = number('wrongTaps', 10000);
+    const mistakes = Math.min(3, number('mistakes', 3));
+    const longestSequence = number('longestSequence', 100);
+    const averageReactionTime = number('averageReactionTime', 60000);
+    const averageTapDelay = number('averageTapDelay', 60000);
+    const taps = correctTaps + wrongTaps;
+    const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 10) / 10));
+    const accuracy = clamp(taps ? correctTaps / taps * 100 : 0);
+    const completionPercentage = clamp(totalSequences ? completedSequences / totalSequences * 100 : 0);
+    const memoryScore = clamp(longestSequence / 10 * 100);
+    const focusScore = clamp(accuracy * .72 + (3 - mistakes) / 3 * 28);
+    const processingSpeed = clamp(100 - Math.max(0, averageReactionTime - 350) / 12);
+    const learningPotential = clamp(memoryScore * .55 + completionPercentage * .45);
+    const attention = clamp(focusScore * .65 + processingSpeed * .35);
+    const visualMemory = clamp(memoryScore * .8 + accuracy * .2);
+    const overallScore = clamp(memoryScore * .24 + focusScore * .18 + processingSpeed * .16 + learningPotential * .18 + accuracy * .12 + attention * .12);
+    const cognitiveAnalytics = { totalSequences, completedSequences, longestSequence, mistakes, correctTaps, wrongTaps, averageReactionTime, averageTapDelay, completionPercentage, memoryScore, focusScore, processingSpeed, learningPotential, accuracy, attention, visualMemory, overallScore, endReason: String(input.endReason || 'COMPLETED') };
+    await this.prisma.gameRuntimeSession.update({ where: { id: session.id }, data: {
+      status: 'COMPLETED', completedAt: new Date(), score: overallScore,
+      elapsedSeconds: Math.min(120, number('elapsedSeconds', 120)),
+      runtimeState: { ...((session.runtimeState || {}) as Record<string, unknown>), cognitiveAnalytics } as Prisma.InputJsonValue,
+    } });
+    await this.event(session.id, 'FOLLOW_LIGHTS_COMPLETED', cognitiveAnalytics);
+    return { state: await this.state(session.id, schoolId, user) };
   }
 
   private async securityViolation(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {

@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
+import { legacyGradesForAgeGroup } from '../games/age-groups';
 import { GameRuntimeService } from '../game-runtime/game-runtime.service';
 import { GameInsightsService } from '../game-insights/game-insights.service';
 import { CreateGameAssignmentDto } from './dto/game-play.dto';
@@ -73,7 +74,13 @@ export class GamePlayService {
       assignmentSettings: { ...(dto.settings || {}), deliveryMode } as Prisma.InputJsonValue, status: 'ASSIGNED',
     }, include: { generatedGame: true, gameAssessment: true } });
     if (dto.targetType === 'STUDENT') {
-      await this.prisma.gameResult.createMany({ data: dto.targetIds.map((studentId) => ({ gameAssignmentId: assignment.id, studentId })), skipDuplicates: true });
+      const masterGame = await this.prisma.game.findUnique({ where: { componentName: game.engineKey }, select: { id: true } });
+      await this.prisma.gameResult.createMany({ data: dto.targetIds.map((studentId) => ({
+        gameAssignmentId: assignment.id,
+        studentId,
+        assessmentId: assessment.id,
+        gameId: masterGame?.id,
+      })), skipDuplicates: true });
       if (deliveryMode === 'SCHOOL') {
         await Promise.all(dto.targetIds.map(async studentId => {
           const application = await this.prisma.application.findFirst({ where: { id: studentId, schoolId }, select: { accessCode: true } });
@@ -93,14 +100,14 @@ export class GamePlayService {
   assignments(schoolId: string, q: any) {
     return this.prisma.gameAssignment.findMany({ where: { gameAssessment: { schoolId }, ...(q.status && { status: q.status }) }, include: { generatedGame: true, gameAssessment: true, _count: { select: { results: true } } }, orderBy: { createdAt: 'desc' } });
   }
-  async assignmentVenue(schoolId: string, grade: string) {
-    if (!grade) throw new BadRequestException('Grade is required to find the school venue.');
+  async assignmentVenue(schoolId: string, ageGroup: string) {
+    if (!ageGroup) throw new BadRequestException('Age group is required to find the school venue.');
     const schedule = await this.prisma.assessmentSchedule.findFirst({
       where: {
         assessment: {
           schoolId,
           applicationId: null,
-          grade,
+          grade: { in: legacyGradesForAgeGroup(ageGroup), mode: 'insensitive' },
           assessmentMode: { in: ['SCHOOL', 'BOTH'] },
           status: { not: 'ARCHIVED' },
         },
@@ -267,7 +274,7 @@ export class GamePlayService {
         id: assignment.id,
         name: assignment.gameAssessment?.name,
         subject: assignment.gameAssessment?.subject,
-        grade: assignment.gameAssessment?.grade,
+        ageGroup: assignment.gameAssessment?.ageGroup,
         difficulty: assignment.gameAssessment?.difficulty || game.template?.difficulty,
         duration: assignment.timeLimitMinutes || assignment.gameAssessment?.timeLimit,
         maximumMarks: maxScore,
@@ -337,7 +344,12 @@ export class GamePlayService {
     const availability = this.availability(assignment);
     if (!availability.available) throw new BadRequestException(availability.reason);
     if (!assignment.generatedGame) throw new BadRequestException('The assigned game is unavailable.');
-    let result = await this.prisma.gameResult.upsert({ where: { gameAssignmentId_studentId: { gameAssignmentId: assignmentId, studentId } }, create: { gameAssignmentId: assignmentId, studentId }, update: {} });
+    const masterGame = await this.prisma.game.findUnique({ where: { componentName: assignment.generatedGame?.engineKey || '' }, select: { id: true } });
+    let result = await this.prisma.gameResult.upsert({
+      where: { gameAssignmentId_studentId: { gameAssignmentId: assignmentId, studentId } },
+      create: { gameAssignmentId: assignmentId, studentId, gameId: masterGame?.id, assessmentId: assignment.gameAssessmentId },
+      update: { gameId: masterGame?.id, assessmentId: assignment.gameAssessmentId },
+    });
     const attempts = await this.prisma.gameAttempt.count({ where: { gameResultId: result.id } });
     const active = await this.prisma.gameRuntimeSession.findFirst({
       where: {
@@ -385,16 +397,40 @@ export class GamePlayService {
     const session = await this.prisma.gameRuntimeSession.findFirst({ where: { id: sessionId, schoolId, userId: studentId, gameResultId: result.id } });
     if (!session) throw new ForbiddenException('Invalid gameplay session.');
     const runtime = session.runtimeState as any;
-    const answered = runtime?.answers?.length || 0, total = session.questionIds.length;
-    const percentage = total ? (Number(runtime?.correct || 0) / total) * 100 : 0;
+    const followLights = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'FOLLOW_THE_LIGHTS' ? runtime.cognitiveAnalytics : null;
+    const answered = followLights ? Number(followLights.correctTaps || 0) + Number(followLights.wrongTaps || 0) : runtime?.answers?.length || 0;
+    const total = followLights ? Math.max(1, answered) : session.questionIds.length;
+    const percentage = followLights ? Number(followLights.overallScore || 0) : total ? (Number(runtime?.correct || 0) / total) * 100 : 0;
     const passed = percentage >= assignment.passingScore;
     const attempt = await this.prisma.gameAttempt.findFirst({ where: { gameResultId: result.id, submittedAt: null }, orderBy: { attemptNumber: 'desc' } });
     await this.prisma.$transaction(async (tx) => {
       await tx.gameRuntimeSession.update({ where: { id: session.id }, data: { status: 'COMPLETED', completedAt: new Date() } });
       await tx.gameResult.update({ where: { id: result.id }, data: { status: 'COMPLETED', totalScore: session.score, percentage, passed, completedAt: new Date() } });
+      if (followLights && result.gameId) {
+        await tx.followLightsAnalytics.upsert({
+          where: { gameResultId: result.id },
+          create: {
+            gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId,
+            totalSequences: Number(followLights.totalSequences || 0), completedSequences: Number(followLights.completedSequences || 0), longestSequence: Number(followLights.longestSequence || 0),
+            mistakes: Number(followLights.mistakes || 0), correctTaps: Number(followLights.correctTaps || 0), wrongTaps: Number(followLights.wrongTaps || 0),
+            averageReactionTime: Number(followLights.averageReactionTime || 0), averageTapDelay: Number(followLights.averageTapDelay || 0), completionPercentage: Number(followLights.completionPercentage || 0),
+            memoryScore: Number(followLights.memoryScore || 0), focusScore: Number(followLights.focusScore || 0), processingSpeed: Number(followLights.processingSpeed || 0),
+            learningPotential: Number(followLights.learningPotential || 0), accuracy: Number(followLights.accuracy || 0), attention: Number(followLights.attention || 0),
+            visualMemory: Number(followLights.visualMemory || 0), overallScore: Number(followLights.overallScore || 0),
+          },
+          update: {
+            totalSequences: Number(followLights.totalSequences || 0), completedSequences: Number(followLights.completedSequences || 0), longestSequence: Number(followLights.longestSequence || 0),
+            mistakes: Number(followLights.mistakes || 0), correctTaps: Number(followLights.correctTaps || 0), wrongTaps: Number(followLights.wrongTaps || 0),
+            averageReactionTime: Number(followLights.averageReactionTime || 0), averageTapDelay: Number(followLights.averageTapDelay || 0), completionPercentage: Number(followLights.completionPercentage || 0),
+            memoryScore: Number(followLights.memoryScore || 0), focusScore: Number(followLights.focusScore || 0), processingSpeed: Number(followLights.processingSpeed || 0),
+            learningPotential: Number(followLights.learningPotential || 0), accuracy: Number(followLights.accuracy || 0), attention: Number(followLights.attention || 0),
+            visualMemory: Number(followLights.visualMemory || 0), overallScore: Number(followLights.overallScore || 0),
+          },
+        });
+      }
       if (attempt) {
         await tx.gameAttempt.update({ where: { id: attempt.id }, data: { submittedAt: new Date(), state: session.runtimeState as Prisma.InputJsonValue } });
-        await tx.gameScore.create({ data: { gameAttemptId: attempt.id, gameKey: assignment.generatedGame?.engineKey || 'GAME', score: session.score, maxScore: total * 10, timeTaken: session.elapsedSeconds, details: { answered, correct: runtime?.correct || 0, incorrect: runtime?.incorrect || 0 } } });
+        await tx.gameScore.create({ data: { gameAttemptId: attempt.id, gameKey: assignment.generatedGame?.engineKey || 'GAME', score: session.score, maxScore: followLights ? 100 : total * 10, timeTaken: session.elapsedSeconds, details: followLights || { answered, correct: runtime?.correct || 0, incorrect: runtime?.incorrect || 0 } } });
       }
     });
     const rewards = await this.insights.processResult(result.id, schoolId);

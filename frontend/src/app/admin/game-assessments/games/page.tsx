@@ -43,6 +43,15 @@ const toTimeInput = (value: string) => {
   if (period === "AM" && hour === 12) hour = 0;
   return `${String(hour).padStart(2, "0")}:${match[2]}`;
 };
+const matchesAgeGroup = (dateOfBirth: string, ageGroup: string) => {
+  const bounds = ageGroup.match(/\d+/g)?.map(Number);
+  if (!dateOfBirth || !bounds) return false;
+  const birthDate = new Date(dateOfBirth);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  if (today.getMonth() < birthDate.getMonth() || (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate())) age -= 1;
+  return age >= bounds[0] && age < bounds[1];
+};
 
 export default function TeacherGameStudio() {
   const [tab, setTab] = useState<"games" | "assign" | "analytics">("games"),
@@ -156,7 +165,7 @@ export default function TeacherGameStudio() {
     [assessments, assignment.gameAssessmentId],
   );
   const eligibleStudents = useMemo(
-    () => students.filter((student) => student.assessmentRequired !== false && (!selectedAssessment?.grade || student.grade === selectedAssessment.grade)),
+    () => students.filter((student) => student.assessmentRequired !== false && (!selectedAssessment?.ageGroup || matchesAgeGroup(student.studentDob, selectedAssessment.ageGroup))),
     [students, selectedAssessment],
   );
   const publishedGames = useMemo(
@@ -164,13 +173,13 @@ export default function TeacherGameStudio() {
     [games],
   );
   useEffect(() => {
-    if (assignment.deliveryMode !== "SCHOOL" || !selectedAssessment?.grade) {
+    if (assignment.deliveryMode !== "SCHOOL" || !selectedAssessment?.ageGroup) {
       setSchoolVenue(null);
       return;
     }
     let cancelled = false;
     setVenueLoading(true);
-    request(`game-assessments/assignment-venue?grade=${encodeURIComponent(selectedAssessment.grade)}`)
+    request(`game-assessments/assignment-venue?ageGroup=${encodeURIComponent(selectedAssessment.ageGroup)}`)
       .then((venue) => {
         if (!cancelled) setSchoolVenue(venue ? {
           ...venue,
@@ -181,7 +190,7 @@ export default function TeacherGameStudio() {
       .catch((e) => { if (!cancelled) setError(msg(e)); })
       .finally(() => { if (!cancelled) setVenueLoading(false); });
     return () => { cancelled = true; };
-  }, [assignment.deliveryMode, selectedAssessment?.grade]);
+  }, [assignment.deliveryMode, selectedAssessment?.ageGroup]);
   const assessmentChoices = useMemo(() => {
     const unique = new Map<string, Row>();
     [...assessments]
@@ -192,7 +201,7 @@ export default function TeacherGameStudio() {
       )
       .forEach((assessment) => {
         const label = assessment.name || assessment.title || "Untitled assessment";
-        const key = `${label.trim().toLowerCase()}::${String(assessment.grade || "").trim().toLowerCase()}`;
+        const key = `${label.trim().toLowerCase()}::${String(assessment.ageGroup || "").trim().toLowerCase()}`;
         if (!unique.has(key) || assessment.id === assignment.gameAssessmentId) {
           unique.set(key, assessment);
         }
@@ -608,7 +617,7 @@ export default function TeacherGameStudio() {
                   {assessmentChoices.map((assessment) => (
                     <option key={assessment.id} value={assessment.id}>
                       {assessment.name || assessment.title || "Untitled assessment"}
-                      {assessment.grade ? ` · ${assessment.grade}` : ""}
+                      {assessment.ageGroup ? ` · ${assessment.ageGroup}` : ""}
                       {` · ${assessment.assessmentMode === "SCHOOL" ? "At School" : "Home"}`}
                     </option>
                   ))}
@@ -711,7 +720,7 @@ export default function TeacherGameStudio() {
               Choose student
             </h3>
             <div className="mt-3">
-              <Field label={selectedAssessment?.grade ? `Eligible students (${selectedAssessment.grade})` : "Student"}>
+              <Field label={selectedAssessment?.ageGroup ? `Eligible students (${selectedAssessment.ageGroup})` : "Student"}>
                 <select
                   className="input"
                   value={assignment.targetIds}
@@ -728,11 +737,11 @@ export default function TeacherGameStudio() {
                         ? "Select an assessment first"
                         : eligibleStudents.length
                           ? "Select a student"
-                          : `No students available in ${selectedAssessment?.grade || "this assessment"}`}
+                          : `No students available in ${selectedAssessment?.ageGroup || "this assessment"}`}
                   </option>
                   {eligibleStudents.map((student) => (
                     <option key={student.id} value={student.id}>
-                      {student.studentFirstName} {student.studentLastName} — {student.grade}
+                      {student.studentFirstName} {student.studentLastName} — {selectedAssessment?.ageGroup}
                     </option>
                   ))}
                 </select>

@@ -1,0 +1,155 @@
+.follow-lights-world {
+  background: radial-gradient(
+    circle at 50% 38%,
+    #f5fdff 0,
+    #e8f8ff 35%,
+    #dceeff 70%,
+    #d5e8ff 100%
+  );
+  color: #15304a;
+}
+.follow-lights-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(1rem, 3vw, 2rem);
+  width: min(76vw, 560px);
+}
+.follow-light {
+  aspect-ratio: 1;
+  border: clamp(8px, 1.2vw, 12px) solid rgba(255, 255, 255, 0.86);
+  border-radius: 34%;
+  box-shadow:
+    inset 0 -14px 24px rgba(0, 0, 0, 0.15),
+    0 14px 32px rgba(42, 75, 105, 0.22);
+  transform: translateZ(0) scale(0.94);
+  transition:
+    transform 120ms ease,
+    filter 120ms ease,
+    box-shadow 120ms ease;
+  touch-action: manipulation;
+}
+.follow-light:active:not(:disabled),
+.follow-light.is-active {
+  transform: translateZ(0) scale(1.04);
+  filter: brightness(1.55) saturate(1.22);
+}
+.follow-light.is-active {
+  box-shadow:
+    0 0 25px var(--glow),
+    0 0 70px var(--glow),
+    inset 0 0 35px rgba(255, 255, 255, 0.82);
+}
+.follow-light.is-ready {
+  cursor: pointer;
+  animation: followReady 1.4s ease-in-out infinite;
+}
+.follow-light.is-ready.is-active {
+  animation: none;
+}
+.follow-phase {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 0.45rem 0.85rem;
+  color: #607b91;
+  font-size: 0.78rem;
+  font-weight: 800;
+  box-shadow: 0 5px 16px rgba(43, 78, 109, 0.1);
+}
+.follow-phase.is-turn {
+  background: #fff;
+  color: #5c2ad5;
+  box-shadow: 0 7px 22px rgba(105, 64, 220, 0.2);
+  animation: followTurnIn 300ms ease-out both;
+}
+.follow-phase.is-watch {
+  background: #173650;
+  color: #fff;
+  box-shadow: 0 7px 22px rgba(23, 54, 80, 0.22);
+}
+.follow-phase-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: #8da3b5;
+}
+.follow-phase.is-turn .follow-phase-dot {
+  background: #7c4dff;
+  box-shadow: 0 0 0 5px rgba(124, 77, 255, 0.13);
+}
+.follow-light-red {
+  background: linear-gradient(145deg, #ff6b75, #e52d43);
+  --glow: #ff4058;
+}
+.follow-light-green {
+  background: linear-gradient(145deg, #5ee59a, #18aa66);
+  --glow: #25db83;
+}
+.follow-light-blue {
+  background: linear-gradient(145deg, #63b8ff, #2775dc);
+  --glow: #3698ff;
+}
+.follow-light-yellow {
+  background: linear-gradient(145deg, #ffe96b, #f3bd20);
+  --glow: #ffd62e;
+}
+.follow-particle {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+  animation: followFloat 8s linear infinite;
+  will-change: transform, opacity;
+}
+@keyframes followFloat {
+  0% {
+    transform: translate3d(0, 20vh, 0) scale(0.4);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.75;
+  }
+  100% {
+    transform: translate3d(8vw, -80vh, 0) scale(1.2);
+    opacity: 0;
+  }
+}
+@keyframes followReady {
+  0%,
+  100% {
+    transform: translateZ(0) scale(0.94);
+  }
+  50% {
+    transform: translateZ(0) scale(0.97);
+  }
+}
+@keyframes followTurnIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-height: 650px) {
+  .follow-lights-grid {
+    width: min(58vh, 450px);
+    gap: 0.8rem;
+  }
+  .follow-light {
+    border-width: 6px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .follow-light,
+  .follow-particle {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -18,7 +18,7 @@ export class GameAssessmentService {
     if (!['HOME', 'SCHOOL'].includes(String(dto.assessmentMode || '').toUpperCase())) {
       throw new BadRequestException('Assessment mode must be HOME or SCHOOL.');
     }
-    const { templateIds = [], ...assessment } = dto;
+    const { templateIds = [], gameIds = [], ...assessment } = dto;
     return this.prisma.gameAssessment.create({
       data: {
         ...assessment,
@@ -31,8 +31,11 @@ export class GameAssessmentService {
         templateSelections: templateIds.length ? {
           create: templateIds.map((templateId) => ({ templateId })),
         } : undefined,
+        gameSelections: gameIds.length ? {
+          create: gameIds.map((gameId) => ({ gameId })),
+        } : undefined,
       },
-      include: { templateSelections: { include: { template: true } } },
+      include: { templateSelections: { include: { template: true } }, gameSelections: { include: { game: true } } },
     });
   }
 
@@ -42,6 +45,7 @@ export class GameAssessmentService {
       include: {
         _count: { select: { questions: true, assignments: true } },
         templateSelections: { include: { template: true } },
+        gameSelections: { include: { game: true } },
       },
       orderBy: { updatedAt: 'desc' },
     });
@@ -56,7 +60,7 @@ export class GameAssessmentService {
       throw new BadRequestException('Assessment mode must be HOME or SCHOOL.');
     }
     await this.requireAssessment(id, schoolId);
-    const { templateIds = [], ...assessment } = dto;
+    const { templateIds = [], gameIds = [], ...assessment } = dto;
     return this.prisma.gameAssessment.update({
       where: { id },
       data: {
@@ -69,8 +73,12 @@ export class GameAssessmentService {
           deleteMany: {},
           create: templateIds.map((templateId) => ({ templateId })),
         },
+        gameSelections: {
+          deleteMany: {},
+          create: gameIds.map((gameId) => ({ gameId })),
+        },
       },
-      include: { templateSelections: { include: { template: true } } },
+      include: { templateSelections: { include: { template: true } }, gameSelections: { include: { game: true } } },
     });
   }
 

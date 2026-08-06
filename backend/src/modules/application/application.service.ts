@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma.service';
 import { CreateApplicationDto, UpdateAssessmentRequirementDto } from './dto/create-application.dto';
 import { randomUUID } from 'crypto';
 import * as ExcelJS from 'exceljs';
+import { legacyGradesForAgeGroup } from '../games/age-groups';
 
 export type StudentRosterQuery = {
   assessmentDate?: string;
@@ -364,7 +365,7 @@ export class ApplicationService {
           assessment: {
             schoolId,
             applicationId: null,
-            grade: assignment.gameAssessment.grade,
+            grade: { in: legacyGradesForAgeGroup(assignment.gameAssessment.ageGroup), mode: 'insensitive' },
             assessmentMode: { in: ['SCHOOL', 'BOTH'] },
             status: { not: 'ARCHIVED' },
           },
@@ -385,7 +386,7 @@ export class ApplicationService {
           studentName: `${student.studentFirstName} ${student.studentLastName}`.trim(),
           applicationId: student.id,
           admissionNumber: student.admissionNumber || '',
-          grade: assignment.gameAssessment.grade || student.grade,
+          ageGroup: assignment.gameAssessment.ageGroup,
           section: student.section || '',
           assessmentId: assignment.id,
           assessmentName: `${assignment.generatedGame?.title || assignment.gameAssessment.name} (Game)`,

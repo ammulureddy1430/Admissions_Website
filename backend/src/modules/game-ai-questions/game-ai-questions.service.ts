@@ -35,7 +35,7 @@ export class GameAIQuestionsService {
       ].filter(Boolean);
       if (mismatches.length) {
         throw new BadRequestException(
-          `The question source does not match the assessment ${mismatches.join(', ')}. Select a textbook for ${assessment.grade} — ${assessment.subject}.`,
+          `The question source does not match the assessment ${mismatches.join(', ')}. Select a textbook for ${assessment.ageGroup} — ${assessment.subject}.`,
         );
       }
     }

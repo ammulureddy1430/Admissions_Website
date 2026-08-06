@@ -20,8 +20,8 @@ export class GamePlayController {
   assignments(@SchoolId() schoolId: string, @Query() query: any) { return this.service.assignments(schoolId, query); }
   @Get('assignment-venue')
   @Roles(Role.SCHOOL_ADMIN, Role.PRINCIPAL, Role.TEACHER, Role.ADMISSIONS_STAFF)
-  assignmentVenue(@SchoolId() schoolId: string, @Query('grade') grade: string) {
-    return this.service.assignmentVenue(schoolId, grade);
+  assignmentVenue(@SchoolId() schoolId: string, @Query('ageGroup') ageGroup: string) {
+    return this.service.assignmentVenue(schoolId, ageGroup);
   }
   @Get('parent/games')
   @Roles(Role.PARENT)

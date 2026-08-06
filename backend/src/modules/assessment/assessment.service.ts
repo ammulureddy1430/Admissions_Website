@@ -1003,13 +1003,13 @@ export class AssessmentService {
         application: studentById.get(result.studentId) || {
           studentFirstName: 'Student',
           studentLastName: '',
-          grade: assessment.grade,
+          ageGroup: assessment.ageGroup,
         },
         assessment: {
           id: assessment.id,
           title: assessment.name,
           subject: assessment.subject,
-          grade: assessment.grade,
+          ageGroup: assessment.ageGroup,
         },
         gameResult: {
           id: result.id,
@@ -1101,7 +1101,7 @@ export class AssessmentService {
     let aiReview: any = fallback;
     try {
       const prompt = `Review this completed educational game assessment for a teacher.
-Grade: ${assessment.grade}
+Age Group: ${assessment.ageGroup}
 Subject: ${assessment.subject}
 Game: ${result.gameAssignment.generatedGame?.title || 'Game assessment'}
 Score: ${result.totalScore}
