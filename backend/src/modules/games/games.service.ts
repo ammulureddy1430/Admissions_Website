@@ -204,6 +204,7 @@ export class GamesService implements OnModuleInit {
 
   async reports(id: string, schoolId: string) {
     const game = await this.one(id, schoolId);
+    if(game.componentName==='MAGIC_PAINT'){const reports=await this.prisma.magicPaintAnalytics.findMany({where:{gameId:id,gameResult:{assessment:{schoolId}}},select:{id:true,studentId:true,assessmentId:true,createdAt:true,creativityScore:true,causeEffectScore:true,objectsCompleted:true,averageCompletionTime:true,interactionConsistency:true,completionStatus:true,overallScore:true},orderBy:{createdAt:'desc'}});return reports.map(report=>({...report,ageGroup:game.ageGroup}));}
     if (game.componentName === 'COLOR_PATH') {
       const reports = await this.prisma.colorPathAnalytics.findMany({
         where: { gameId: id, gameResult: { assessment: { schoolId } } },

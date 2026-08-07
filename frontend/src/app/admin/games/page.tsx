@@ -21,6 +21,7 @@ import FollowTheLightsGame from "@/games/follow-the-lights/Game";
 import BallStackGame from "@/games/ball-stack/Game";
 import SoundDetectiveGame from "@/games/sound-detective/Game";
 import ColorPathGame from "@/games/color-path/Game";
+import MagicPaintGame from "@/games/magic-paint/Game";
 
 type Game = {
   id: string;
@@ -590,6 +591,8 @@ export default function GamesPage() {
               <SoundDetectiveGame sound durationSeconds={previewing.durationSeconds} onComplete={() => setPreviewing(null)} />
             ) : previewing.componentName === "COLOR_PATH" ? (
               <ColorPathGame sound durationSeconds={previewing.durationSeconds} onComplete={() => setPreviewing(null)} />
+            ) : previewing.componentName === "MAGIC_PAINT" ? (
+              <MagicPaintGame sound durationSeconds={previewing.durationSeconds} onComplete={() => setPreviewing(null)} />
             ) : (
               <div className="grid h-full place-items-center text-center text-white">
                 <div>
@@ -617,6 +620,7 @@ function GameArtwork({ componentName }: { componentName: string }) {
   if (componentName === "FOLLOW_THE_LIGHTS") return <div className={`${common} place-items-center bg-[#101d45]/90`} aria-hidden><div className="grid grid-cols-2 gap-3">{["#ffcf4a","#64d9be","#ed6f79","#738dff"].map((color,index)=><i key={color} className={`h-8 w-8 rounded-full border-4 border-white/80 shadow-[0_0_18px_currentColor] ${index===1 ? "scale-110" : "opacity-75"}`} style={{backgroundColor:color,color}}/>)}</div><span className="keep-white absolute bottom-2 text-[8px] font-black tracking-widest text-white">WATCH • REMEMBER</span></div>;
   if (componentName === "SOUND_DETECTIVE") return <div className={`${common} place-items-center bg-[#fff8e8]`} aria-hidden><div className="flex h-12 items-center gap-1">{[18,34,48,28,42,22,38].map((height,index)=><i key={index} className="w-2 rounded-full bg-gradient-to-t from-[#d85d31] to-[#f3b83f]" style={{height}}/>)}</div><span className="absolute left-3 top-3 text-2xl">🎧</span><span className="absolute bottom-2 text-[8px] font-black tracking-widest text-[#8b4a2a]">LISTEN • IDENTIFY</span></div>;
   if (componentName === "COLOR_PATH") return <div className={`${common} bg-gradient-to-b from-[#ddf7ff] to-[#b7e995]`} aria-hidden><span className="absolute left-[18px] top-[30px] text-3xl">🐻</span>{["#ef4444","#22c55e","#3b82f6","#facc15"].map((color,index)=><i key={color} className="absolute bottom-5 h-5 w-9 rounded-[50%] border-2 border-white shadow" style={{backgroundColor:color,left:50+index*25,transform:`translateY(${index%2 ? -12 : 0}px)`}}/>)}<span className="absolute inset-x-0 bottom-1 text-center text-[8px] font-black tracking-widest text-[#31555c]">COLOR PATH</span></div>;
+  if (componentName === "MAGIC_PAINT") return <div className={`${common} bg-gradient-to-b from-[#c9f3ff] to-[#a6e383]`} aria-hidden><span className="absolute left-1/2 top-4 -translate-x-1/2 text-5xl">🦋</span>{["#ff4f64","#19c37d","#3b82f6","#ffd229","#9b5de5"].map((paint,index)=><i key={paint} className="absolute bottom-3 h-5 w-5 rounded-full border-2 border-white" style={{backgroundColor:paint,left:35+index*24}}/>)}</div>;
   return <div className={`${common} place-items-center`} aria-hidden><Gamepad2 className="h-9 w-9 text-[#007f70]"/></div>;
 }
 
@@ -626,6 +630,7 @@ function GameMeta({ label, value, icon, accent = false }: { label: string; value
 
 function gameCardTheme(componentName: string) {
   if (componentName === "COLOR_PATH") return "from-[#5a3cc8] via-[#8c55df] to-[#d56eb4]";
+  if (componentName === "MAGIC_PAINT") return "from-[#ff4f64] via-[#9b5de5] to-[#3b82f6]";
   if (componentName === "BALL_STACK") return "from-[#096e79] via-[#12a18f] to-[#6fc486]";
   if (componentName === "FOLLOW_THE_LIGHTS") return "from-[#122655] via-[#324b98] to-[#6377d7]";
   if (componentName === "SOUND_DETECTIVE") return "from-[#9b4d21] via-[#dd7b35] to-[#f1b84b]";

@@ -168,6 +168,7 @@ model Game {
   ballStackAnalytics      BallStackAnalytics[]
   soundDetectiveAnalytics SoundDetectiveAnalytics[]
   colorPathAnalytics      ColorPathAnalytics[]
+  magicPaintAnalytics     MagicPaintAnalytics[]
   realTimeAssignments     RealTimeGameAssignment[]
   createdAt               DateTime                  @default(now()) @map("created_at")
   updatedAt               DateTime                  @updatedAt @map("updated_at")
@@ -302,6 +303,7 @@ model GameResult {
   ballStackAnalytics      BallStackAnalytics?
   soundDetectiveAnalytics SoundDetectiveAnalytics?
   colorPathAnalytics      ColorPathAnalytics?
+  magicPaintAnalytics     MagicPaintAnalytics?
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
 
@@ -3063,4 +3065,29 @@ model ColorPathAnalytics {
   @@index([gameId, assessmentId])
   @@index([studentId, assessmentId])
   @@map("ColorPathAnalytics")
+}
+
+model MagicPaintAnalytics {
+  id                    String     @id @default(uuid())
+  studentId             String
+  assessmentId          String
+  gameId                String
+  gameResultId          String     @unique
+  gameResult            GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
+  game                  Game       @relation(fields: [gameId], references: [id])
+  objectsCompleted      Int
+  colorsUsed            String[]
+  interactionsPerObject Int[]
+  averageCompletionTime Float
+  interactionConsistency Float
+  completionPercentage  Float
+  creativityScore       Float
+  causeEffectScore      Float
+  overallScore          Float
+  completionStatus      String
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+  @@index([gameId, assessmentId])
+  @@index([studentId, assessmentId])
+  @@map("MagicPaintAnalytics")
 }

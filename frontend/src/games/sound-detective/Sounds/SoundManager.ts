@@ -5,6 +5,8 @@ export class SoundManager {
   private enabled = true;
   private activeNodes: AudioNode[] = [];
   private currentPlayTimeout?: number;
+  private masterGain?: GainNode;
+  private compressor?: DynamicsCompressorNode;
 
   constructor(enabled = true) {
     this.enabled = enabled;
@@ -19,10 +21,27 @@ export class SoundManager {
 
   initContext() {
     if (typeof window === "undefined") return;
-    this.context ||= new (window.AudioContext || (window as any).webkitAudioContext)();
+    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    this.context ||= new AudioContextClass();
     if (this.context.state === "suspended") {
       void this.context.resume();
     }
+    if (!this.masterGain || !this.compressor) {
+      this.masterGain = this.context.createGain();
+      this.masterGain.gain.value = 1.45;
+      this.compressor = this.context.createDynamicsCompressor();
+      this.compressor.threshold.value = -24;
+      this.compressor.knee.value = 18;
+      this.compressor.ratio.value = 5;
+      this.compressor.attack.value = 0.008;
+      this.compressor.release.value = 0.22;
+      this.masterGain.connect(this.compressor).connect(this.context.destination);
+    }
+  }
+
+  private output(ctx: AudioContext): AudioNode {
+    this.initContext();
+    return this.masterGain || ctx.destination;
   }
 
   play(soundId: SoundId, onEnd?: () => void): number {
@@ -121,8 +140,8 @@ export class SoundManager {
     noiseGain.gain.setValueAtTime(0.12, startTime);
     noiseGain.gain.exponentialRampToValueAtTime(0.001, startTime + barkLen - 0.05);
 
-    osc.connect(filter).connect(gain).connect(ctx.destination);
-    noise.connect(filter).connect(noiseGain).connect(ctx.destination);
+    osc.connect(filter).connect(gain).connect(this.output(ctx));
+    noise.connect(filter).connect(noiseGain).connect(this.output(ctx));
 
     osc.start(startTime);
     osc.stop(startTime + barkLen);
@@ -158,7 +177,7 @@ export class SoundManager {
     gain.gain.linearRampToValueAtTime(0.18, startTime + 0.9);
     gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
 
-    osc.connect(filter).connect(gain).connect(ctx.destination);
+    osc.connect(filter).connect(gain).connect(this.output(ctx));
     osc.start(startTime);
     osc.stop(startTime + duration);
 
@@ -185,7 +204,7 @@ export class SoundManager {
       gain.gain.linearRampToValueAtTime(0.16, chirpTime + 0.015);
       gain.gain.exponentialRampToValueAtTime(0.001, chirpTime + 0.12);
 
-      osc.connect(gain).connect(ctx.destination);
+      osc.connect(gain).connect(this.output(ctx));
       osc.start(chirpTime);
       osc.stop(chirpTime + 0.15);
 
@@ -232,7 +251,7 @@ export class SoundManager {
 
     osc1.connect(osc1Gain).connect(filter);
     osc2.connect(osc2Gain).connect(filter);
-    filter.connect(gain).connect(ctx.destination);
+    filter.connect(gain).connect(this.output(ctx));
 
     osc1.start(startTime);
     osc1.stop(startTime + duration);
@@ -270,7 +289,7 @@ export class SoundManager {
 
     osc1.connect(gain);
     osc2.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(this.output(ctx));
 
     osc1.start(startTime);
     osc1.stop(startTime + blastDuration);
@@ -298,7 +317,7 @@ export class SoundManager {
       gain.gain.linearRampToValueAtTime(gains[idx], startTime + 0.008);
       gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
 
-      osc.connect(gain).connect(ctx.destination);
+      osc.connect(gain).connect(this.output(ctx));
       osc.start(startTime);
       osc.stop(startTime + duration);
 
@@ -331,7 +350,7 @@ export class SoundManager {
     gain.gain.linearRampToValueAtTime(0.18, snareTime + 0.01);
     gain.gain.exponentialRampToValueAtTime(0.001, snareTime + 0.18);
 
-    noise.connect(filter).connect(gain).connect(ctx.destination);
+    noise.connect(filter).connect(gain).connect(this.output(ctx));
     noise.start(snareTime);
     noise.stop(snareTime + 0.2);
 
@@ -351,7 +370,7 @@ export class SoundManager {
     gain.gain.linearRampToValueAtTime(0.35, startTime + 0.008);
     gain.gain.exponentialRampToValueAtTime(0.001, startTime + hitDuration);
 
-    osc.connect(gain).connect(ctx.destination);
+    osc.connect(gain).connect(this.output(ctx));
     osc.start(startTime);
     osc.stop(startTime + hitDuration);
 
@@ -383,7 +402,7 @@ export class SoundManager {
       gain.gain.linearRampToValueAtTime(0.08, puffTime + 0.015);
       gain.gain.exponentialRampToValueAtTime(0.001, puffTime + 0.1);
 
-      noise.connect(filter).connect(gain).connect(ctx.destination);
+      noise.connect(filter).connect(gain).connect(this.output(ctx));
       noise.start(puffTime);
       noise.stop(puffTime + 0.12);
 
@@ -413,7 +432,7 @@ export class SoundManager {
 
     osc1.connect(gain);
     osc2.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(this.output(ctx));
 
     osc1.start(startTime);
     osc1.stop(startTime + whistleDuration);
@@ -430,13 +449,13 @@ export class SoundManager {
     }
     this.activeNodes.forEach((node) => {
       try {
-        (node as any).stop?.();
-      } catch (err) {
+        if ("stop" in node) (node as AudioScheduledSourceNode).stop();
+      } catch {
         // already stopped
       }
       try {
         node.disconnect();
-      } catch (err) {
+      } catch {
         // already disconnected
       }
     });
@@ -447,5 +466,7 @@ export class SoundManager {
     this.stopAll();
     void this.context?.close();
     this.context = undefined;
+    this.masterGain = undefined;
+    this.compressor = undefined;
   }
 }

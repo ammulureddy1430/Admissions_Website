@@ -42,6 +42,7 @@ import FollowTheLightsGame from "@/games/follow-the-lights/Game";
 import BallStackGame from "@/games/ball-stack/Game";
 import SoundDetectiveGame from "@/games/sound-detective/Game";
 import ColorPathGame from "@/games/color-path/Game";
+import MagicPaintGame from "@/games/magic-paint/Game";
 
 const MAX_SECURITY_WARNINGS = 3;
 type GameOption = { id?: string; optionKey?: string; optionText: string };
@@ -253,7 +254,8 @@ export function GameRuntimePlayer({
           actionName === "FOLLOW_LIGHTS_COMPLETE" ||
           actionName === "BALL_STACK_COMPLETE" ||
           actionName === "SOUND_DETECTIVE_COMPLETE" ||
-          actionName === "COLOR_PATH_COMPLETE") &&
+          actionName === "COLOR_PATH_COMPLETE" ||
+          actionName === "MAGIC_PAINT_COMPLETE") &&
         next.status === "COMPLETED"
       ) {
         onComplete?.(next);
@@ -342,7 +344,8 @@ export function GameRuntimePlayer({
       timeoutHandled.current ||
       state.engine?.engineKey === "BALL_STACK" ||
       state.engine?.engineKey === "SOUND_DETECTIVE" ||
-      state.engine?.engineKey === "COLOR_PATH"
+      state.engine?.engineKey === "COLOR_PATH" ||
+      state.engine?.engineKey === "MAGIC_PAINT"
     )
       return;
     timeoutHandled.current = true;
@@ -364,6 +367,7 @@ export function GameRuntimePlayer({
   const isBallStack = state.engine?.engineKey === "BALL_STACK";
   const isSoundDetective = state.engine?.engineKey === "SOUND_DETECTIVE";
   const isColorPath = state.engine?.engineKey === "COLOR_PATH";
+  const isMagicPaint = state.engine?.engineKey === "MAGIC_PAINT";
   const showGameIntro = state.status === "READY";
   const assignedGameName =
     state.generatedGame?.title ||
@@ -391,7 +395,8 @@ export function GameRuntimePlayer({
     isFollowTheLights ||
     isBallStack ||
     isSoundDetective ||
-    isColorPath;
+    isColorPath ||
+    isMagicPaint;
   const player = (
     <div
       ref={playerRef}
@@ -510,6 +515,8 @@ export function GameRuntimePlayer({
               durationSeconds={60}
               onComplete={(metrics) => action("COLOR_PATH_COMPLETE", metrics)}
             />
+          ) : isMagicPaint ? (
+            <MagicPaintGame disabled={state.status !== "RUNNING"} sound={sound} durationSeconds={120} onComplete={(metrics) => action("MAGIC_PAINT_COMPLETE", metrics)} />
           ) : q ? (
             state.engine?.engineKey === "BOARD_GAME" ? (
               <BoardGame

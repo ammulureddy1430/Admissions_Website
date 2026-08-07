@@ -134,6 +134,8 @@
   color: #4b382a;
 }
 
+.sound-detective-replay{display:flex;align-items:center;justify-content:center;gap:.7rem;min-width:260px;margin:0 auto .3rem;padding:.8rem 1.25rem;border:3px solid #fff;border-radius:999px;background:linear-gradient(135deg,#b33939,#ff5a45);color:#fff;box-shadow:0 6px 0 #812b2b,0 12px 22px #b3393933;font-size:.82rem;letter-spacing:.08em;cursor:pointer;transition:transform .15s,filter .15s}.sound-detective-replay>span{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#fff;color:#b33939;font-size:13px}.sound-detective-replay svg{width:21px}.sound-detective-replay:hover:not(:disabled){transform:translateY(-3px);filter:brightness(1.08)}.sound-detective-replay:active:not(:disabled){transform:translateY(3px);box-shadow:0 2px 0 #812b2b}.sound-detective-replay:disabled{cursor:default;opacity:.8}.sound-detective-replay.is-playing{animation:pulse-border 1s infinite}.sound-detective-card:disabled{cursor:wait;opacity:.62;transform:none}
+
 /* Animations classes for kid-friendly premium feel */
 .animate-bounce-gentle {
   animation: bounce 1.8s infinite;

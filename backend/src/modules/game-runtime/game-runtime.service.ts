@@ -19,6 +19,7 @@ const ENGINES = [
   ['BALL_STACK','Ball Stack'],
   ['SOUND_DETECTIVE','Sound Detective'],
   ['COLOR_PATH','Color Path'],
+  ['MAGIC_PAINT','Magic Paint'],
 ] as const;
 
 @Injectable()
@@ -116,6 +117,7 @@ export class GameRuntimeService {
     if (session.engine.engineKey === 'COLOR_PATH' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) {
       throw new BadRequestException('Color Path does not allow pause, hints, retries, skips, or question answers.');
     }
+    if (session.engine.engineKey === 'MAGIC_PAINT' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Magic Paint does not allow pause, hints, retries, skips, or question answers.');
     if (action === 'START') return this.transition(session.id, 'RUNNING', { startedAt: session.startedAt || new Date(), pausedAt: null }, 'STARTED', dto.payload, schoolId, user);
     if (action === 'PAUSE') {
       if (session.status !== 'RUNNING') throw new BadRequestException('Only a running game can be paused.');
@@ -141,6 +143,7 @@ export class GameRuntimeService {
     if (action === 'BALL_STACK_COMPLETE') return this.ballStackComplete(session, dto.payload, schoolId, user);
     if (action === 'SOUND_DETECTIVE_COMPLETE') return this.soundDetectiveComplete(session, dto.payload, schoolId, user);
     if (action === 'COLOR_PATH_COMPLETE') return this.colorPathComplete(session, dto.payload, schoolId, user);
+    if (action === 'MAGIC_PAINT_COMPLETE') return this.magicPaintComplete(session, dto.payload, schoolId, user);
     if (action === 'SECURITY_VIOLATION') return this.securityViolation(session, dto.payload, schoolId, user);
     if (action === 'COMPLETE') return this.transition(id, 'COMPLETED', { completedAt: new Date() }, 'COMPLETED', dto.payload, schoolId, user);
     throw new BadRequestException('Unsupported runtime action.');
@@ -289,6 +292,15 @@ export class GameRuntimeService {
     await this.prisma.gameRuntimeSession.update({ where: { id: session.id }, data: { status: 'COMPLETED', completedAt: new Date(), score: overallScore, elapsedSeconds, runtimeState: { ...((session.runtimeState || {}) as Record<string, unknown>), cognitiveAnalytics } as Prisma.InputJsonValue } });
     await this.event(session.id, 'COLOR_PATH_COMPLETED', cognitiveAnalytics);
     return { state: await this.state(session.id, schoolId, user) };
+  }
+
+  private async magicPaintComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
+    if (session.engine.engineKey !== 'MAGIC_PAINT' || session.status !== 'RUNNING') throw new BadRequestException('Magic Paint metrics require an active Magic Paint session.');
+    const input=(payload||{}) as Record<string,any>; const number=(key:string,max=100000)=>Math.max(0,Math.min(max,Number(input[key])||0)); const clamp=(value:number)=>Math.max(0,Math.min(100,Math.round(value*10)/10));
+    const objectsCompleted=number('objectsCompleted',1000); const colorsUsed=Array.isArray(input.colorsUsed)?[...new Set(input.colorsUsed.map(String))].slice(0,7):[]; const interactionsPerObject=Array.isArray(input.interactionsPerObject)?input.interactionsPerObject.map((n:unknown)=>Math.max(0,Math.min(100,Number(n)||0))).slice(0,1000):[];
+    const averageCompletionTime=number('averageCompletionTime',120000); const interactionConsistency=clamp(number('interactionConsistency',100)); const completionPercentage=clamp(number('completionPercentage',100)); const creativityScore=clamp(number('creativityScore',100)); const causeEffectScore=clamp(number('causeEffectScore',100)); const overallScore=clamp((creativityScore+causeEffectScore)/2); const elapsedSeconds=Math.min(120,number('elapsedSeconds',120)); const completionStatus=objectsCompleted>=5||elapsedSeconds>=119?'COMPLETED':'ENDED';
+    const cognitiveAnalytics={objectsCompleted,colorsUsed,interactionsPerObject,averageCompletionTime,interactionConsistency,completionPercentage,creativityScore,causeEffectScore,overallScore,completionStatus};
+    await this.prisma.gameRuntimeSession.update({where:{id:session.id},data:{status:'COMPLETED',completedAt:new Date(),score:overallScore,elapsedSeconds,runtimeState:{...((session.runtimeState||{}) as Record<string,unknown>),cognitiveAnalytics} as Prisma.InputJsonValue}}); await this.event(session.id,'MAGIC_PAINT_COMPLETED',cognitiveAnalytics); return {state:await this.state(session.id,schoolId,user)};
   }
 
 

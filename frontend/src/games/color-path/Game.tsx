@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Timer } from "lucide-react";
+import { Timer, Volume2 } from "lucide-react";
 import { ColorPathAnalyticsService } from "./AnalyticsService";
 import { COLOR_PATH_DURATION_SECONDS, COLOR_PATH_TOTAL_ROUNDS, ColorPathEngine } from "./GameEngine";
 import { COLOR_LABELS } from "./PathGenerator";
@@ -15,6 +15,11 @@ export default function ColorPathGame({ disabled = false, sound = true, duration
   const metrics = useRef(engine.emptyMetrics()); const startedAt = useRef(0); const finished = useRef(false); const sounds = useRef<ColorPathSoundManager | null>(null); const analytics = useRef(new ColorPathAnalyticsService(onComplete));
   useEffect(() => { startedAt.current = performance.now(); sounds.current = new ColorPathSoundManager(sound); return () => sounds.current?.dispose(); }, [sound]);
   useEffect(() => sounds.current?.setEnabled(sound), [sound]); useEffect(() => { analytics.current = new ColorPathAnalyticsService(onComplete); }, [onComplete]);
+  useEffect(() => {
+    if (disabled || !sound) return;
+    const announce = window.setTimeout(() => sounds.current?.speakColor(COLOR_LABELS[round.target]), 220);
+    return () => window.clearTimeout(announce);
+  }, [disabled, round.id, round.target, sound]);
   const finish = useCallback(async (reason: "TIME_LIMIT_REACHED" | "ROUNDS_COMPLETED") => { if (finished.current) return; finished.current = true; metrics.current.endReason = reason; metrics.current.elapsedSeconds = durationSeconds - seconds; await analytics.current.save(scoreColorPath(metrics.current)); }, [durationSeconds, seconds]);
   useEffect(() => { if (disabled || finished.current) return; const timer = window.setInterval(() => setSeconds(value => Math.max(0, value - 1)), 1000); return () => clearInterval(timer); }, [disabled]);
   useEffect(() => { if (seconds === 0) void finish("TIME_LIMIT_REACHED"); }, [seconds, finish]);
@@ -32,7 +37,7 @@ export default function ColorPathGame({ disabled = false, sound = true, duration
   const progress = (durationSeconds - seconds) / durationSeconds * 100;
   return <div className="color-path-world" role="application" aria-label="Color Path visual recognition assessment">
     <div className="color-path-sky"><i /><i /><i /></div><div className="color-path-progress"><span style={{ width: `${progress}%` }} /></div>
-    <div className="color-path-target"><small>TARGET COLOR</small><strong><i style={{ background: round.targetFill }} />{COLOR_LABELS[round.target]}</strong></div>
+    <div className="color-path-target"><small>TARGET COLOR</small><strong><i style={{ background: round.targetFill }} />{COLOR_LABELS[round.target]}<button type="button" onClick={() => sounds.current?.speakColor(COLOR_LABELS[round.target])} aria-label={`Hear ${COLOR_LABELS[round.target]} again`}><Volume2 /></button></strong></div>
     <div className="color-path-timer"><Timer /><strong>{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</strong></div>
     <div className="color-path-level" aria-label={`Round ${round.id} of ${COLOR_PATH_TOTAL_ROUNDS}`}>{Array.from({ length: COLOR_PATH_TOTAL_ROUNDS }, (_, index) => index + 1).map(level => <i key={level} className={level <= round.id ? "active" : ""} />)}</div>
     <div className={`color-path-character ${movingTo ? "is-jumping" : ""}`} style={movingTo ? { left: `${movingTo.x}%`, top: `${movingTo.y - 12}%` } : undefined} aria-hidden><span className="cp-ear left"/><span className="cp-ear right"/><span className="cp-face"><i/><i/><b/></span><span className="cp-body"/></div>

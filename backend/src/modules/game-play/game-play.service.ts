@@ -230,13 +230,13 @@ export class GamePlayService {
       strategy: copy.strategy,
       timer: {
         minutes: assignment.timeLimitMinutes || assignment.gameAssessment?.timeLimit || null,
-        pauses: game.engineKey !== 'COLOR_PATH',
+        pauses: !['COLOR_PATH','MAGIC_PAINT'].includes(game.engineKey),
         expiry: 'The practice or assessment ends when the timer reaches zero.',
       },
       scoring: {
         correctAction: correctPoints,
         wrongAction: incorrectPoints,
-        hintPenalty: game.engineKey === 'COLOR_PATH' ? 0 : 2,
+        hintPenalty: ['COLOR_PATH','MAGIC_PAINT'].includes(game.engineKey) ? 0 : 2,
         timeBonus: Number(configuration?.scoringRules?.timeBonus ?? 0),
         completionBonus: Number(configuration?.scoringRules?.completionBonus ?? 0),
         maximumScore: maxScore,
@@ -401,10 +401,11 @@ export class GamePlayService {
     const ballStack = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'BALL_STACK' ? runtime.cognitiveAnalytics : null;
     const soundDetective = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'SOUND_DETECTIVE' ? runtime.cognitiveAnalytics : null;
     const colorPath = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'COLOR_PATH' ? runtime.cognitiveAnalytics : null;
-    const cognitive = followLights || ballStack || soundDetective || colorPath;
-    const answered = followLights ? Number(followLights.correctTaps || 0) + Number(followLights.wrongTaps || 0) : ballStack ? Number(ballStack.totalBallsDropped || 0) : soundDetective ? Number(soundDetective.roundsPlayed || 0) : colorPath ? Number(colorPath.roundsPlayed || 0) : runtime?.answers?.length || 0;
+    const magicPaint = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'MAGIC_PAINT' ? runtime.cognitiveAnalytics : null;
+    const cognitive = followLights || ballStack || soundDetective || colorPath || magicPaint;
+    const answered = followLights ? Number(followLights.correctTaps || 0) + Number(followLights.wrongTaps || 0) : ballStack ? Number(ballStack.totalBallsDropped || 0) : soundDetective ? Number(soundDetective.roundsPlayed || 0) : colorPath ? Number(colorPath.roundsPlayed || 0) : magicPaint ? Number(magicPaint.objectsCompleted || 0) : runtime?.answers?.length || 0;
     const total = cognitive ? Math.max(1, answered) : session.questionIds.length;
-    const percentage = followLights ? Number(followLights.overallScore || 0) : ballStack ? Number(ballStack.overallCognitiveScore || 0) : soundDetective ? Number(soundDetective.overallScore || 0) : colorPath ? Number(colorPath.overallScore || 0) : total ? (Number(runtime?.correct || 0) / total) * 100 : 0;
+    const percentage = followLights ? Number(followLights.overallScore || 0) : ballStack ? Number(ballStack.overallCognitiveScore || 0) : soundDetective ? Number(soundDetective.overallScore || 0) : colorPath ? Number(colorPath.overallScore || 0) : magicPaint ? Number(magicPaint.overallScore || 0) : total ? (Number(runtime?.correct || 0) / total) * 100 : 0;
     const passed = percentage >= assignment.passingScore;
     const attempt = await this.prisma.gameAttempt.findFirst({ where: { gameResultId: result.id, submittedAt: null }, orderBy: { attemptNumber: 'desc' } });
     await this.prisma.$transaction(async (tx) => {
@@ -466,6 +467,10 @@ export class GamePlayService {
           overallScore: Number(colorPath.overallScore || 0), completionStatus: String(colorPath.completionStatus || 'COMPLETED'),
         };
         await tx.colorPathAnalytics.upsert({ where: { gameResultId: result.id }, create: { ...data, gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId }, update: data });
+      }
+      if (magicPaint && result.gameId) {
+        const data={objectsCompleted:Number(magicPaint.objectsCompleted||0),colorsUsed:Array.isArray(magicPaint.colorsUsed)?magicPaint.colorsUsed:[],interactionsPerObject:Array.isArray(magicPaint.interactionsPerObject)?magicPaint.interactionsPerObject:[],averageCompletionTime:Number(magicPaint.averageCompletionTime||0),interactionConsistency:Number(magicPaint.interactionConsistency||0),completionPercentage:Number(magicPaint.completionPercentage||0),creativityScore:Number(magicPaint.creativityScore||0),causeEffectScore:Number(magicPaint.causeEffectScore||0),overallScore:Number(magicPaint.overallScore||0),completionStatus:String(magicPaint.completionStatus||'COMPLETED')};
+        await tx.magicPaintAnalytics.upsert({where:{gameResultId:result.id},create:{...data,gameResultId:result.id,gameId:result.gameId,studentId,assessmentId:assignment.gameAssessmentId},update:data});
       }
       if (attempt) {
         await tx.gameAttempt.update({ where: { id: attempt.id }, data: { submittedAt: new Date(), state: session.runtimeState as Prisma.InputJsonValue } });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Timer, Volume2, VolumeX, Play, Music } from "lucide-react";
+import { Timer, Volume2, VolumeX, Music } from "lucide-react";
 import { SoundDetectiveEngine } from "./GameEngine";
 import { scoreSoundDetective } from "./ScoringEngine";
 import { SoundDetectiveAnalyticsService } from "./AnalyticsService";
@@ -175,7 +175,7 @@ export default function SoundDetectiveGame({
     const timer = window.setInterval(() => {
       elapsedRef.current += 1;
 
-      if (phase === "choices") {
+      if (phase === "choices" && !isAudioPlaying) {
         setRoundSeconds((prev) => {
           if (prev <= 1) {
             // Time out: treated as incorrect
@@ -196,15 +196,14 @@ export default function SoundDetectiveGame({
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [disabled, phase, showRoundIntro, beginRound, finish]);
+  }, [disabled, phase, showRoundIntro, isAudioPlaying, beginRound, finish]);
 
   // Handle card selection
-  const selectCard = (choice: SoundItem) => {
+  const selectCard = (choice: SoundItem, eventTime: number) => {
     if (phase !== "choices" || disabled || finished.current || isSelecting.current) return;
     isSelecting.current = true;
 
-    const now = performance.now();
-    const rt = now - inputStartedAt.current;
+    const rt = eventTime - inputStartedAt.current;
     metrics.current.reactionTimes.push(rt);
 
     const correct = engine.current.isCorrect(choice.id);
@@ -389,11 +388,27 @@ export default function SoundDetectiveGame({
 
         {!showRoundIntro && phase === "choices" && (
           <div className="flex flex-col items-center justify-center w-full animate-in fade-in duration-300">
+            <button
+              type="button"
+              className={`sound-detective-replay ${isAudioPlaying ? "is-playing" : ""}`}
+              disabled={isAudioPlaying || !soundEnabled}
+              onClick={() => {
+                if (!target || !sounds.current || isAudioPlaying) return;
+                setIsAudioPlaying(true);
+                sounds.current.play(target.id, () => setIsAudioPlaying(false));
+              }}
+              aria-label="Play the sound again"
+            >
+              <span>{isAudioPlaying ? "🔊" : "▶"}</span>
+              <strong>{isAudioPlaying ? "LISTEN..." : "PLAY SOUND AGAIN"}</strong>
+              <Volume2 />
+            </button>
             <div className="sound-detective-grid">
               {options.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => selectCard(item)}
+                  onClick={(event) => selectCard(item, event.timeStamp)}
+                  disabled={isAudioPlaying}
                   className={`sound-detective-card group`}
                 >
                   <span className={`sound-detective-emoji ${getAnimationClass(item)}`}>

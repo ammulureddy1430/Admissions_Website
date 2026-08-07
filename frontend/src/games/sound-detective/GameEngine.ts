@@ -34,10 +34,12 @@ export class SoundDetectiveEngine {
     difficulty: number;
   } {
     this.round += 1;
-    let difficulty = 1; // Always Level 1 (easiest level with mixed categories)
+    const difficulty = 1; // Always Level 1 (easiest level with mixed categories)
 
     // 1. Determine target category and candidate items (only easy recognizable items)
-    const easyIds = ["dog", "cat", "bird", "cow", "car_horn", "train", "bell", "drum"];
+    // Cat is intentionally excluded: the synthesized meow is not reliably
+    // recognizable enough for a high-stakes early-years assessment.
+    const easyIds = ["dog", "bird", "cow", "car_horn", "train", "bell", "drum"];
     const targetCandidates = SOUND_ITEMS.filter((item) => easyIds.includes(item.id));
 
     // Exclude already played targets to avoid repetitions
