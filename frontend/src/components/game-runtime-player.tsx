@@ -43,6 +43,7 @@ import BallStackGame from "@/games/ball-stack/Game";
 import SoundDetectiveGame from "@/games/sound-detective/Game";
 import ColorPathGame from "@/games/color-path/Game";
 import MagicPaintGame from "@/games/magic-paint/Game";
+import TrainTrackBuilderGame from "@/games/train-track-builder/Game";
 
 const MAX_SECURITY_WARNINGS = 3;
 type GameOption = { id?: string; optionKey?: string; optionText: string };
@@ -255,7 +256,8 @@ export function GameRuntimePlayer({
           actionName === "BALL_STACK_COMPLETE" ||
           actionName === "SOUND_DETECTIVE_COMPLETE" ||
           actionName === "COLOR_PATH_COMPLETE" ||
-          actionName === "MAGIC_PAINT_COMPLETE") &&
+          actionName === "MAGIC_PAINT_COMPLETE" ||
+          actionName === "TRAIN_TRACK_COMPLETE") &&
         next.status === "COMPLETED"
       ) {
         onComplete?.(next);
@@ -345,7 +347,8 @@ export function GameRuntimePlayer({
       state.engine?.engineKey === "BALL_STACK" ||
       state.engine?.engineKey === "SOUND_DETECTIVE" ||
       state.engine?.engineKey === "COLOR_PATH" ||
-      state.engine?.engineKey === "MAGIC_PAINT"
+      state.engine?.engineKey === "MAGIC_PAINT" ||
+      state.engine?.engineKey === "TRAIN_TRACK_BUILDER"
     )
       return;
     timeoutHandled.current = true;
@@ -368,6 +371,7 @@ export function GameRuntimePlayer({
   const isSoundDetective = state.engine?.engineKey === "SOUND_DETECTIVE";
   const isColorPath = state.engine?.engineKey === "COLOR_PATH";
   const isMagicPaint = state.engine?.engineKey === "MAGIC_PAINT";
+  const isTrainTrackBuilder = state.engine?.engineKey === "TRAIN_TRACK_BUILDER";
   const showGameIntro = state.status === "READY";
   const assignedGameName =
     state.generatedGame?.title ||
@@ -396,7 +400,8 @@ export function GameRuntimePlayer({
     isBallStack ||
     isSoundDetective ||
     isColorPath ||
-    isMagicPaint;
+    isMagicPaint ||
+    isTrainTrackBuilder;
   const player = (
     <div
       ref={playerRef}
@@ -517,6 +522,8 @@ export function GameRuntimePlayer({
             />
           ) : isMagicPaint ? (
             <MagicPaintGame disabled={state.status !== "RUNNING"} sound={sound} durationSeconds={120} onComplete={(metrics) => action("MAGIC_PAINT_COMPLETE", metrics)} />
+          ) : isTrainTrackBuilder ? (
+            <TrainTrackBuilderGame disabled={state.status !== "RUNNING"} sound={sound} durationSeconds={120} onComplete={(metrics) => action("TRAIN_TRACK_COMPLETE", metrics)} />
           ) : q ? (
             state.engine?.engineKey === "BOARD_GAME" ? (
               <BoardGame

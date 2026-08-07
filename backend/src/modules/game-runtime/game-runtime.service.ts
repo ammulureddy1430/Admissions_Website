@@ -20,6 +20,7 @@ const ENGINES = [
   ['SOUND_DETECTIVE','Sound Detective'],
   ['COLOR_PATH','Color Path'],
   ['MAGIC_PAINT','Magic Paint'],
+  ['TRAIN_TRACK_BUILDER','Train Track Builder'],
 ] as const;
 
 @Injectable()
@@ -118,6 +119,7 @@ export class GameRuntimeService {
       throw new BadRequestException('Color Path does not allow pause, hints, retries, skips, or question answers.');
     }
     if (session.engine.engineKey === 'MAGIC_PAINT' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Magic Paint does not allow pause, hints, retries, skips, or question answers.');
+    if (session.engine.engineKey === 'TRAIN_TRACK_BUILDER' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Train Track Builder does not allow pause, hints, retries, skips, or question answers.');
     if (action === 'START') return this.transition(session.id, 'RUNNING', { startedAt: session.startedAt || new Date(), pausedAt: null }, 'STARTED', dto.payload, schoolId, user);
     if (action === 'PAUSE') {
       if (session.status !== 'RUNNING') throw new BadRequestException('Only a running game can be paused.');
@@ -144,6 +146,7 @@ export class GameRuntimeService {
     if (action === 'SOUND_DETECTIVE_COMPLETE') return this.soundDetectiveComplete(session, dto.payload, schoolId, user);
     if (action === 'COLOR_PATH_COMPLETE') return this.colorPathComplete(session, dto.payload, schoolId, user);
     if (action === 'MAGIC_PAINT_COMPLETE') return this.magicPaintComplete(session, dto.payload, schoolId, user);
+    if (action === 'TRAIN_TRACK_COMPLETE') return this.trainTrackComplete(session, dto.payload, schoolId, user);
     if (action === 'SECURITY_VIOLATION') return this.securityViolation(session, dto.payload, schoolId, user);
     if (action === 'COMPLETE') return this.transition(id, 'COMPLETED', { completedAt: new Date() }, 'COMPLETED', dto.payload, schoolId, user);
     throw new BadRequestException('Unsupported runtime action.');
@@ -301,6 +304,15 @@ export class GameRuntimeService {
     const averageCompletionTime=number('averageCompletionTime',120000); const interactionConsistency=clamp(number('interactionConsistency',100)); const completionPercentage=clamp(number('completionPercentage',100)); const creativityScore=clamp(number('creativityScore',100)); const causeEffectScore=clamp(number('causeEffectScore',100)); const overallScore=clamp((creativityScore+causeEffectScore)/2); const elapsedSeconds=Math.min(120,number('elapsedSeconds',120)); const completionStatus=objectsCompleted>=5||elapsedSeconds>=119?'COMPLETED':'ENDED';
     const cognitiveAnalytics={objectsCompleted,colorsUsed,interactionsPerObject,averageCompletionTime,interactionConsistency,completionPercentage,creativityScore,causeEffectScore,overallScore,completionStatus};
     await this.prisma.gameRuntimeSession.update({where:{id:session.id},data:{status:'COMPLETED',completedAt:new Date(),score:overallScore,elapsedSeconds,runtimeState:{...((session.runtimeState||{}) as Record<string,unknown>),cognitiveAnalytics} as Prisma.InputJsonValue}}); await this.event(session.id,'MAGIC_PAINT_COMPLETED',cognitiveAnalytics); return {state:await this.state(session.id,schoolId,user)};
+  }
+
+  private async trainTrackComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
+    if (session.engine.engineKey !== 'TRAIN_TRACK_BUILDER' || session.status !== 'RUNNING') throw new BadRequestException('Train Track Builder metrics require an active session.');
+    const input=(payload||{}) as Record<string,any>;const number=(key:string,max=100000)=>Math.max(0,Math.min(max,Number(input[key])||0));const clamp=(value:number)=>Math.max(0,Math.min(100,Math.round(value*10)/10));
+    const roundsPlayed=number('roundsPlayed',1000),tracksCompleted=number('tracksCompleted',10000),successfulRoutes=Math.min(roundsPlayed,number('successfulRoutes',1000)),correctRotations=number('correctRotations',10000),incorrectRotations=number('incorrectRotations',10000),averageCompletionTime=number('averageCompletionTime',120000),highestDifficulty=Math.min(7,Math.max(1,number('highestDifficulty',7))),elapsedSeconds=Math.min(120,number('elapsedSeconds',120));
+    const rotations=correctRotations+incorrectRotations,logicalAccuracy=clamp(rotations?correctRotations/rotations*100:0),routeRate=roundsPlayed?successfulRoutes/roundsPlayed*100:0,difficulty=highestDifficulty/7*100,completionPercentage=clamp(roundsPlayed/7*100),logicalThinkingScore=clamp(logicalAccuracy*.55+routeRate*.3+difficulty*.15),causeEffectScore=clamp(routeRate*.48+logicalAccuracy*.32+completionPercentage*.2),overallScore=clamp((logicalThinkingScore+causeEffectScore)/2),completionStatus=elapsedSeconds>=119||roundsPlayed>=7?'COMPLETED':'PARTIAL';
+    const cognitiveAnalytics={roundsPlayed,tracksCompleted,successfulRoutes,correctRotations,incorrectRotations,averageCompletionTime,highestDifficulty,logicalAccuracy,logicalThinkingScore,causeEffectScore,completionPercentage,overallScore,completionStatus};
+    await this.prisma.gameRuntimeSession.update({where:{id:session.id},data:{status:'COMPLETED',completedAt:new Date(),score:overallScore,elapsedSeconds,runtimeState:{...((session.runtimeState||{}) as Record<string,unknown>),cognitiveAnalytics} as Prisma.InputJsonValue}});await this.event(session.id,'TRAIN_TRACK_COMPLETED',cognitiveAnalytics);return{state:await this.state(session.id,schoolId,user)};
   }
 
 

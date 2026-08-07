@@ -1,0 +1,1 @@
+import type{TrainTrackScores}from"./Types";export class TrainTrackAnalyticsService{constructor(private sink:(metrics:TrainTrackScores)=>void|Promise<void>){}async save(metrics:TrainTrackScores){await this.sink(metrics)}}
