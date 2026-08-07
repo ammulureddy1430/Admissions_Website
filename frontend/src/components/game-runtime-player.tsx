@@ -44,6 +44,7 @@ import SoundDetectiveGame from "@/games/sound-detective/Game";
 import ColorPathGame from "@/games/color-path/Game";
 import MagicPaintGame from "@/games/magic-paint/Game";
 import TrainTrackBuilderGame from "@/games/train-track-builder/Game";
+import PackageSorterGame from "@/games/package-sorter/Game";
 
 const MAX_SECURITY_WARNINGS = 3;
 type GameOption = { id?: string; optionKey?: string; optionText: string };
@@ -348,7 +349,8 @@ export function GameRuntimePlayer({
       state.engine?.engineKey === "SOUND_DETECTIVE" ||
       state.engine?.engineKey === "COLOR_PATH" ||
       state.engine?.engineKey === "MAGIC_PAINT" ||
-      state.engine?.engineKey === "TRAIN_TRACK_BUILDER"
+      state.engine?.engineKey === "TRAIN_TRACK_BUILDER" ||
+      state.engine?.engineKey === "PACKAGE_SORTER"
     )
       return;
     timeoutHandled.current = true;
@@ -372,6 +374,7 @@ export function GameRuntimePlayer({
   const isColorPath = state.engine?.engineKey === "COLOR_PATH";
   const isMagicPaint = state.engine?.engineKey === "MAGIC_PAINT";
   const isTrainTrackBuilder = state.engine?.engineKey === "TRAIN_TRACK_BUILDER";
+  const isPackageSorter = state.engine?.engineKey === "PACKAGE_SORTER";
   const showGameIntro = state.status === "READY";
   const assignedGameName =
     state.generatedGame?.title ||
@@ -401,7 +404,8 @@ export function GameRuntimePlayer({
     isSoundDetective ||
     isColorPath ||
     isMagicPaint ||
-    isTrainTrackBuilder;
+    isTrainTrackBuilder ||
+    isPackageSorter;
   const player = (
     <div
       ref={playerRef}
@@ -420,7 +424,7 @@ export function GameRuntimePlayer({
       }}
       className={`game-runtime-player fixed inset-0 z-[9999] flex h-[100dvh] w-screen flex-col bg-gradient-to-br from-[#071633] via-[#123b5a] to-[#007f70] text-white ${isAdventure ? "is-adventure-game" : ""} ${isBoardGame ? "is-board-game" : ""} ${isBuildingGame ? "is-building-game" : ""} ${isDragDropGame ? "is-drag-drop-game" : ""} ${isFishingGame ? "is-fishing-game" : ""} ${isLogicGame ? "is-logic-game" : ""} ${isMazeGame ? "is-maze-game" : ""} ${isMemoryGame ? "is-memory-game" : ""} ${isRacingGame ? "is-racing-game" : ""} ${isSortingGame ? "is-sorting-game" : ""} ${isTreasureHunt ? "is-treasure-hunt" : ""}`}
     >
-      {!isFollowTheLights && !isBallStack && !isSoundDetective && !isColorPath && (
+      {!isFollowTheLights && !isBallStack && !isSoundDetective && !isColorPath && !isPackageSorter && !isMagicPaint && !isTrainTrackBuilder && (
         <>
           <header className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3">
             <div>
@@ -524,6 +528,8 @@ export function GameRuntimePlayer({
             <MagicPaintGame disabled={state.status !== "RUNNING"} sound={sound} durationSeconds={120} onComplete={(metrics) => action("MAGIC_PAINT_COMPLETE", metrics)} />
           ) : isTrainTrackBuilder ? (
             <TrainTrackBuilderGame disabled={state.status !== "RUNNING"} sound={sound} durationSeconds={120} onComplete={(metrics) => action("TRAIN_TRACK_COMPLETE", metrics)} />
+          ) : isPackageSorter ? (
+            <PackageSorterGame disabled={state.status !== "RUNNING"} sound={sound} durationSeconds={120} onComplete={(metrics) => action("PACKAGE_SORTER_COMPLETE", metrics)} />
           ) : q ? (
             state.engine?.engineKey === "BOARD_GAME" ? (
               <BoardGame

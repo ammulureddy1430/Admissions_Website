@@ -403,10 +403,11 @@ export class GamePlayService {
     const colorPath = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'COLOR_PATH' ? runtime.cognitiveAnalytics : null;
     const magicPaint = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'MAGIC_PAINT' ? runtime.cognitiveAnalytics : null;
     const trainTrack = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'TRAIN_TRACK_BUILDER' ? runtime.cognitiveAnalytics : null;
-    const cognitive = followLights || ballStack || soundDetective || colorPath || magicPaint || trainTrack;
-    const answered = followLights ? Number(followLights.correctTaps || 0) + Number(followLights.wrongTaps || 0) : ballStack ? Number(ballStack.totalBallsDropped || 0) : soundDetective ? Number(soundDetective.roundsPlayed || 0) : colorPath ? Number(colorPath.roundsPlayed || 0) : magicPaint ? Number(magicPaint.objectsCompleted || 0) : trainTrack ? Number(trainTrack.roundsPlayed || 0) : runtime?.answers?.length || 0;
+    const packageSorter = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'PACKAGE_SORTER' ? runtime.cognitiveAnalytics : null;
+    const cognitive = followLights || ballStack || soundDetective || colorPath || magicPaint || trainTrack || packageSorter;
+    const answered = followLights ? Number(followLights.correctTaps || 0) + Number(followLights.wrongTaps || 0) : ballStack ? Number(ballStack.totalBallsDropped || 0) : soundDetective ? Number(soundDetective.roundsPlayed || 0) : colorPath ? Number(colorPath.roundsPlayed || 0) : magicPaint ? Number(magicPaint.objectsCompleted || 0) : trainTrack ? Number(trainTrack.roundsPlayed || 0) : packageSorter ? Number(packageSorter.packagesSorted || 0) : runtime?.answers?.length || 0;
     const total = cognitive ? Math.max(1, answered) : session.questionIds.length;
-    const percentage = followLights ? Number(followLights.overallScore || 0) : ballStack ? Number(ballStack.overallCognitiveScore || 0) : soundDetective ? Number(soundDetective.overallScore || 0) : colorPath ? Number(colorPath.overallScore || 0) : magicPaint ? Number(magicPaint.overallScore || 0) : trainTrack ? Number(trainTrack.overallScore || 0) : total ? (Number(runtime?.correct || 0) / total) * 100 : 0;
+    const percentage = followLights ? Number(followLights.overallScore || 0) : ballStack ? Number(ballStack.overallCognitiveScore || 0) : soundDetective ? Number(soundDetective.overallScore || 0) : colorPath ? Number(colorPath.overallScore || 0) : magicPaint ? Number(magicPaint.overallScore || 0) : trainTrack ? Number(trainTrack.overallScore || 0) : packageSorter ? Number(packageSorter.overallScore || 0) : total ? (Number(runtime?.correct || 0) / total) * 100 : 0;
     const passed = percentage >= assignment.passingScore;
     const attempt = await this.prisma.gameAttempt.findFirst({ where: { gameResultId: result.id, submittedAt: null }, orderBy: { attemptNumber: 'desc' } });
     await this.prisma.$transaction(async (tx) => {
@@ -476,6 +477,26 @@ export class GamePlayService {
       if (trainTrack && result.gameId) {
         const data={roundsPlayed:Number(trainTrack.roundsPlayed||0),tracksCompleted:Number(trainTrack.tracksCompleted||0),successfulRoutes:Number(trainTrack.successfulRoutes||0),correctRotations:Number(trainTrack.correctRotations||0),incorrectRotations:Number(trainTrack.incorrectRotations||0),averageCompletionTime:Number(trainTrack.averageCompletionTime||0),highestDifficulty:Number(trainTrack.highestDifficulty||1),logicalAccuracy:Number(trainTrack.logicalAccuracy||0),logicalThinkingScore:Number(trainTrack.logicalThinkingScore||0),causeEffectScore:Number(trainTrack.causeEffectScore||0),completionPercentage:Number(trainTrack.completionPercentage||0),overallScore:Number(trainTrack.overallScore||0),completionStatus:String(trainTrack.completionStatus||'COMPLETED')};
         await tx.trainTrackAnalytics.upsert({where:{gameResultId:result.id},create:{...data,gameResultId:result.id,gameId:result.gameId,studentId,assessmentId:assignment.gameAssessmentId},update:data});
+      }
+      if (packageSorter && result.gameId) {
+        const data = {
+          roundsPlayed: Number(packageSorter.roundsPlayed || 0),
+          packagesSorted: Number(packageSorter.packagesSorted || 0),
+          correctDeliveries: Number(packageSorter.correctDeliveries || 0),
+          incorrectDeliveries: Number(packageSorter.incorrectDeliveries || 0),
+          averageDecisionTime: Number(packageSorter.averageDecisionTime || 0),
+          organizationScore: Number(packageSorter.organizationScore || 0),
+          decisionMakingScore: Number(packageSorter.decisionMakingScore || 0),
+          highestDifficulty: Number(packageSorter.highestDifficulty || 1),
+          completionPercentage: Number(packageSorter.completionPercentage || 0),
+          overallScore: Number(packageSorter.overallScore || 0),
+          completionStatus: String(packageSorter.completionStatus || 'COMPLETED'),
+        };
+        await tx.packageSorterAnalytics.upsert({
+          where: { gameResultId: result.id },
+          create: { ...data, gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId },
+          update: data,
+        });
       }
       if (attempt) {
         await tx.gameAttempt.update({ where: { id: attempt.id }, data: { submittedAt: new Date(), state: session.runtimeState as Prisma.InputJsonValue } });

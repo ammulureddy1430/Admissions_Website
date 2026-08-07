@@ -170,6 +170,7 @@ model Game {
   colorPathAnalytics      ColorPathAnalytics[]
   magicPaintAnalytics     MagicPaintAnalytics[]
   trainTrackAnalytics     TrainTrackAnalytics[]
+  packageSorterAnalytics  PackageSorterAnalytics[]
   realTimeAssignments     RealTimeGameAssignment[]
   createdAt               DateTime                  @default(now()) @map("created_at")
   updatedAt               DateTime                  @updatedAt @map("updated_at")
@@ -306,6 +307,7 @@ model GameResult {
   colorPathAnalytics      ColorPathAnalytics?
   magicPaintAnalytics     MagicPaintAnalytics?
   trainTrackAnalytics     TrainTrackAnalytics?
+  packageSorterAnalytics  PackageSorterAnalytics?
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
 
@@ -3121,4 +3123,31 @@ model TrainTrackAnalytics {
   @@index([gameId, assessmentId])
   @@index([studentId, assessmentId])
   @@map("TrainTrackAnalytics")
+}
+
+model PackageSorterAnalytics {
+  id                  String     @id @default(uuid())
+  studentId           String
+  assessmentId        String
+  gameId              String
+  gameResultId        String     @unique
+  gameResult          GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
+  game                Game       @relation(fields: [gameId], references: [id])
+  roundsPlayed        Int
+  packagesSorted      Int
+  correctDeliveries   Int
+  incorrectDeliveries Int
+  averageDecisionTime Float
+  organizationScore   Float
+  decisionMakingScore Float
+  highestDifficulty   Int
+  completionPercentage Float
+  overallScore        Float
+  completionStatus    String
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  @@index([gameId, assessmentId])
+  @@index([studentId, assessmentId])
+  @@map("PackageSorterAnalytics")
 }

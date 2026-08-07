@@ -22,6 +22,7 @@ registerGame({ componentName: "SOUND_DETECTIVE", load: () => import("./sound-det
 registerGame({ componentName: "COLOR_PATH", load: () => import("./color-path/Game") });
 registerGame({ componentName: "MAGIC_PAINT", load: () => import("./magic-paint/Game") });
 registerGame({ componentName: "TRAIN_TRACK_BUILDER", load: () => import("./train-track-builder/Game") });
+registerGame({ componentName: "PACKAGE_SORTER", load: () => import("./package-sorter/Game") });
 registerGame({ componentName: "RACING_GAME", load: () => import("@/components/racing-game/RacingGame").then((module) => ({ default: module.RacingGame })) });
 registerGame({ componentName: "SORTING_GAME", load: () => import("@/components/sorting-game/SortingGame").then((module) => ({ default: module.SortingGame })) });
 registerGame({ componentName: "TREASURE_HUNT", load: () => import("@/components/treasure-hunt-game/TreasureHuntGame").then((module) => ({ default: module.TreasureHuntGame })) });

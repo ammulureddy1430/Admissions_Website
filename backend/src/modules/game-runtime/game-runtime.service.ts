@@ -21,6 +21,7 @@ const ENGINES = [
   ['COLOR_PATH','Color Path'],
   ['MAGIC_PAINT','Magic Paint'],
   ['TRAIN_TRACK_BUILDER','Train Track Builder'],
+  ['PACKAGE_SORTER','Package Sorter'],
 ] as const;
 
 @Injectable()
@@ -120,6 +121,7 @@ export class GameRuntimeService {
     }
     if (session.engine.engineKey === 'MAGIC_PAINT' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Magic Paint does not allow pause, hints, retries, skips, or question answers.');
     if (session.engine.engineKey === 'TRAIN_TRACK_BUILDER' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Train Track Builder does not allow pause, hints, retries, skips, or question answers.');
+    if (session.engine.engineKey === 'PACKAGE_SORTER' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Package Sorter does not allow pause, hints, retries, skips, or question answers.');
     if (action === 'START') return this.transition(session.id, 'RUNNING', { startedAt: session.startedAt || new Date(), pausedAt: null }, 'STARTED', dto.payload, schoolId, user);
     if (action === 'PAUSE') {
       if (session.status !== 'RUNNING') throw new BadRequestException('Only a running game can be paused.');
@@ -147,6 +149,7 @@ export class GameRuntimeService {
     if (action === 'COLOR_PATH_COMPLETE') return this.colorPathComplete(session, dto.payload, schoolId, user);
     if (action === 'MAGIC_PAINT_COMPLETE') return this.magicPaintComplete(session, dto.payload, schoolId, user);
     if (action === 'TRAIN_TRACK_COMPLETE') return this.trainTrackComplete(session, dto.payload, schoolId, user);
+    if (action === 'PACKAGE_SORTER_COMPLETE') return this.packageSorterComplete(session, dto.payload, schoolId, user);
     if (action === 'SECURITY_VIOLATION') return this.securityViolation(session, dto.payload, schoolId, user);
     if (action === 'COMPLETE') return this.transition(id, 'COMPLETED', { completedAt: new Date() }, 'COMPLETED', dto.payload, schoolId, user);
     throw new BadRequestException('Unsupported runtime action.');
@@ -313,6 +316,63 @@ export class GameRuntimeService {
     const rotations=correctRotations+incorrectRotations,logicalAccuracy=clamp(rotations?correctRotations/rotations*100:0),routeRate=roundsPlayed?successfulRoutes/roundsPlayed*100:0,difficulty=highestDifficulty/7*100,completionPercentage=clamp(roundsPlayed/7*100),logicalThinkingScore=clamp(logicalAccuracy*.55+routeRate*.3+difficulty*.15),causeEffectScore=clamp(routeRate*.48+logicalAccuracy*.32+completionPercentage*.2),overallScore=clamp((logicalThinkingScore+causeEffectScore)/2),completionStatus=elapsedSeconds>=119||roundsPlayed>=7?'COMPLETED':'PARTIAL';
     const cognitiveAnalytics={roundsPlayed,tracksCompleted,successfulRoutes,correctRotations,incorrectRotations,averageCompletionTime,highestDifficulty,logicalAccuracy,logicalThinkingScore,causeEffectScore,completionPercentage,overallScore,completionStatus};
     await this.prisma.gameRuntimeSession.update({where:{id:session.id},data:{status:'COMPLETED',completedAt:new Date(),score:overallScore,elapsedSeconds,runtimeState:{...((session.runtimeState||{}) as Record<string,unknown>),cognitiveAnalytics} as Prisma.InputJsonValue}});await this.event(session.id,'TRAIN_TRACK_COMPLETED',cognitiveAnalytics);return{state:await this.state(session.id,schoolId,user)};
+  }
+
+  private async packageSorterComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
+    if (session.engine.engineKey !== 'PACKAGE_SORTER' || session.status !== 'RUNNING') throw new BadRequestException('Package Sorter metrics require an active session.');
+    const input = (payload || {}) as Record<string, any>;
+    const number = (key: string, max = 100000) => Math.max(0, Math.min(max, Number(input[key]) || 0));
+    const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 10) / 10));
+
+    const roundsPlayed = number('roundsPlayed', 1000);
+    const packagesSorted = number('packagesSorted', 10000);
+    const correctDeliveries = number('correctDeliveries', 10000);
+    const incorrectDeliveries = number('incorrectDeliveries', 10000);
+    const averageDecisionTime = number('averageDecisionTime', 60000);
+    const highestDifficulty = Math.min(5, Math.max(1, number('highestDifficulty', 5)));
+    const elapsedSeconds = Math.min(120, number('elapsedSeconds', 120));
+
+    const accuracy = packagesSorted ? (correctDeliveries / packagesSorted) * 100 : 0;
+    const completionPercentage = clamp((elapsedSeconds / 120) * 100);
+
+    const organizationScore = clamp(accuracy * 0.8 + (roundsPlayed / 5) * 20);
+    const decisionSpeedScore = clamp(100 - Math.max(0, averageDecisionTime - 1200) / 15);
+    const decisionMakingScore = clamp(accuracy * 0.6 + decisionSpeedScore * 0.4);
+
+    const overallScore = clamp((organizationScore + decisionMakingScore) / 2);
+    const completionStatus = elapsedSeconds >= 119 || roundsPlayed >= 5 ? 'COMPLETED' : 'PARTIAL';
+
+    const cognitiveAnalytics = {
+      roundsPlayed,
+      packagesSorted,
+      correctDeliveries,
+      incorrectDeliveries,
+      averageDecisionTime,
+      highestDifficulty,
+      sortingAccuracy: accuracy,
+      organizationScore,
+      decisionMakingScore,
+      completionPercentage,
+      overallScore,
+      completionStatus,
+    };
+
+    await this.prisma.gameRuntimeSession.update({
+      where: { id: session.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        score: overallScore,
+        elapsedSeconds,
+        runtimeState: {
+          ...((session.runtimeState || {}) as Record<string, unknown>),
+          cognitiveAnalytics,
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    await this.event(session.id, 'PACKAGE_SORTER_COMPLETED', cognitiveAnalytics);
+    return { state: await this.state(session.id, schoolId, user) };
   }
 
 
