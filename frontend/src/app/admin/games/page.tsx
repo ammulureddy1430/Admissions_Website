@@ -24,6 +24,9 @@ import ColorPathGame from "@/games/color-path/Game";
 import MagicPaintGame from "@/games/magic-paint/Game";
 import TrainTrackBuilderGame from "@/games/train-track-builder/Game";
 import PackageSorterGame from "@/games/package-sorter/Game";
+import MagicTrainGame from "@/games/magic-train/Game";
+import RoomDesignerGame from "@/games/room-designer/Game";
+import TrafficLightChallengeGame from "@/games/traffic-light-challenge/Game";
 
 type Game = {
   id: string;
@@ -52,7 +55,15 @@ type Student = {
 };
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
-const AGE_GROUPS = ["3–4 Years", "4–5 Years", "5–7 Years", "7–9 Years", "9–11 Years", "11–13 Years", "13–16 Years"];
+const AGE_GROUPS = [
+  "3–4 Years",
+  "4–5 Years",
+  "5–7 Years",
+  "7–9 Years",
+  "9–11 Years",
+  "11–13 Years",
+  "13–16 Years",
+];
 
 export default function GamesPage() {
   const [games, setGames] = useState<Game[]>([]);
@@ -111,7 +122,9 @@ export default function GamesPage() {
 
   const visible = useMemo(() => {
     const value = query.trim().toLowerCase();
-    const matchingAgeGroup = ageGroupFilter ? games.filter((game) => game.ageGroup === ageGroupFilter) : games;
+    const matchingAgeGroup = ageGroupFilter
+      ? games.filter((game) => game.ageGroup === ageGroupFilter)
+      : games;
     return value
       ? matchingAgeGroup.filter((game) =>
           [game.name, game.category, game.gameType].some((field) =>
@@ -241,48 +254,82 @@ export default function GamesPage() {
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-[#a7fff0]">
               <Gamepad2 className="h-3.5 w-3.5" /> Cognitive game library
             </div>
-            <h1 className="keep-white text-3xl font-black tracking-[-0.035em] text-white sm:text-4xl">Real-time Games</h1>
-            <p className="keep-white mt-2 max-w-xl text-xs font-medium leading-5 text-white/85">Preview assessment experiences, review eligible age groups, and assign games to matched students.</p>
+            <h1 className="keep-white text-3xl font-black tracking-[-0.035em] text-white sm:text-4xl">
+              Real-time Games
+            </h1>
+            <p className="keep-white mt-2 max-w-xl text-xs font-medium leading-5 text-white/85">
+              Preview assessment experiences, review eligible age groups, and
+              assign games to matched students.
+            </p>
           </div>
           <div className="flex gap-2">
             <DashboardStat value={games.length} label="Active games" />
-            <DashboardStat value={games.reduce((sum, game) => sum + (game.assignmentCount || 0), 0)} label="Assignments" />
+            <DashboardStat
+              value={games.reduce(
+                (sum, game) => sum + (game.assignmentCount || 0),
+                0,
+              )}
+              label="Assignments"
+            />
           </div>
         </div>
       </header>
 
       {error && (
-        <div className="games-error-alert flex items-center justify-between gap-4 rounded-xl px-4 py-3" role="alert">
+        <div
+          className="games-error-alert flex items-center justify-between gap-4 rounded-xl px-4 py-3"
+          role="alert"
+        >
           <span className="flex min-w-0 items-center gap-2.5">
             <AlertCircle className="h-4 w-4 shrink-0" />
-            <span className="text-xs font-bold">{error === "Failed to fetch" ? "Unable to connect to the Games service. Please try again." : error}</span>
+            <span className="text-xs font-bold">
+              {error === "Failed to fetch"
+                ? "Unable to connect to the Games service. Please try again."
+                : error}
+            </span>
           </span>
-          <button type="button" onClick={() => void load()} className="games-error-retry shrink-0 rounded-lg px-3 py-1.5 text-[10px] font-black">Retry</button>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="games-error-retry shrink-0 rounded-lg px-3 py-1.5 text-[10px] font-black"
+          >
+            Retry
+          </button>
         </div>
       )}
 
       <section className="overflow-visible rounded-[24px] border border-[#d8e9e5] bg-white shadow-[0_12px_40px_rgba(7,40,45,.06)]">
         <div className="flex flex-col justify-between gap-4 border-b border-[#e5efec] px-5 py-5 sm:flex-row sm:items-center sm:px-6">
           <div>
-            <p className="text-base font-black tracking-tight text-[#071633]">Available assessments</p>
+            <p className="text-base font-black tracking-tight text-[#071633]">
+              Available assessments
+            </p>
             <p className="mt-1 text-[10px] text-[#7b8d98]">
               {visible.length} of {games.length} games shown
             </p>
           </div>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-          <select value={ageGroupFilter} onChange={(event) => setAgeGroupFilter(event.target.value)} className="min-h-11 rounded-xl border border-[#d5e7e2] bg-white px-3 py-2.5 text-xs font-bold text-[#304754] shadow-sm outline-none focus:border-[#009b87] focus:ring-4 focus:ring-[#009b87]/10">
-            <option value="">All Age Groups</option>
-            {AGE_GROUPS.map((ageGroup) => <option key={ageGroup} value={ageGroup}>{ageGroup}</option>)}
-          </select>
-          <label className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#82939e]" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search games or skills"
-              className="min-h-11 w-full rounded-xl border border-[#d5e7e2] bg-white py-2.5 pl-9 pr-3 text-xs shadow-sm outline-none focus:border-[#009b87] focus:ring-4 focus:ring-[#009b87]/10"
-            />
-          </label>
+            <select
+              value={ageGroupFilter}
+              onChange={(event) => setAgeGroupFilter(event.target.value)}
+              className="min-h-11 rounded-xl border border-[#d5e7e2] bg-white px-3 py-2.5 text-xs font-bold text-[#304754] shadow-sm outline-none focus:border-[#009b87] focus:ring-4 focus:ring-[#009b87]/10"
+            >
+              <option value="">All Age Groups</option>
+              {AGE_GROUPS.map((ageGroup) => (
+                <option key={ageGroup} value={ageGroup}>
+                  {ageGroup}
+                </option>
+              ))}
+            </select>
+            <label className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#82939e]" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search games or skills"
+                className="min-h-11 w-full rounded-xl border border-[#d5e7e2] bg-white py-2.5 pl-9 pr-3 text-xs shadow-sm outline-none focus:border-[#009b87] focus:ring-4 focus:ring-[#009b87]/10"
+              />
+            </label>
           </div>
         </div>
 
@@ -313,30 +360,91 @@ export default function GamesPage() {
                 key={game.id}
                 className="group relative overflow-visible rounded-[22px] border border-[#dce9e6] bg-white p-4 shadow-[0_4px_18px_rgba(7,35,42,.04)] transition duration-300 hover:-translate-y-1 hover:border-[#a7d8cd] hover:shadow-[0_18px_38px_rgba(7,75,68,.12)] sm:p-5"
               >
-                <div className={`relative mb-4 flex h-28 items-center overflow-hidden rounded-2xl bg-gradient-to-br ${gameCardTheme(game.componentName)}`}>
+                <div
+                  className={`relative mb-4 flex h-28 items-center overflow-hidden rounded-2xl bg-gradient-to-br ${gameCardTheme(game.componentName)}`}
+                >
                   <div className="absolute -right-8 -top-10 h-36 w-36 rounded-full border-[24px] border-white/20" />
                   <div className="absolute bottom-[-42px] left-[24%] h-24 w-40 rotate-[-8deg] rounded-[50%] bg-white/15" />
                   <GameArtwork componentName={game.componentName} />
                   <div className="relative z-10 ml-4 min-w-0 pr-4">
-                    <p className="keep-white text-[9px] font-black uppercase tracking-[.16em] text-white/80">{game.category}</p>
-                    <p className="keep-white mt-1 text-sm font-black leading-tight text-white">{game.cognitiveSkill || game.category}</p>
+                    <p className="keep-white text-[9px] font-black uppercase tracking-[.16em] text-white/80">
+                      {game.category}
+                    </p>
+                    <p className="keep-white mt-1 text-sm font-black leading-tight text-white">
+                      {game.cognitiveSkill || game.category}
+                    </p>
                   </div>
-                  <span className={`absolute right-3 top-3 z-20 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[8px] font-black uppercase backdrop-blur ${game.isActive ? "border-white/30 bg-white/90 text-emerald-700" : "border-white/20 bg-slate-900/50 text-white"}`}><span className={`h-1.5 w-1.5 rounded-full ${game.isActive ? "bg-emerald-500" : "bg-slate-400"}`} />{game.isActive ? "Active" : "Disabled"}</span>
+                  <span
+                    className={`absolute right-3 top-3 z-20 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[8px] font-black uppercase backdrop-blur ${game.isActive ? "border-white/30 bg-white/90 text-emerald-700" : "border-white/20 bg-slate-900/50 text-white"}`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${game.isActive ? "bg-emerald-500" : "bg-slate-400"}`}
+                    />
+                    {game.isActive ? "Active" : "Disabled"}
+                  </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h2 className="text-base font-black tracking-tight text-[#071633]">{game.name}</h2>
-                    <p className="mt-1 line-clamp-2 min-h-9 text-[10px] font-medium leading-[18px] text-[#526b78]">{game.description || game.componentName}</p>
+                    <h2 className="text-base font-black tracking-tight text-[#071633]">
+                      {game.name}
+                    </h2>
+                    <p className="mt-1 line-clamp-2 min-h-9 text-[10px] font-medium leading-[18px] text-[#526b78]">
+                      {game.description || game.componentName}
+                    </p>
                   </div>
                   <div className="relative shrink-0">
-                    <button aria-label={`More options for ${game.name}`} disabled={busy === game.id} onClick={() => setMenu(menu === game.id ? "" : game.id)} className="grid h-9 w-9 place-items-center rounded-xl border border-[#e0ebe8] text-[#607080] transition hover:border-[#b9dcd4] hover:bg-[#eaf7f3] hover:text-[#007f70]">{busy === game.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}</button>
-                    {menu === game.id && <div className="absolute right-0 top-11 z-30 w-44 overflow-hidden rounded-xl border border-[#dceae6] bg-white p-1.5 shadow-xl"><MenuButton icon={<Pencil />} label="Edit details" onClick={() => { setEditing({ ...game }); setMenu(""); }} /><MenuButton icon={<Power />} label={game.isActive ? "Disable" : "Enable"} onClick={() => void toggle(game)} /><MenuButton danger icon={<Trash2 />} label="Remove" onClick={() => void remove(game)} /></div>}
+                    <button
+                      aria-label={`More options for ${game.name}`}
+                      disabled={busy === game.id}
+                      onClick={() => setMenu(menu === game.id ? "" : game.id)}
+                      className="grid h-9 w-9 place-items-center rounded-xl border border-[#e0ebe8] text-[#607080] transition hover:border-[#b9dcd4] hover:bg-[#eaf7f3] hover:text-[#007f70]"
+                    >
+                      {busy === game.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <MoreHorizontal className="h-4 w-4" />
+                      )}
+                    </button>
+                    {menu === game.id && (
+                      <div className="absolute right-0 top-11 z-30 w-44 overflow-hidden rounded-xl border border-[#dceae6] bg-white p-1.5 shadow-xl">
+                        <MenuButton
+                          icon={<Pencil />}
+                          label="Edit details"
+                          onClick={() => {
+                            setEditing({ ...game });
+                            setMenu("");
+                          }}
+                        />
+                        <MenuButton
+                          icon={<Power />}
+                          label={game.isActive ? "Disable" : "Enable"}
+                          onClick={() => void toggle(game)}
+                        />
+                        <MenuButton
+                          danger
+                          icon={<Trash2 />}
+                          label="Remove"
+                          onClick={() => void remove(game)}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="mt-4 grid grid-cols-3 gap-2">
-                  <GameMeta label="Age group" value={game.ageGroup} icon={<Users />} accent />
-                  <GameMeta label="Duration" value={`${Math.round(game.durationSeconds / 60)} min`} />
-                  <GameMeta label="Assigned" value={`${game.assignmentCount || 0} batches`} />
+                  <GameMeta
+                    label="Age group"
+                    value={game.ageGroup}
+                    icon={<Users />}
+                    accent
+                  />
+                  <GameMeta
+                    label="Duration"
+                    value={`${Math.round(game.durationSeconds / 60)} min`}
+                  />
+                  <GameMeta
+                    label="Assigned"
+                    value={`${game.assignmentCount || 0} batches`}
+                  />
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[#e8f0ee] pt-4">
                   <button
@@ -374,9 +482,21 @@ export default function GamesPage() {
               onChange={(value) => setEditing({ ...editing, category: value })}
             />
             <label>
-              <span className="mb-1 block text-[10px] font-black uppercase text-slate-500">Age Group</span>
-              <select className="input" value={editing.ageGroup || ""} onChange={(event) => setEditing({ ...editing, ageGroup: event.target.value })}>
-                {AGE_GROUPS.map((ageGroup) => <option key={ageGroup} value={ageGroup}>{ageGroup}</option>)}
+              <span className="mb-1 block text-[10px] font-black uppercase text-slate-500">
+                Age Group
+              </span>
+              <select
+                className="input"
+                value={editing.ageGroup || ""}
+                onChange={(event) =>
+                  setEditing({ ...editing, ageGroup: event.target.value })
+                }
+              >
+                {AGE_GROUPS.map((ageGroup) => (
+                  <option key={ageGroup} value={ageGroup}>
+                    {ageGroup}
+                  </option>
+                ))}
               </select>
             </label>
             <Field
@@ -588,17 +708,59 @@ export default function GamesPage() {
                 onComplete={() => setPreviewing(null)}
               />
             ) : previewing.componentName === "BALL_STACK" ? (
-              <BallStackGame sound durationSeconds={previewing.durationSeconds} onComplete={() => setPreviewing(null)} />
+              <BallStackGame
+                sound
+                durationSeconds={previewing.durationSeconds}
+                onComplete={() => setPreviewing(null)}
+              />
             ) : previewing.componentName === "SOUND_DETECTIVE" ? (
-              <SoundDetectiveGame sound durationSeconds={previewing.durationSeconds} onComplete={() => setPreviewing(null)} />
+              <SoundDetectiveGame
+                sound
+                durationSeconds={previewing.durationSeconds}
+                onComplete={() => setPreviewing(null)}
+              />
             ) : previewing.componentName === "COLOR_PATH" ? (
-              <ColorPathGame sound durationSeconds={previewing.durationSeconds} onComplete={() => setPreviewing(null)} />
+              <ColorPathGame
+                sound
+                durationSeconds={previewing.durationSeconds}
+                onComplete={() => setPreviewing(null)}
+              />
             ) : previewing.componentName === "MAGIC_PAINT" ? (
-              <MagicPaintGame sound durationSeconds={previewing.durationSeconds} onComplete={() => setPreviewing(null)} />
+              <MagicPaintGame
+                sound
+                durationSeconds={previewing.durationSeconds}
+                onComplete={() => setPreviewing(null)}
+              />
             ) : previewing.componentName === "TRAIN_TRACK_BUILDER" ? (
-              <TrainTrackBuilderGame sound durationSeconds={previewing.durationSeconds} onComplete={() => setPreviewing(null)} />
+              <TrainTrackBuilderGame
+                sound
+                durationSeconds={previewing.durationSeconds}
+                onComplete={() => setPreviewing(null)}
+              />
             ) : previewing.componentName === "PACKAGE_SORTER" ? (
-              <PackageSorterGame sound durationSeconds={previewing.durationSeconds} onComplete={() => setPreviewing(null)} />
+              <PackageSorterGame
+                sound
+                durationSeconds={previewing.durationSeconds}
+                onComplete={() => setPreviewing(null)}
+              />
+            ) : previewing.componentName === "MAGIC_TRAIN" ? (
+              <MagicTrainGame
+                sound
+                durationSeconds={previewing.durationSeconds}
+                onComplete={() => setPreviewing(null)}
+              />
+            ) : previewing.componentName === "ROOM_DESIGNER" ? (
+              <RoomDesignerGame
+                sound
+                durationSeconds={previewing.durationSeconds}
+                onComplete={() => setPreviewing(null)}
+              />
+            ) : previewing.componentName === "TRAFFIC_LIGHT_CHALLENGE" ? (
+              <TrafficLightChallengeGame
+                sound
+                durationSeconds={previewing.durationSeconds}
+                onComplete={() => setPreviewing(null)}
+              />
             ) : (
               <div className="grid h-full place-items-center text-center text-white">
                 <div>
@@ -617,33 +779,247 @@ export default function GamesPage() {
 }
 
 function DashboardStat({ value, label }: { value: number; label: string }) {
-  return <div className="keep-white min-w-28 rounded-2xl border border-white/25 bg-[#064f50]/45 px-4 py-3 text-white shadow-sm backdrop-blur-sm"><p className="keep-white text-xl font-black leading-none text-white">{value}</p><p className="keep-white mt-1.5 text-[8px] font-black uppercase tracking-[.14em] text-white/80">{label}</p></div>;
+  return (
+    <div className="keep-white min-w-28 rounded-2xl border border-white/25 bg-[#064f50]/45 px-4 py-3 text-white shadow-sm backdrop-blur-sm">
+      <p className="keep-white text-xl font-black leading-none text-white">
+        {value}
+      </p>
+      <p className="keep-white mt-1.5 text-[8px] font-black uppercase tracking-[.14em] text-white/80">
+        {label}
+      </p>
+    </div>
+  );
 }
 
 function GameArtwork({ componentName }: { componentName: string }) {
-  const common = "relative z-10 ml-5 grid h-24 w-40 shrink-0 overflow-hidden rounded-xl border border-white/60 bg-white/90 shadow-lg transition duration-300 group-hover:scale-[1.04]";
-  if (componentName === "BALL_STACK") return <div className={`${common} place-items-center`} aria-hidden><span className="absolute inset-x-0 top-2.5 text-center text-[8px] font-black tracking-[.16em] text-[#37616a]">BALANCE • PLACE</span><div className="absolute bottom-2.5 left-1/2 flex -translate-x-1/2 flex-col-reverse items-center drop-shadow-md"><i className="h-4 w-20 rounded-full bg-[#27b99d] ring-2 ring-white"/><i className="-mb-0.5 h-4 w-16 rounded-full bg-[#f3c84b] ring-2 ring-white"/><i className="-mb-0.5 h-4 w-12 rounded-full bg-[#f27668] ring-2 ring-white"/><i className="-mb-0.5 h-4 w-8 rounded-full bg-[#6b5bd2] ring-2 ring-white"/></div></div>;
-  if (componentName === "FOLLOW_THE_LIGHTS") return <div className={`${common} place-items-center bg-[#101d45]/90`} aria-hidden><div className="grid grid-cols-2 gap-3">{["#ffcf4a","#64d9be","#ed6f79","#738dff"].map((color,index)=><i key={color} className={`h-8 w-8 rounded-full border-4 border-white/80 shadow-[0_0_18px_currentColor] ${index===1 ? "scale-110" : "opacity-75"}`} style={{backgroundColor:color,color}}/>)}</div><span className="keep-white absolute bottom-2 text-[8px] font-black tracking-widest text-white">WATCH • REMEMBER</span></div>;
-  if (componentName === "SOUND_DETECTIVE") return <div className={`${common} place-items-center bg-[#fff8e8]`} aria-hidden><div className="flex h-12 items-center gap-1">{[18,34,48,28,42,22,38].map((height,index)=><i key={index} className="w-2 rounded-full bg-gradient-to-t from-[#d85d31] to-[#f3b83f]" style={{height}}/>)}</div><span className="absolute left-3 top-3 text-2xl">🎧</span><span className="absolute bottom-2 text-[8px] font-black tracking-widest text-[#8b4a2a]">LISTEN • IDENTIFY</span></div>;
-  if (componentName === "COLOR_PATH") return <div className={`${common} bg-gradient-to-b from-[#ddf7ff] to-[#b7e995]`} aria-hidden><span className="absolute left-[18px] top-[30px] text-3xl">🐻</span>{["#ef4444","#22c55e","#3b82f6","#facc15"].map((color,index)=><i key={color} className="absolute bottom-5 h-5 w-9 rounded-[50%] border-2 border-white shadow" style={{backgroundColor:color,left:50+index*25,transform:`translateY(${index%2 ? -12 : 0}px)`}}/>)}<span className="absolute inset-x-0 bottom-1 text-center text-[8px] font-black tracking-widest text-[#31555c]">COLOR PATH</span></div>;
-  if (componentName === "MAGIC_PAINT") return <div className={`${common} bg-gradient-to-b from-[#c9f3ff] to-[#a6e383]`} aria-hidden><span className="absolute left-1/2 top-4 -translate-x-1/2 text-5xl">🦋</span>{["#ff4f64","#19c37d","#3b82f6","#ffd229","#9b5de5"].map((paint,index)=><i key={paint} className="absolute bottom-3 h-5 w-5 rounded-full border-2 border-white" style={{backgroundColor:paint,left:35+index*24}}/>)}</div>;
-  if (componentName === "TRAIN_TRACK_BUILDER") return <div className={`${common} place-items-center bg-gradient-to-b from-[#c9f2ff] to-[#8fd17b]`} aria-hidden><span className="absolute left-2 top-5 text-4xl">🚂</span><span className="absolute right-2 top-5 text-4xl">🏁</span><i className="absolute bottom-6 left-10 right-8 h-2 rounded bg-slate-600 shadow-[0_-7px_0_#d9e1df,0_7px_0_#d9e1df]"/><span className="absolute bottom-1 text-[8px] font-black tracking-widest text-[#31555c]">BUILD • CONNECT</span></div>;
-  if (componentName === "PACKAGE_SORTER") return <div className={`${common} bg-gradient-to-b from-[#ffe4e6] to-[#fecdd3]`} aria-hidden><span className="absolute left-3 top-3 text-3xl">📦</span><span className="absolute right-3 top-3 text-3xl">🚚</span><span className="absolute bottom-2 text-[8px] font-black tracking-widest text-[#9f1239]">SORT • DELIVER</span></div>;
-  return <div className={`${common} place-items-center`} aria-hidden><Gamepad2 className="h-9 w-9 text-[#007f70]"/></div>;
+  const common =
+    "relative z-10 ml-5 grid h-24 w-40 shrink-0 overflow-hidden rounded-xl border border-white/60 bg-white/90 shadow-lg transition duration-300 group-hover:scale-[1.04]";
+  if (componentName === "BALL_STACK")
+    return (
+      <div className={`${common} place-items-center`} aria-hidden>
+        <span className="absolute inset-x-0 top-2.5 text-center text-[8px] font-black tracking-[.16em] text-[#37616a]">
+          BALANCE • PLACE
+        </span>
+        <div className="absolute bottom-2.5 left-1/2 flex -translate-x-1/2 flex-col-reverse items-center drop-shadow-md">
+          <i className="h-4 w-20 rounded-full bg-[#27b99d] ring-2 ring-white" />
+          <i className="-mb-0.5 h-4 w-16 rounded-full bg-[#f3c84b] ring-2 ring-white" />
+          <i className="-mb-0.5 h-4 w-12 rounded-full bg-[#f27668] ring-2 ring-white" />
+          <i className="-mb-0.5 h-4 w-8 rounded-full bg-[#6b5bd2] ring-2 ring-white" />
+        </div>
+      </div>
+    );
+  if (componentName === "FOLLOW_THE_LIGHTS")
+    return (
+      <div
+        className={`${common} place-items-center bg-[#101d45]/90`}
+        aria-hidden
+      >
+        <div className="grid grid-cols-2 gap-3">
+          {["#ffcf4a", "#64d9be", "#ed6f79", "#738dff"].map((color, index) => (
+            <i
+              key={color}
+              className={`h-8 w-8 rounded-full border-4 border-white/80 shadow-[0_0_18px_currentColor] ${index === 1 ? "scale-110" : "opacity-75"}`}
+              style={{ backgroundColor: color, color }}
+            />
+          ))}
+        </div>
+        <span className="keep-white absolute bottom-2 text-[8px] font-black tracking-widest text-white">
+          WATCH • REMEMBER
+        </span>
+      </div>
+    );
+  if (componentName === "SOUND_DETECTIVE")
+    return (
+      <div className={`${common} place-items-center bg-[#fff8e8]`} aria-hidden>
+        <div className="flex h-12 items-center gap-1">
+          {[18, 34, 48, 28, 42, 22, 38].map((height, index) => (
+            <i
+              key={index}
+              className="w-2 rounded-full bg-gradient-to-t from-[#d85d31] to-[#f3b83f]"
+              style={{ height }}
+            />
+          ))}
+        </div>
+        <span className="absolute left-3 top-3 text-2xl">🎧</span>
+        <span className="absolute bottom-2 text-[8px] font-black tracking-widest text-[#8b4a2a]">
+          LISTEN • IDENTIFY
+        </span>
+      </div>
+    );
+  if (componentName === "COLOR_PATH")
+    return (
+      <div
+        className={`${common} bg-gradient-to-b from-[#ddf7ff] to-[#b7e995]`}
+        aria-hidden
+      >
+        <span className="absolute left-[18px] top-[30px] text-3xl">🐻</span>
+        {["#ef4444", "#22c55e", "#3b82f6", "#facc15"].map((color, index) => (
+          <i
+            key={color}
+            className="absolute bottom-5 h-5 w-9 rounded-[50%] border-2 border-white shadow"
+            style={{
+              backgroundColor: color,
+              left: 50 + index * 25,
+              transform: `translateY(${index % 2 ? -12 : 0}px)`,
+            }}
+          />
+        ))}
+        <span className="absolute inset-x-0 bottom-1 text-center text-[8px] font-black tracking-widest text-[#31555c]">
+          COLOR PATH
+        </span>
+      </div>
+    );
+  if (componentName === "MAGIC_PAINT")
+    return (
+      <div
+        className={`${common} bg-gradient-to-b from-[#c9f3ff] to-[#a6e383]`}
+        aria-hidden
+      >
+        <span className="absolute left-1/2 top-4 -translate-x-1/2 text-5xl">
+          🦋
+        </span>
+        {["#ff4f64", "#19c37d", "#3b82f6", "#ffd229", "#9b5de5"].map(
+          (paint, index) => (
+            <i
+              key={paint}
+              className="absolute bottom-3 h-5 w-5 rounded-full border-2 border-white"
+              style={{ backgroundColor: paint, left: 35 + index * 24 }}
+            />
+          ),
+        )}
+      </div>
+    );
+  if (componentName === "TRAIN_TRACK_BUILDER")
+    return (
+      <div
+        className={`${common} place-items-center bg-gradient-to-b from-[#c9f2ff] to-[#8fd17b]`}
+        aria-hidden
+      >
+        <span className="absolute left-2 top-5 text-4xl">🚂</span>
+        <span className="absolute right-2 top-5 text-4xl">🏁</span>
+        <i className="absolute bottom-6 left-10 right-8 h-2 rounded bg-slate-600 shadow-[0_-7px_0_#d9e1df,0_7px_0_#d9e1df]" />
+        <span className="absolute bottom-1 text-[8px] font-black tracking-widest text-[#31555c]">
+          BUILD • CONNECT
+        </span>
+      </div>
+    );
+  if (componentName === "PACKAGE_SORTER")
+    return (
+      <div
+        className={`${common} bg-gradient-to-b from-[#ffe4e6] to-[#fecdd3]`}
+        aria-hidden
+      >
+        <span className="absolute left-3 top-3 text-3xl">📦</span>
+        <span className="absolute right-3 top-3 text-3xl">🚚</span>
+        <span className="absolute bottom-2 text-[8px] font-black tracking-widest text-[#9f1239]">
+          SORT • DELIVER
+        </span>
+      </div>
+    );
+  if (componentName === "MAGIC_TRAIN")
+    return (
+      <div
+        className={`${common} bg-gradient-to-b from-[#bdeeff] to-[#86ce7b]`}
+        aria-hidden
+      >
+        <span className="absolute left-3 top-6 text-4xl">🚂</span>
+        <div className="absolute bottom-7 left-14 flex gap-1">
+          {["#ff6178", "#ffd34e", "#48a9f8"].map((color) => (
+            <i
+              key={color}
+              className="h-7 w-9 rounded-md border-2 border-white shadow"
+              style={{ backgroundColor: color }}
+            />
+          ))}
+        </div>
+        <i className="absolute bottom-5 left-2 right-2 h-1.5 rounded bg-slate-600" />
+        <span className="absolute inset-x-0 bottom-1 text-center text-[8px] font-black tracking-widest text-[#31555c]">
+          WATCH • BUILD
+        </span>
+      </div>
+    );
+  if (componentName === "ROOM_DESIGNER")
+    return (
+      <div
+        className={`${common} bg-gradient-to-b from-[#f7d6c8] to-[#eabf91]`}
+        aria-hidden
+      >
+        <span className="absolute left-3 top-3 text-3xl">🛏️</span>
+        <span className="absolute left-1/2 top-3 -translate-x-1/2 text-3xl">
+          🪑
+        </span>
+        <span className="absolute right-3 top-3 text-3xl">🪴</span>
+        <i className="absolute bottom-5 left-4 right-4 h-7 rounded-[50%] bg-[#8167cf]/35" />
+        <span className="absolute inset-x-0 bottom-1 text-center text-[8px] font-black tracking-widest text-[#62465d]">
+          WATCH • REBUILD
+        </span>
+      </div>
+    );
+  if (componentName === "TRAFFIC_LIGHT_CHALLENGE")
+    return (
+      <div className={`${common} bg-gradient-to-b from-[#92e2f3] to-[#8ed279]`} aria-hidden>
+        <span className="absolute left-4 top-7 text-4xl">🚙</span>
+        <div className="absolute right-5 top-3 flex flex-col gap-1 rounded-lg bg-[#26394e] p-1.5">
+          <i className="h-4 w-4 rounded-full bg-[#f15c69]"/><i className="h-4 w-4 rounded-full bg-[#f3c846]"/><i className="h-4 w-4 rounded-full bg-[#43c88d]"/>
+        </div>
+        <i className="absolute bottom-5 left-2 right-2 h-1.5 bg-slate-600" />
+        <span className="absolute inset-x-0 bottom-1 text-center text-[8px] font-black tracking-widest text-[#31555c]">WATCH • DRIVE</span>
+      </div>
+    );
+  return (
+    <div className={`${common} place-items-center`} aria-hidden>
+      <Gamepad2 className="h-9 w-9 text-[#007f70]" />
+    </div>
+  );
 }
 
-function GameMeta({ label, value, icon, accent = false }: { label: string; value: string; icon?: React.ReactNode; accent?: boolean }) {
-  return <div className="rounded-xl border border-[#edf2f1] bg-[#f7faf9] px-3 py-2.5"><p className="text-[7px] font-black uppercase tracking-[.12em] text-[#96a5ad]">{label}</p><p className={`mt-1 flex items-center gap-1 text-[10px] font-black ${accent ? "text-violet-700" : "text-[#173044]"}`}>{icon && <span className="[&_svg]:h-3 [&_svg]:w-3">{icon}</span>}{value}</p></div>;
+function GameMeta({
+  label,
+  value,
+  icon,
+  accent = false,
+}: {
+  label: string;
+  value: string;
+  icon?: React.ReactNode;
+  accent?: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-[#edf2f1] bg-[#f7faf9] px-3 py-2.5">
+      <p className="text-[7px] font-black uppercase tracking-[.12em] text-[#96a5ad]">
+        {label}
+      </p>
+      <p
+        className={`mt-1 flex items-center gap-1 text-[10px] font-black ${accent ? "text-violet-700" : "text-[#173044]"}`}
+      >
+        {icon && <span className="[&_svg]:h-3 [&_svg]:w-3">{icon}</span>}
+        {value}
+      </p>
+    </div>
+  );
 }
 
 function gameCardTheme(componentName: string) {
-  if (componentName === "COLOR_PATH") return "from-[#5a3cc8] via-[#8c55df] to-[#d56eb4]";
-  if (componentName === "MAGIC_PAINT") return "from-[#ff4f64] via-[#9b5de5] to-[#3b82f6]";
-  if (componentName === "BALL_STACK") return "from-[#096e79] via-[#12a18f] to-[#6fc486]";
-  if (componentName === "FOLLOW_THE_LIGHTS") return "from-[#122655] via-[#324b98] to-[#6377d7]";
-  if (componentName === "SOUND_DETECTIVE") return "from-[#9b4d21] via-[#dd7b35] to-[#f1b84b]";
-  if (componentName === "TRAIN_TRACK_BUILDER") return "from-[#145d73] via-[#258d83] to-[#68b967]";
-  if (componentName === "PACKAGE_SORTER") return "from-[#9f1239] via-[#e11d48] to-[#fda4af]";
+  if (componentName === "COLOR_PATH")
+    return "from-[#5a3cc8] via-[#8c55df] to-[#d56eb4]";
+  if (componentName === "MAGIC_PAINT")
+    return "from-[#ff4f64] via-[#9b5de5] to-[#3b82f6]";
+  if (componentName === "BALL_STACK")
+    return "from-[#096e79] via-[#12a18f] to-[#6fc486]";
+  if (componentName === "FOLLOW_THE_LIGHTS")
+    return "from-[#122655] via-[#324b98] to-[#6377d7]";
+  if (componentName === "SOUND_DETECTIVE")
+    return "from-[#9b4d21] via-[#dd7b35] to-[#f1b84b]";
+  if (componentName === "TRAIN_TRACK_BUILDER")
+    return "from-[#145d73] via-[#258d83] to-[#68b967]";
+  if (componentName === "PACKAGE_SORTER")
+    return "from-[#9f1239] via-[#e11d48] to-[#fda4af]";
+  if (componentName === "MAGIC_TRAIN")
+    return "from-[#3f51a3] via-[#6754c7] to-[#f06d91]";
+  if (componentName === "ROOM_DESIGNER")
+    return "from-[#8457a8] via-[#c46894] to-[#ef9a78]";
+  if (componentName === "TRAFFIC_LIGHT_CHALLENGE")
+    return "from-[#1675a5] via-[#23a9a0] to-[#75c96d]";
   return "from-[#0b6870] via-[#168e84] to-[#54baa5]";
 }
 
