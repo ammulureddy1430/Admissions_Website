@@ -171,6 +171,8 @@ model Game {
   magicPaintAnalytics     MagicPaintAnalytics[]
   trainTrackAnalytics     TrainTrackAnalytics[]
   packageSorterAnalytics  PackageSorterAnalytics[]
+  rescueMissionAnalytics  RescueMissionAnalytics[]
+  parkingEscapeAnalytics  ParkingEscapeAnalytics[]
   realTimeAssignments     RealTimeGameAssignment[]
   createdAt               DateTime                  @default(now()) @map("created_at")
   updatedAt               DateTime                  @updatedAt @map("updated_at")
@@ -308,6 +310,8 @@ model GameResult {
   magicPaintAnalytics     MagicPaintAnalytics?
   trainTrackAnalytics     TrainTrackAnalytics?
   packageSorterAnalytics  PackageSorterAnalytics?
+  rescueMissionAnalytics  RescueMissionAnalytics?
+  parkingEscapeAnalytics  ParkingEscapeAnalytics?
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
 
@@ -3072,25 +3076,26 @@ model ColorPathAnalytics {
 }
 
 model MagicPaintAnalytics {
-  id                    String     @id @default(uuid())
-  studentId             String
-  assessmentId          String
-  gameId                String
-  gameResultId          String     @unique
-  gameResult            GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
-  game                  Game       @relation(fields: [gameId], references: [id])
-  objectsCompleted      Int
-  colorsUsed            String[]
-  interactionsPerObject Int[]
-  averageCompletionTime Float
+  id                     String     @id @default(uuid())
+  studentId              String
+  assessmentId           String
+  gameId                 String
+  gameResultId           String     @unique
+  gameResult             GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
+  game                   Game       @relation(fields: [gameId], references: [id])
+  objectsCompleted       Int
+  colorsUsed             String[]
+  interactionsPerObject  Int[]
+  averageCompletionTime  Float
   interactionConsistency Float
-  completionPercentage  Float
-  creativityScore       Float
-  causeEffectScore      Float
-  overallScore          Float
-  completionStatus      String
-  createdAt             DateTime   @default(now())
-  updatedAt             DateTime   @updatedAt
+  completionPercentage   Float
+  creativityScore        Float
+  causeEffectScore       Float
+  overallScore           Float
+  completionStatus       String
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+
   @@index([gameId, assessmentId])
   @@index([studentId, assessmentId])
   @@map("MagicPaintAnalytics")
@@ -3126,28 +3131,87 @@ model TrainTrackAnalytics {
 }
 
 model PackageSorterAnalytics {
-  id                  String     @id @default(uuid())
-  studentId           String
-  assessmentId        String
-  gameId              String
-  gameResultId        String     @unique
-  gameResult          GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
-  game                Game       @relation(fields: [gameId], references: [id])
-  roundsPlayed        Int
-  packagesSorted      Int
-  correctDeliveries   Int
-  incorrectDeliveries Int
-  averageDecisionTime Float
-  organizationScore   Float
-  decisionMakingScore Float
-  highestDifficulty   Int
+  id                   String     @id @default(uuid())
+  studentId            String
+  assessmentId         String
+  gameId               String
+  gameResultId         String     @unique
+  gameResult           GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
+  game                 Game       @relation(fields: [gameId], references: [id])
+  roundsPlayed         Int
+  packagesSorted       Int
+  correctDeliveries    Int
+  incorrectDeliveries  Int
+  averageDecisionTime  Float
+  organizationScore    Float
+  decisionMakingScore  Float
+  highestDifficulty    Int
   completionPercentage Float
-  overallScore        Float
-  completionStatus    String
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
+  overallScore         Float
+  completionStatus     String
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
 
   @@index([gameId, assessmentId])
   @@index([studentId, assessmentId])
   @@map("PackageSorterAnalytics")
+}
+
+model RescueMissionAnalytics {
+  id                        String     @id @default(uuid())
+  studentId                 String
+  assessmentId              String
+  gameId                    String
+  gameResultId              String     @unique
+  gameResult                GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
+  game                      Game       @relation(fields: [gameId], references: [id])
+  missionsStarted           Int
+  missionsCompleted         Int
+  successfulRescues         Int
+  unsuccessfulActions       Int
+  strategyChanges           Int
+  successfulStrategyChanges Int
+  averageDecisionTime       Float
+  averageSolutionTime       Float
+  highestDifficulty         Int
+  problemSolvingScore       Float
+  cognitiveFlexibilityScore Float
+  completionPercentage      Float
+  overallScore              Float
+  completionStatus          String
+  createdAt                 DateTime   @default(now())
+  updatedAt                 DateTime   @updatedAt
+
+  @@index([gameId, assessmentId])
+  @@index([studentId, assessmentId])
+  @@map("RescueMissionAnalytics")
+}
+
+model ParkingEscapeAnalytics {
+  id                         String     @id @default(uuid())
+  studentId                  String
+  assessmentId               String
+  gameId                     String
+  gameResultId               String     @unique
+  gameResult                 GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
+  game                       Game       @relation(fields: [gameId], references: [id])
+  levelsStarted              Int
+  levelsCompleted            Int
+  targetCarsEscaped          Int
+  totalVehicleMoves          Int
+  efficientMoves             Int
+  unnecessaryMoves           Int
+  averageLevelCompletionTime Float
+  highestLevel               Int
+  strategicPlanningScore     Float
+  spatialReasoningScore      Float
+  completionPercentage       Float
+  overallScore               Float
+  completionStatus           String
+  createdAt                  DateTime   @default(now())
+  updatedAt                  DateTime   @updatedAt
+
+  @@index([gameId, assessmentId])
+  @@index([studentId, assessmentId])
+  @@map("ParkingEscapeAnalytics")
 }

@@ -25,6 +25,22 @@ export class GamesService implements OnModuleInit {
       });
       if (!admin) continue;
 
+      let rescueCategory = await this.prisma.gameCategory.findFirst({ where: { name: 'Problem Solving & Cognitive Flexibility', schoolId: school.id } });
+      if (!rescueCategory) rescueCategory = await this.prisma.gameCategory.create({ data: { schoolId: school.id, name: 'Problem Solving & Cognitive Flexibility', status: 'ACTIVE' } });
+      await this.prisma.gameTemplate.upsert({
+        where: { schoolId_templateId: { schoolId: school.id, templateId: 'GT-RESCUE-MISSION' } },
+        create: { templateId: 'GT-RESCUE-MISSION', schoolId: school.id, name: 'Rescue Mission Template', description: 'A visual two-minute assessment of problem solving and cognitive flexibility.', categoryId: rescueCategory.id, difficulty: 'EASY_MEDIUM', estimatedDuration: 2, minimumQuestions: 1, maximumQuestions: 1, supportedDevices: ['Desktop', 'Tablet', 'Mobile'], status: 'ACTIVE', createdById: admin.id },
+        update: { status: 'ACTIVE', estimatedDuration: 2 },
+      });
+
+      let parkingCategory = await this.prisma.gameCategory.findFirst({ where: { name: 'Strategic Planning & Spatial Reasoning', schoolId: school.id } });
+      if (!parkingCategory) parkingCategory = await this.prisma.gameCategory.create({ data: { schoolId: school.id, name: 'Strategic Planning & Spatial Reasoning', status: 'ACTIVE' } });
+      await this.prisma.gameTemplate.upsert({
+        where: { schoolId_templateId: { schoolId: school.id, templateId: 'GT-PARKING-ESCAPE' } },
+        create: { templateId: 'GT-PARKING-ESCAPE', schoolId: school.id, name: 'Parking Escape Template', description: 'A two-minute strategic planning and spatial reasoning assessment.', categoryId: parkingCategory.id, difficulty: 'MEDIUM', estimatedDuration: 2, minimumQuestions: 1, maximumQuestions: 1, supportedDevices: ['Desktop', 'Tablet', 'Mobile'], status: 'ACTIVE', createdById: admin.id },
+        update: { status: 'ACTIVE', estimatedDuration: 2, difficulty: 'MEDIUM' },
+      });
+
       let categorySound = await this.prisma.gameCategory.findFirst({
         where: { name: 'Auditory Recognition', schoolId: school.id }
       });
@@ -204,6 +220,18 @@ export class GamesService implements OnModuleInit {
 
   async reports(id: string, schoolId: string) {
     const game = await this.one(id, schoolId);
+    if (game.componentName === 'RESCUE_MISSION') {
+      const reports = await this.prisma.rescueMissionAnalytics.findMany({
+        where: { gameId: id, gameResult: { assessment: { schoolId } } },
+        select: { id: true, studentId: true, assessmentId: true, createdAt: true, problemSolvingScore: true, cognitiveFlexibilityScore: true, missionsCompleted: true, successfulRescues: true, strategyChanges: true, successfulStrategyChanges: true, averageSolutionTime: true, highestDifficulty: true, completionPercentage: true, overallScore: true, completionStatus: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      return reports.map((report) => ({ ...report, ageGroup: game.ageGroup }));
+    }
+    if (game.componentName === 'PARKING_ESCAPE') {
+      const reports = await this.prisma.parkingEscapeAnalytics.findMany({ where: { gameId: id, gameResult: { assessment: { schoolId } } }, select: { id: true, studentId: true, assessmentId: true, createdAt: true, strategicPlanningScore: true, spatialReasoningScore: true, levelsCompleted: true, targetCarsEscaped: true, totalVehicleMoves: true, efficientMoves: true, unnecessaryMoves: true, averageLevelCompletionTime: true, highestLevel: true, completionPercentage: true, overallScore: true, completionStatus: true }, orderBy: { createdAt: 'desc' } });
+      return reports.map((report) => ({ ...report, ageGroup: game.ageGroup, averageMovesPerLevel: report.levelsCompleted ? report.totalVehicleMoves / report.levelsCompleted : 0, moveEfficiency: report.totalVehicleMoves ? report.efficientMoves / report.totalVehicleMoves * 100 : 0 }));
+    }
     if(game.componentName==='TRAIN_TRACK_BUILDER'){const reports=await this.prisma.trainTrackAnalytics.findMany({where:{gameId:id,gameResult:{assessment:{schoolId}}},select:{id:true,studentId:true,assessmentId:true,createdAt:true,logicalThinkingScore:true,causeEffectScore:true,tracksCompleted:true,averageCompletionTime:true,logicalAccuracy:true,highestDifficulty:true,completionStatus:true,overallScore:true},orderBy:{createdAt:'desc'}});return reports.map(report=>({...report,ageGroup:game.ageGroup}));}
     if(game.componentName==='PACKAGE_SORTER'){const reports=await this.prisma.packageSorterAnalytics.findMany({where:{gameId:id,gameResult:{assessment:{schoolId}}},select:{id:true,studentId:true,assessmentId:true,createdAt:true,organizationScore:true,decisionMakingScore:true,packagesSorted:true,correctDeliveries:true,incorrectDeliveries:true,averageDecisionTime:true,highestDifficulty:true,completionPercentage:true,overallScore:true,completionStatus:true},orderBy:{createdAt:'desc'}});return reports.map(report=>({...report,ageGroup:game.ageGroup}));}
     if(game.componentName==='MAGIC_PAINT'){const reports=await this.prisma.magicPaintAnalytics.findMany({where:{gameId:id,gameResult:{assessment:{schoolId}}},select:{id:true,studentId:true,assessmentId:true,createdAt:true,creativityScore:true,causeEffectScore:true,objectsCompleted:true,averageCompletionTime:true,interactionConsistency:true,completionStatus:true,overallScore:true},orderBy:{createdAt:'desc'}});return reports.map(report=>({...report,ageGroup:game.ageGroup}));}

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" role="img" aria-labelledby="title">
+  <title id="title">Rescue Mission</title>
+  <defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#91e6f5"/><stop offset="1" stop-color="#d8f9ff"/></linearGradient><linearGradient id="grass"><stop stop-color="#8fd67e"/><stop offset="1" stop-color="#65bd72"/></linearGradient></defs>
+  <rect width="640" height="320" rx="28" fill="url(#sky)"/><circle cx="550" cy="62" r="34" fill="#ffd65a"/><path d="M0 205Q120 135 245 205Q390 105 640 198V320H0Z" fill="#65bf91" opacity=".65"/><rect y="220" width="640" height="100" fill="url(#grass)"/>
+  <g transform="translate(90 130)"><circle cx="48" cy="35" r="25" fill="#f1ad70"/><path d="M24 16Q48-12 72 16" fill="#ec534f"/><rect x="15" y="55" width="68" height="82" rx="26" fill="#31a9a0"/><path d="M26 62h45l-5 42H31Z" fill="#fff" opacity=".9"/><circle cx="48" cy="82" r="13" fill="#ef5e5f"/><path d="M48 73v18M39 82h18" stroke="#fff" stroke-width="6" stroke-linecap="round"/></g>
+  <g transform="translate(300 112) rotate(-5)"><path d="M0 150L74 0M52 160L126 10M17 119h55M32 88h55M47 57h55M62 26h55" fill="none" stroke="#875c3f" stroke-width="14" stroke-linecap="round"/></g>
+  <g transform="translate(465 72)"><rect y="60" width="125" height="137" rx="16" fill="#d9aa78"/><rect x="-8" y="48" width="141" height="24" rx="10" fill="#8a674c"/><text x="63" y="43" text-anchor="middle" font-size="60">🐱</text></g>
+  <g fill="#fff8"><circle cx="100" cy="55" r="20"/><circle cx="130" cy="48" r="30"/><circle cx="162" cy="58" r="18"/></g>
+</svg>

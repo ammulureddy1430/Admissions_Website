@@ -45,6 +45,8 @@ import ColorPathGame from "@/games/color-path/Game";
 import MagicPaintGame from "@/games/magic-paint/Game";
 import TrainTrackBuilderGame from "@/games/train-track-builder/Game";
 import PackageSorterGame from "@/games/package-sorter/Game";
+import RescueMissionGame from "@/games/rescue-mission/Game";
+import ParkingEscapeGame from "@/games/parking-escape/Game";
 
 const MAX_SECURITY_WARNINGS = 3;
 type GameOption = { id?: string; optionKey?: string; optionText: string };
@@ -351,6 +353,8 @@ export function GameRuntimePlayer({
       state.engine?.engineKey === "MAGIC_PAINT" ||
       state.engine?.engineKey === "TRAIN_TRACK_BUILDER" ||
       state.engine?.engineKey === "PACKAGE_SORTER"
+      || state.engine?.engineKey === "RESCUE_MISSION"
+      || state.engine?.engineKey === "PARKING_ESCAPE"
     )
       return;
     timeoutHandled.current = true;
@@ -375,6 +379,8 @@ export function GameRuntimePlayer({
   const isMagicPaint = state.engine?.engineKey === "MAGIC_PAINT";
   const isTrainTrackBuilder = state.engine?.engineKey === "TRAIN_TRACK_BUILDER";
   const isPackageSorter = state.engine?.engineKey === "PACKAGE_SORTER";
+  const isRescueMission = state.engine?.engineKey === "RESCUE_MISSION";
+  const isParkingEscape = state.engine?.engineKey === "PARKING_ESCAPE";
   const showGameIntro = state.status === "READY";
   const assignedGameName =
     state.generatedGame?.title ||
@@ -405,7 +411,9 @@ export function GameRuntimePlayer({
     isColorPath ||
     isMagicPaint ||
     isTrainTrackBuilder ||
-    isPackageSorter;
+    isPackageSorter ||
+    isRescueMission ||
+    isParkingEscape;
   const player = (
     <div
       ref={playerRef}
@@ -530,6 +538,10 @@ export function GameRuntimePlayer({
             <TrainTrackBuilderGame disabled={state.status !== "RUNNING"} sound={sound} durationSeconds={120} onComplete={(metrics) => action("TRAIN_TRACK_COMPLETE", metrics)} />
           ) : isPackageSorter ? (
             <PackageSorterGame disabled={state.status !== "RUNNING"} sound={sound} durationSeconds={120} onComplete={(metrics) => action("PACKAGE_SORTER_COMPLETE", metrics)} />
+          ) : isRescueMission ? (
+            <RescueMissionGame disabled={state.status !== "RUNNING"} sound={sound} durationSeconds={120} onComplete={(metrics) => action("RESCUE_MISSION_COMPLETE", metrics)} />
+          ) : isParkingEscape ? (
+            <ParkingEscapeGame disabled={state.status !== "RUNNING"} sound={sound} durationSeconds={120} onComplete={(metrics) => action("PARKING_ESCAPE_COMPLETE", metrics)} />
           ) : q ? (
             state.engine?.engineKey === "BOARD_GAME" ? (
               <BoardGame

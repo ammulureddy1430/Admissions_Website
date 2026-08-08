@@ -26,7 +26,8 @@ import TrainTrackBuilderGame from "@/games/train-track-builder/Game";
 import PackageSorterGame from "@/games/package-sorter/Game";
 import MagicTrainGame from "@/games/magic-train/Game";
 import RoomDesignerGame from "@/games/room-designer/Game";
-import TrafficLightChallengeGame from "@/games/traffic-light-challenge/Game";
+import RescueMissionGame from "@/games/rescue-mission/Game";
+import ParkingEscapeGame from "@/games/parking-escape/Game";
 
 type Game = {
   id: string;
@@ -755,12 +756,14 @@ export default function GamesPage() {
                 durationSeconds={previewing.durationSeconds}
                 onComplete={() => setPreviewing(null)}
               />
-            ) : previewing.componentName === "TRAFFIC_LIGHT_CHALLENGE" ? (
-              <TrafficLightChallengeGame
+            ) : previewing.componentName === "RESCUE_MISSION" ? (
+              <RescueMissionGame
                 sound
                 durationSeconds={previewing.durationSeconds}
                 onComplete={() => setPreviewing(null)}
               />
+            ) : previewing.componentName === "PARKING_ESCAPE" ? (
+              <ParkingEscapeGame sound durationSeconds={previewing.durationSeconds} onComplete={() => setPreviewing(null)} />
             ) : (
               <div className="grid h-full place-items-center text-center text-white">
                 <div>
@@ -955,17 +958,17 @@ function GameArtwork({ componentName }: { componentName: string }) {
         </span>
       </div>
     );
-  if (componentName === "TRAFFIC_LIGHT_CHALLENGE")
+  if (componentName === "RESCUE_MISSION")
     return (
-      <div className={`${common} bg-gradient-to-b from-[#92e2f3] to-[#8ed279]`} aria-hidden>
-        <span className="absolute left-4 top-7 text-4xl">🚙</span>
-        <div className="absolute right-5 top-3 flex flex-col gap-1 rounded-lg bg-[#26394e] p-1.5">
-          <i className="h-4 w-4 rounded-full bg-[#f15c69]"/><i className="h-4 w-4 rounded-full bg-[#f3c846]"/><i className="h-4 w-4 rounded-full bg-[#43c88d]"/>
-        </div>
-        <i className="absolute bottom-5 left-2 right-2 h-1.5 bg-slate-600" />
-        <span className="absolute inset-x-0 bottom-1 text-center text-[8px] font-black tracking-widest text-[#31555c]">WATCH • DRIVE</span>
+      <div className={`${common} bg-gradient-to-b from-[#99e7f4] to-[#82d17d]`} aria-hidden>
+        <span className="absolute bottom-3 left-3 text-4xl">🧑‍🚒</span>
+        <span className="absolute right-4 top-3 text-4xl">🐱</span>
+        <span className="absolute bottom-2 right-12 -rotate-6 text-4xl">🪜</span>
+        <span className="absolute inset-x-0 bottom-1 text-center text-[8px] font-black tracking-widest text-[#24545c]">CHOOSE • ADAPT • RESCUE</span>
       </div>
     );
+  if (componentName === "PARKING_ESCAPE")
+    return (<div className={`${common} bg-gradient-to-b from-[#8dd9f0] to-[#425563]`} aria-hidden><span className="absolute bottom-4 left-3 text-4xl">🚗</span><span className="absolute left-1/2 top-3 -translate-x-1/2 text-4xl">🚙</span><span className="absolute bottom-3 right-3 text-4xl">➡️</span><span className="absolute inset-x-0 bottom-1 text-center text-[8px] font-black tracking-widest text-white">PLAN • MOVE • ESCAPE</span></div>);
   return (
     <div className={`${common} place-items-center`} aria-hidden>
       <Gamepad2 className="h-9 w-9 text-[#007f70]" />
@@ -1018,8 +1021,10 @@ function gameCardTheme(componentName: string) {
     return "from-[#3f51a3] via-[#6754c7] to-[#f06d91]";
   if (componentName === "ROOM_DESIGNER")
     return "from-[#8457a8] via-[#c46894] to-[#ef9a78]";
-  if (componentName === "TRAFFIC_LIGHT_CHALLENGE")
-    return "from-[#1675a5] via-[#23a9a0] to-[#75c96d]";
+  if (componentName === "RESCUE_MISSION")
+    return "from-[#117995] via-[#23a994] to-[#79ca70]";
+  if (componentName === "PARKING_ESCAPE")
+    return "from-[#173f59] via-[#287a8c] to-[#57b58b]";
   return "from-[#0b6870] via-[#168e84] to-[#54baa5]";
 }
 

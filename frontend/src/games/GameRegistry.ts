@@ -110,8 +110,12 @@ registerGame({
   load: () => import("./room-designer/Game"),
 });
 registerGame({
-  componentName: "TRAFFIC_LIGHT_CHALLENGE",
-  load: () => import("./traffic-light-challenge/Game"),
+  componentName: "RESCUE_MISSION",
+  load: () => import("./rescue-mission/Game"),
+});
+registerGame({
+  componentName: "PARKING_ESCAPE",
+  load: () => import("./parking-escape/Game"),
 });
 registerGame({
   componentName: "RACING_GAME",

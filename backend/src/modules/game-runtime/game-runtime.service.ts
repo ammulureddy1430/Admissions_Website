@@ -22,6 +22,8 @@ const ENGINES = [
   ['MAGIC_PAINT','Magic Paint'],
   ['TRAIN_TRACK_BUILDER','Train Track Builder'],
   ['PACKAGE_SORTER','Package Sorter'],
+  ['RESCUE_MISSION','Rescue Mission'],
+  ['PARKING_ESCAPE','Parking Escape'],
 ] as const;
 
 @Injectable()
@@ -122,6 +124,8 @@ export class GameRuntimeService {
     if (session.engine.engineKey === 'MAGIC_PAINT' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Magic Paint does not allow pause, hints, retries, skips, or question answers.');
     if (session.engine.engineKey === 'TRAIN_TRACK_BUILDER' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Train Track Builder does not allow pause, hints, retries, skips, or question answers.');
     if (session.engine.engineKey === 'PACKAGE_SORTER' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Package Sorter does not allow pause, hints, retries, skips, or question answers.');
+    if (session.engine.engineKey === 'RESCUE_MISSION' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Rescue Mission does not allow pause, hints, retries, skips, or question answers.');
+    if (session.engine.engineKey === 'PARKING_ESCAPE' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Parking Escape does not allow pause, hints, answers, or skips.');
     if (action === 'START') return this.transition(session.id, 'RUNNING', { startedAt: session.startedAt || new Date(), pausedAt: null }, 'STARTED', dto.payload, schoolId, user);
     if (action === 'PAUSE') {
       if (session.status !== 'RUNNING') throw new BadRequestException('Only a running game can be paused.');
@@ -150,6 +154,8 @@ export class GameRuntimeService {
     if (action === 'MAGIC_PAINT_COMPLETE') return this.magicPaintComplete(session, dto.payload, schoolId, user);
     if (action === 'TRAIN_TRACK_COMPLETE') return this.trainTrackComplete(session, dto.payload, schoolId, user);
     if (action === 'PACKAGE_SORTER_COMPLETE') return this.packageSorterComplete(session, dto.payload, schoolId, user);
+    if (action === 'RESCUE_MISSION_COMPLETE') return this.rescueMissionComplete(session, dto.payload, schoolId, user);
+    if (action === 'PARKING_ESCAPE_COMPLETE') return this.parkingEscapeComplete(session, dto.payload, schoolId, user);
     if (action === 'SECURITY_VIOLATION') return this.securityViolation(session, dto.payload, schoolId, user);
     if (action === 'COMPLETE') return this.transition(id, 'COMPLETED', { completedAt: new Date() }, 'COMPLETED', dto.payload, schoolId, user);
     throw new BadRequestException('Unsupported runtime action.');
@@ -372,6 +378,60 @@ export class GameRuntimeService {
     });
 
     await this.event(session.id, 'PACKAGE_SORTER_COMPLETED', cognitiveAnalytics);
+    return { state: await this.state(session.id, schoolId, user) };
+  }
+
+  private async rescueMissionComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
+    if (session.engine.engineKey !== 'RESCUE_MISSION' || session.status !== 'RUNNING') throw new BadRequestException('Rescue Mission metrics require an active session.');
+    const input = (payload || {}) as Record<string, any>;
+    const number = (key: string, max = 100000) => Math.max(0, Math.min(max, Number(input[key]) || 0));
+    const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 10) / 10));
+    const missionsStarted = number('missions_started', 1000);
+    const missionsCompleted = Math.min(missionsStarted, number('missions_completed', 1000));
+    const successfulRescues = Math.min(missionsCompleted, number('successful_rescues', 1000));
+    const unsuccessfulActions = number('unsuccessful_actions', 10000);
+    const strategyChanges = number('strategy_changes', 10000);
+    const successfulStrategyChanges = Math.min(strategyChanges, number('successful_strategy_changes', 10000));
+    const averageDecisionTime = number('average_decision_time', 120000);
+    const averageSolutionTime = number('average_solution_time', 120000);
+    const highestDifficulty = Math.min(6, Math.max(1, number('highest_difficulty', 6)));
+    const elapsedSeconds = Math.min(120, number('elapsed_seconds', 120));
+    const completionRate = missionsStarted ? missionsCompleted / missionsStarted : 0;
+    const actionEfficiency = successfulRescues + unsuccessfulActions ? successfulRescues / (successfulRescues + unsuccessfulActions) : 0;
+    const recovery = strategyChanges ? successfulStrategyChanges / strategyChanges : (unsuccessfulActions ? 0 : 1);
+    const difficultyProgress = highestDifficulty / 6;
+    const problemSolvingScore = clamp((completionRate * .42 + actionEfficiency * .36 + difficultyProgress * .22) * 100);
+    const cognitiveFlexibilityScore = clamp((recovery * .58 + Math.min(1, strategyChanges / 4) * .22 + difficultyProgress * .2) * 100);
+    const completionPercentage = clamp(Math.max(missionsStarted / 4, elapsedSeconds / 120) * 100);
+    const overallScore = clamp((problemSolvingScore + cognitiveFlexibilityScore) / 2);
+    const completionStatus = missionsStarted >= 4 || elapsedSeconds >= 119 ? 'COMPLETED' : 'PARTIAL';
+    const cognitiveAnalytics = { missionsStarted, missionsCompleted, successfulRescues, unsuccessfulActions, strategyChanges, successfulStrategyChanges, averageDecisionTime, averageSolutionTime, highestDifficulty, problemSolvingScore, cognitiveFlexibilityScore, completionPercentage, overallScore, completionStatus };
+    await this.prisma.gameRuntimeSession.update({ where: { id: session.id }, data: { status: 'COMPLETED', completedAt: new Date(), score: overallScore, elapsedSeconds, runtimeState: { ...((session.runtimeState || {}) as Record<string, unknown>), cognitiveAnalytics } as Prisma.InputJsonValue } });
+    await this.event(session.id, 'RESCUE_MISSION_COMPLETED', cognitiveAnalytics);
+    return { state: await this.state(session.id, schoolId, user) };
+  }
+
+  private async parkingEscapeComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
+    if (session.engine.engineKey !== 'PARKING_ESCAPE' || session.status !== 'RUNNING') throw new BadRequestException('Parking Escape metrics require an active session.');
+    const input = (payload || {}) as Record<string, any>;
+    const number = (key: string, max = 100000) => Math.max(0, Math.min(max, Number(input[key]) || 0));
+    const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 10) / 10));
+    const levelsStarted = number('levels_started', 100), levelsCompleted = Math.min(levelsStarted, number('levels_completed', 100));
+    const targetCarsEscaped = Math.min(levelsCompleted, number('target_cars_escaped', 100));
+    const totalVehicleMoves = number('total_vehicle_moves'), efficientMoves = Math.min(totalVehicleMoves, number('efficient_moves'));
+    const unnecessaryMoves = Math.min(totalVehicleMoves, number('unnecessary_moves'));
+    const highestLevel = Math.min(4, Math.max(1, number('highest_level', 4)));
+    const averageLevelCompletionTime = number('average_level_completion_time', 120);
+    const moveEfficiency = totalVehicleMoves ? efficientMoves / totalVehicleMoves : 0;
+    const escapeRate = levelsStarted ? targetCarsEscaped / levelsStarted : 0;
+    const strategicPlanningScore = clamp((moveEfficiency * .55 + escapeRate * .3 + highestLevel / 4 * .15) * 100);
+    const spatialReasoningScore = clamp((escapeRate * .55 + moveEfficiency * .3 + highestLevel / 4 * .15) * 100);
+    const completionPercentage = clamp(Math.max(levelsCompleted / 4, number('completion_percentage') / 100) * 100);
+    const overallScore = clamp((strategicPlanningScore + spatialReasoningScore) / 2);
+    const completionStatus = String(input.completionStatus || 'COMPLETED');
+    const cognitiveAnalytics = { levelsStarted, levelsCompleted, targetCarsEscaped, totalVehicleMoves, efficientMoves, unnecessaryMoves, averageLevelCompletionTime, highestLevel, strategicPlanningScore, spatialReasoningScore, completionPercentage, overallScore, completionStatus };
+    await this.prisma.gameRuntimeSession.update({ where: { id: session.id }, data: { status: 'COMPLETED', completedAt: new Date(), score: overallScore, elapsedSeconds: 120, runtimeState: { ...((session.runtimeState || {}) as Record<string, unknown>), cognitiveAnalytics } as Prisma.InputJsonValue } });
+    await this.event(session.id, 'PARKING_ESCAPE_COMPLETED', cognitiveAnalytics);
     return { state: await this.state(session.id, schoolId, user) };
   }
 

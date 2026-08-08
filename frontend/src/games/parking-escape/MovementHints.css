@@ -1,0 +1,10 @@
+.parking-car.active::after {
+  position: absolute;
+  z-index: -1;
+  inset: -4px;
+  border: 2px dashed #80f0d0;
+  border-radius: inherit;
+  background: #52d5b31f;
+  box-shadow: 0 0 14px #62e2c555;
+  content: "";
+}

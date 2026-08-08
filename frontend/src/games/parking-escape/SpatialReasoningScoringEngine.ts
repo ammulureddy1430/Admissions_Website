@@ -1,0 +1,2 @@
+import type { ParkingRawMetrics } from "./Types";const clamp=(v:number)=>Math.max(0,Math.min(100,v));
+export class SpatialReasoningScoringEngine { score(m:ParkingRawMetrics){const accuracy=m.total_vehicle_moves+m.invalid_moves?m.total_vehicle_moves/(m.total_vehicle_moves+m.invalid_moves):0;const navigation=m.levels_started?m.target_cars_escaped/m.levels_started:0;const difficulty=m.highest_level/4;return Math.round(clamp((accuracy*.45+navigation*.4+difficulty*.15)*100)*10)/10} }

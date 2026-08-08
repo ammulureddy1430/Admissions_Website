@@ -1,0 +1,2 @@
+import type { ParkingRawMetrics } from "./Types";const clamp=(v:number)=>Math.max(0,Math.min(100,v));
+export class StrategicPlanningScoringEngine { score(m:ParkingRawMetrics){const efficiency=m.total_vehicle_moves?m.efficient_moves/m.total_vehicle_moves:0;const economy=m.total_vehicle_moves?Math.min(1,m.optimal_moves/m.total_vehicle_moves):0;const progress=m.levels_completed/4;return Math.round(clamp((efficiency*.4+economy*.4+progress*.2)*100)*10)/10} }

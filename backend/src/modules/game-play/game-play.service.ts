@@ -404,10 +404,12 @@ export class GamePlayService {
     const magicPaint = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'MAGIC_PAINT' ? runtime.cognitiveAnalytics : null;
     const trainTrack = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'TRAIN_TRACK_BUILDER' ? runtime.cognitiveAnalytics : null;
     const packageSorter = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'PACKAGE_SORTER' ? runtime.cognitiveAnalytics : null;
-    const cognitive = followLights || ballStack || soundDetective || colorPath || magicPaint || trainTrack || packageSorter;
-    const answered = followLights ? Number(followLights.correctTaps || 0) + Number(followLights.wrongTaps || 0) : ballStack ? Number(ballStack.totalBallsDropped || 0) : soundDetective ? Number(soundDetective.roundsPlayed || 0) : colorPath ? Number(colorPath.roundsPlayed || 0) : magicPaint ? Number(magicPaint.objectsCompleted || 0) : trainTrack ? Number(trainTrack.roundsPlayed || 0) : packageSorter ? Number(packageSorter.packagesSorted || 0) : runtime?.answers?.length || 0;
+    const rescueMission = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'RESCUE_MISSION' ? runtime.cognitiveAnalytics : null;
+    const parkingEscape = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'PARKING_ESCAPE' ? runtime.cognitiveAnalytics : null;
+    const cognitive = followLights || ballStack || soundDetective || colorPath || magicPaint || trainTrack || packageSorter || rescueMission || parkingEscape;
+    const answered = followLights ? Number(followLights.correctTaps || 0) + Number(followLights.wrongTaps || 0) : ballStack ? Number(ballStack.totalBallsDropped || 0) : soundDetective ? Number(soundDetective.roundsPlayed || 0) : colorPath ? Number(colorPath.roundsPlayed || 0) : magicPaint ? Number(magicPaint.objectsCompleted || 0) : trainTrack ? Number(trainTrack.roundsPlayed || 0) : packageSorter ? Number(packageSorter.packagesSorted || 0) : rescueMission ? Number(rescueMission.missionsCompleted || 0) : parkingEscape ? Number(parkingEscape.levelsCompleted || 0) : runtime?.answers?.length || 0;
     const total = cognitive ? Math.max(1, answered) : session.questionIds.length;
-    const percentage = followLights ? Number(followLights.overallScore || 0) : ballStack ? Number(ballStack.overallCognitiveScore || 0) : soundDetective ? Number(soundDetective.overallScore || 0) : colorPath ? Number(colorPath.overallScore || 0) : magicPaint ? Number(magicPaint.overallScore || 0) : trainTrack ? Number(trainTrack.overallScore || 0) : packageSorter ? Number(packageSorter.overallScore || 0) : total ? (Number(runtime?.correct || 0) / total) * 100 : 0;
+    const percentage = followLights ? Number(followLights.overallScore || 0) : ballStack ? Number(ballStack.overallCognitiveScore || 0) : soundDetective ? Number(soundDetective.overallScore || 0) : colorPath ? Number(colorPath.overallScore || 0) : magicPaint ? Number(magicPaint.overallScore || 0) : trainTrack ? Number(trainTrack.overallScore || 0) : packageSorter ? Number(packageSorter.overallScore || 0) : rescueMission ? Number(rescueMission.overallScore || 0) : parkingEscape ? Number(parkingEscape.overallScore || 0) : total ? (Number(runtime?.correct || 0) / total) * 100 : 0;
     const passed = percentage >= assignment.passingScore;
     const attempt = await this.prisma.gameAttempt.findFirst({ where: { gameResultId: result.id, submittedAt: null }, orderBy: { attemptNumber: 'desc' } });
     await this.prisma.$transaction(async (tx) => {
@@ -497,6 +499,16 @@ export class GamePlayService {
           create: { ...data, gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId },
           update: data,
         });
+      }
+      if (rescueMission && result.gameId) {
+        const data = {
+          missionsStarted: Number(rescueMission.missionsStarted || 0), missionsCompleted: Number(rescueMission.missionsCompleted || 0), successfulRescues: Number(rescueMission.successfulRescues || 0), unsuccessfulActions: Number(rescueMission.unsuccessfulActions || 0), strategyChanges: Number(rescueMission.strategyChanges || 0), successfulStrategyChanges: Number(rescueMission.successfulStrategyChanges || 0), averageDecisionTime: Number(rescueMission.averageDecisionTime || 0), averageSolutionTime: Number(rescueMission.averageSolutionTime || 0), highestDifficulty: Number(rescueMission.highestDifficulty || 1), problemSolvingScore: Number(rescueMission.problemSolvingScore || 0), cognitiveFlexibilityScore: Number(rescueMission.cognitiveFlexibilityScore || 0), completionPercentage: Number(rescueMission.completionPercentage || 0), overallScore: Number(rescueMission.overallScore || 0), completionStatus: String(rescueMission.completionStatus || 'COMPLETED'),
+        };
+        await tx.rescueMissionAnalytics.upsert({ where: { gameResultId: result.id }, create: { ...data, gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId }, update: data });
+      }
+      if (parkingEscape && result.gameId) {
+        const data = { levelsStarted: Number(parkingEscape.levelsStarted || 0), levelsCompleted: Number(parkingEscape.levelsCompleted || 0), targetCarsEscaped: Number(parkingEscape.targetCarsEscaped || 0), totalVehicleMoves: Number(parkingEscape.totalVehicleMoves || 0), efficientMoves: Number(parkingEscape.efficientMoves || 0), unnecessaryMoves: Number(parkingEscape.unnecessaryMoves || 0), averageLevelCompletionTime: Number(parkingEscape.averageLevelCompletionTime || 0), highestLevel: Number(parkingEscape.highestLevel || 1), strategicPlanningScore: Number(parkingEscape.strategicPlanningScore || 0), spatialReasoningScore: Number(parkingEscape.spatialReasoningScore || 0), completionPercentage: Number(parkingEscape.completionPercentage || 0), overallScore: Number(parkingEscape.overallScore || 0), completionStatus: String(parkingEscape.completionStatus || 'COMPLETED') };
+        await tx.parkingEscapeAnalytics.upsert({ where: { gameResultId: result.id }, create: { ...data, gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId }, update: data });
       }
       if (attempt) {
         await tx.gameAttempt.update({ where: { id: attempt.id }, data: { submittedAt: new Date(), state: session.runtimeState as Prisma.InputJsonValue } });

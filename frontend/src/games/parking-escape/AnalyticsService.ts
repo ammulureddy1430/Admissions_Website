@@ -1,0 +1,1 @@
+import type{ParkingEscapeMetrics}from"./Types";export class AnalyticsService{constructor(private complete:(m:ParkingEscapeMetrics)=>void|Promise<void>){}save(m:ParkingEscapeMetrics){return this.complete(m)}}
