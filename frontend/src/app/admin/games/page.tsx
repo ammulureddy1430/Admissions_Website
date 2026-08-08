@@ -28,6 +28,7 @@ import MagicTrainGame from "@/games/magic-train/Game";
 import RoomDesignerGame from "@/games/room-designer/Game";
 import RescueMissionGame from "@/games/rescue-mission/Game";
 import ParkingEscapeGame from "@/games/parking-escape/Game";
+import WaterPipelineGame from "@/games/water-pipeline/Game";
 
 type Game = {
   id: string;
@@ -764,6 +765,8 @@ export default function GamesPage() {
               />
             ) : previewing.componentName === "PARKING_ESCAPE" ? (
               <ParkingEscapeGame sound durationSeconds={previewing.durationSeconds} onComplete={() => setPreviewing(null)} />
+            ) : previewing.componentName === "WATER_PIPELINE" ? (
+              <WaterPipelineGame sound durationSeconds={previewing.durationSeconds} onComplete={() => setPreviewing(null)} />
             ) : (
               <div className="grid h-full place-items-center text-center text-white">
                 <div>
@@ -969,6 +972,8 @@ function GameArtwork({ componentName }: { componentName: string }) {
     );
   if (componentName === "PARKING_ESCAPE")
     return (<div className={`${common} bg-gradient-to-b from-[#8dd9f0] to-[#425563]`} aria-hidden><span className="absolute bottom-4 left-3 text-4xl">🚗</span><span className="absolute left-1/2 top-3 -translate-x-1/2 text-4xl">🚙</span><span className="absolute bottom-3 right-3 text-4xl">➡️</span><span className="absolute inset-x-0 bottom-1 text-center text-[8px] font-black tracking-widest text-white">PLAN • MOVE • ESCAPE</span></div>);
+  if (componentName === "WATER_PIPELINE")
+    return (<div className={`${common} bg-gradient-to-b from-[#70d8ef] to-[#59af72]`} aria-hidden><span className="absolute bottom-4 left-3 text-4xl">💧</span><span className="absolute left-1/2 top-3 -translate-x-1/2 text-4xl">🔧</span><span className="absolute bottom-3 right-3 text-4xl">🌻</span><span className="absolute inset-x-0 bottom-1 text-center text-[8px] font-black tracking-widest text-white">TURN • CONNECT • FLOW</span></div>);
   return (
     <div className={`${common} place-items-center`} aria-hidden>
       <Gamepad2 className="h-9 w-9 text-[#007f70]" />
@@ -1025,6 +1030,8 @@ function gameCardTheme(componentName: string) {
     return "from-[#117995] via-[#23a994] to-[#79ca70]";
   if (componentName === "PARKING_ESCAPE")
     return "from-[#173f59] via-[#287a8c] to-[#57b58b]";
+  if (componentName === "WATER_PIPELINE")
+    return "from-[#137da1] via-[#20a7b0] to-[#68bd70]";
   return "from-[#0b6870] via-[#168e84] to-[#54baa5]";
 }
 

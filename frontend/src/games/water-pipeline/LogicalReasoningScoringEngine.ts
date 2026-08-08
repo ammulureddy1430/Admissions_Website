@@ -1,0 +1,1 @@
+import type{PipelineRawMetrics}from"./Types";export class LogicalReasoningScoringEngine{score(m:PipelineRawMetrics){const attempts=m.successful_connections+m.failed_connections,accuracy=attempts?m.successful_connections/attempts:0,progress=m.highest_level/4,completion=m.completed_pipelines/4;return Math.round(Math.min(100,(accuracy*.38+completion*.42+progress*.2)*1000)/10)}}

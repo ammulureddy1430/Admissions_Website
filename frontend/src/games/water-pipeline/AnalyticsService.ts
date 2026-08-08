@@ -1,0 +1,1 @@
+import type{WaterPipelineMetrics}from"./Types";export class AnalyticsService{constructor(private complete:(metrics:WaterPipelineMetrics)=>void|Promise<void>){}save(metrics:WaterPipelineMetrics){return this.complete(metrics)}}

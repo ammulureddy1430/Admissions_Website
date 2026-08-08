@@ -47,6 +47,7 @@ import TrainTrackBuilderGame from "@/games/train-track-builder/Game";
 import PackageSorterGame from "@/games/package-sorter/Game";
 import RescueMissionGame from "@/games/rescue-mission/Game";
 import ParkingEscapeGame from "@/games/parking-escape/Game";
+import WaterPipelineGame from "@/games/water-pipeline/Game";
 
 const MAX_SECURITY_WARNINGS = 3;
 type GameOption = { id?: string; optionKey?: string; optionText: string };
@@ -355,6 +356,7 @@ export function GameRuntimePlayer({
       state.engine?.engineKey === "PACKAGE_SORTER"
       || state.engine?.engineKey === "RESCUE_MISSION"
       || state.engine?.engineKey === "PARKING_ESCAPE"
+      || state.engine?.engineKey === "WATER_PIPELINE"
     )
       return;
     timeoutHandled.current = true;
@@ -381,6 +383,7 @@ export function GameRuntimePlayer({
   const isPackageSorter = state.engine?.engineKey === "PACKAGE_SORTER";
   const isRescueMission = state.engine?.engineKey === "RESCUE_MISSION";
   const isParkingEscape = state.engine?.engineKey === "PARKING_ESCAPE";
+  const isWaterPipeline = state.engine?.engineKey === "WATER_PIPELINE";
   const showGameIntro = state.status === "READY";
   const assignedGameName =
     state.generatedGame?.title ||
@@ -413,7 +416,8 @@ export function GameRuntimePlayer({
     isTrainTrackBuilder ||
     isPackageSorter ||
     isRescueMission ||
-    isParkingEscape;
+    isParkingEscape ||
+    isWaterPipeline;
   const player = (
     <div
       ref={playerRef}
@@ -542,6 +546,8 @@ export function GameRuntimePlayer({
             <RescueMissionGame disabled={state.status !== "RUNNING"} sound={sound} durationSeconds={120} onComplete={(metrics) => action("RESCUE_MISSION_COMPLETE", metrics)} />
           ) : isParkingEscape ? (
             <ParkingEscapeGame disabled={state.status !== "RUNNING"} sound={sound} durationSeconds={120} onComplete={(metrics) => action("PARKING_ESCAPE_COMPLETE", metrics)} />
+          ) : isWaterPipeline ? (
+            <WaterPipelineGame disabled={state.status !== "RUNNING"} sound={sound} durationSeconds={120} onComplete={(metrics) => action("WATER_PIPELINE_COMPLETE", metrics)} />
           ) : q ? (
             state.engine?.engineKey === "BOARD_GAME" ? (
               <BoardGame

@@ -118,6 +118,10 @@ registerGame({
   load: () => import("./parking-escape/Game"),
 });
 registerGame({
+  componentName: "WATER_PIPELINE",
+  load: () => import("./water-pipeline/Game"),
+});
+registerGame({
   componentName: "RACING_GAME",
   load: () =>
     import("@/components/racing-game/RacingGame").then((module) => ({

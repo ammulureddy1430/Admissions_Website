@@ -1,0 +1,1 @@
+import{ConnectionEngine}from"./ConnectionEngine";import type{PipelineLayout}from"./Types";export class WaterFlowEngine{evaluate(layout:PipelineLayout){const engine=new ConnectionEngine(),wet=engine.trace(layout);return{wet,complete:engine.complete(layout,wet),connections:engine.connections(layout)}}}

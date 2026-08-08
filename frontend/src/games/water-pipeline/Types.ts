@@ -1,0 +1,6 @@
+export type Direction="N"|"E"|"S"|"W";
+export type PipeKind="straight"|"corner"|"tee"|"cross";
+export type PipePiece={id:string;x:number;y:number;kind:PipeKind;rotation:0|1|2|3;solutionRotation:0|1|2|3;locked?:boolean};
+export type PipelineLayout={level:number;cols:number;rows:number;pieces:PipePiece[];path:string[];source:{x:number;y:number};destination:{x:number;y:number};optimalRotations:number};
+export type WaterPipelineMetrics={student_id?:string;assessment_id?:string;game_id?:string;age_group:"5–7 Years";levels_started:number;levels_completed:number;pipes_rotated:number;successful_connections:number;failed_connections:number;completed_pipelines:number;average_solution_time:number;average_rotations_per_level:number;highest_level:number;logical_reasoning_score:number;problem_solving_score:number;completion_percentage:number;overall_score:number;started_at:string;completed_at:string;completionStatus:"COMPLETED"|"PARTIAL"};
+export type PipelineRawMetrics=Omit<WaterPipelineMetrics,"average_solution_time"|"average_rotations_per_level"|"logical_reasoning_score"|"problem_solving_score"|"completion_percentage"|"overall_score"|"completed_at"|"completionStatus">&{solution_times:number[];optimal_rotations:number};

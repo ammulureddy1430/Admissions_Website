@@ -173,6 +173,7 @@ model Game {
   packageSorterAnalytics  PackageSorterAnalytics[]
   rescueMissionAnalytics  RescueMissionAnalytics[]
   parkingEscapeAnalytics  ParkingEscapeAnalytics[]
+  waterPipelineAnalytics  WaterPipelineAnalytics[]
   realTimeAssignments     RealTimeGameAssignment[]
   createdAt               DateTime                  @default(now()) @map("created_at")
   updatedAt               DateTime                  @updatedAt @map("updated_at")
@@ -312,6 +313,7 @@ model GameResult {
   packageSorterAnalytics  PackageSorterAnalytics?
   rescueMissionAnalytics  RescueMissionAnalytics?
   parkingEscapeAnalytics  ParkingEscapeAnalytics?
+  waterPipelineAnalytics  WaterPipelineAnalytics?
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
 
@@ -3214,4 +3216,34 @@ model ParkingEscapeAnalytics {
   @@index([gameId, assessmentId])
   @@index([studentId, assessmentId])
   @@map("ParkingEscapeAnalytics")
+}
+
+model WaterPipelineAnalytics {
+  id                       String     @id @default(uuid())
+  studentId                String
+  assessmentId             String
+  gameId                   String
+  gameResultId             String     @unique
+  gameResult               GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
+  game                     Game       @relation(fields: [gameId], references: [id])
+  levelsStarted            Int
+  levelsCompleted          Int
+  pipesRotated             Int
+  successfulConnections    Int
+  failedConnections        Int
+  completedPipelines       Int
+  averageSolutionTime      Float
+  averageRotationsPerLevel Float
+  highestLevel             Int
+  logicalReasoningScore    Float
+  problemSolvingScore      Float
+  completionPercentage     Float
+  overallScore             Float
+  completionStatus         String
+  createdAt                DateTime   @default(now())
+  updatedAt                DateTime   @updatedAt
+
+  @@index([gameId, assessmentId])
+  @@index([studentId, assessmentId])
+  @@map("WaterPipelineAnalytics")
 }

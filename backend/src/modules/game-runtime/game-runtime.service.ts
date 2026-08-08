@@ -24,6 +24,7 @@ const ENGINES = [
   ['PACKAGE_SORTER','Package Sorter'],
   ['RESCUE_MISSION','Rescue Mission'],
   ['PARKING_ESCAPE','Parking Escape'],
+  ['WATER_PIPELINE','Water Pipeline'],
 ] as const;
 
 @Injectable()
@@ -126,6 +127,7 @@ export class GameRuntimeService {
     if (session.engine.engineKey === 'PACKAGE_SORTER' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Package Sorter does not allow pause, hints, retries, skips, or question answers.');
     if (session.engine.engineKey === 'RESCUE_MISSION' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Rescue Mission does not allow pause, hints, retries, skips, or question answers.');
     if (session.engine.engineKey === 'PARKING_ESCAPE' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Parking Escape does not allow pause, hints, answers, or skips.');
+    if (session.engine.engineKey === 'WATER_PIPELINE' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Water Pipeline does not allow pause, hints, answers, or skips.');
     if (action === 'START') return this.transition(session.id, 'RUNNING', { startedAt: session.startedAt || new Date(), pausedAt: null }, 'STARTED', dto.payload, schoolId, user);
     if (action === 'PAUSE') {
       if (session.status !== 'RUNNING') throw new BadRequestException('Only a running game can be paused.');
@@ -156,6 +158,7 @@ export class GameRuntimeService {
     if (action === 'PACKAGE_SORTER_COMPLETE') return this.packageSorterComplete(session, dto.payload, schoolId, user);
     if (action === 'RESCUE_MISSION_COMPLETE') return this.rescueMissionComplete(session, dto.payload, schoolId, user);
     if (action === 'PARKING_ESCAPE_COMPLETE') return this.parkingEscapeComplete(session, dto.payload, schoolId, user);
+    if (action === 'WATER_PIPELINE_COMPLETE') return this.waterPipelineComplete(session, dto.payload, schoolId, user);
     if (action === 'SECURITY_VIOLATION') return this.securityViolation(session, dto.payload, schoolId, user);
     if (action === 'COMPLETE') return this.transition(id, 'COMPLETED', { completedAt: new Date() }, 'COMPLETED', dto.payload, schoolId, user);
     throw new BadRequestException('Unsupported runtime action.');
@@ -433,6 +436,15 @@ export class GameRuntimeService {
     await this.prisma.gameRuntimeSession.update({ where: { id: session.id }, data: { status: 'COMPLETED', completedAt: new Date(), score: overallScore, elapsedSeconds: 120, runtimeState: { ...((session.runtimeState || {}) as Record<string, unknown>), cognitiveAnalytics } as Prisma.InputJsonValue } });
     await this.event(session.id, 'PARKING_ESCAPE_COMPLETED', cognitiveAnalytics);
     return { state: await this.state(session.id, schoolId, user) };
+  }
+
+  private async waterPipelineComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
+    if (session.engine.engineKey !== 'WATER_PIPELINE' || session.status !== 'RUNNING') throw new BadRequestException('Water Pipeline metrics require an active session.');
+    const input=(payload||{}) as Record<string,any>,number=(key:string,max=100000)=>Math.max(0,Math.min(max,Number(input[key])||0)),clamp=(value:number)=>Math.max(0,Math.min(100,Math.round(value*10)/10));
+    const levelsStarted=number('levels_started',4),levelsCompleted=Math.min(levelsStarted,number('levels_completed',4)),pipesRotated=number('pipes_rotated'),successfulConnections=number('successful_connections'),failedConnections=number('failed_connections'),completedPipelines=Math.min(levelsCompleted,number('completed_pipelines',4)),averageSolutionTime=number('average_solution_time',120),averageRotationsPerLevel=number('average_rotations_per_level'),highestLevel=Math.min(4,Math.max(1,number('highest_level',4))),attempts=successfulConnections+failedConnections,accuracy=attempts?successfulConnections/attempts:0,completion=completedPipelines/4,efficiency=averageRotationsPerLevel?Math.min(1,8/averageRotationsPerLevel):0;
+    const logicalReasoningScore=clamp((accuracy*.38+completion*.42+highestLevel/4*.2)*100),problemSolvingScore=clamp((efficiency*.4+completion*.45+(failedConnections?Math.min(1,completedPipelines/failedConnections):1)*.15)*100),completionPercentage=clamp(levelsCompleted/4*100),overallScore=clamp((logicalReasoningScore+problemSolvingScore)/2),completionStatus=String(input.completionStatus||'COMPLETED');
+    const cognitiveAnalytics={levelsStarted,levelsCompleted,pipesRotated,successfulConnections,failedConnections,completedPipelines,averageSolutionTime,averageRotationsPerLevel,highestLevel,logicalReasoningScore,problemSolvingScore,completionPercentage,overallScore,completionStatus};
+    await this.prisma.gameRuntimeSession.update({where:{id:session.id},data:{status:'COMPLETED',completedAt:new Date(),score:overallScore,elapsedSeconds:120,runtimeState:{...((session.runtimeState||{}) as Record<string,unknown>),cognitiveAnalytics}as Prisma.InputJsonValue}});await this.event(session.id,'WATER_PIPELINE_COMPLETED',cognitiveAnalytics);return{state:await this.state(session.id,schoolId,user)};
   }
 
 
