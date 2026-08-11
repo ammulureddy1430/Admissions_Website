@@ -8,6 +8,7 @@ import {
   Eye,
   Gamepad2,
   Loader2,
+  ListChecks,
   MoreHorizontal,
   Pencil,
   Power,
@@ -53,8 +54,17 @@ type Student = {
   studentFirstName: string;
   studentLastName: string;
   ageGroup: string;
+  grade?: string;
   status: string;
+  allGamesAssigned?: boolean;
 };
+type GameReview = {
+  id: string; status: string; percentage: number; totalScore: number; passed: boolean | null;
+  reviewStatus: string; schoolReview?: string; recommendation?: string; completedAt?: string;
+  student?: { studentFirstName: string; studentLastName: string; grade: string };
+  gameName?: string; componentName?: string; performanceMetrics?: Record<string, number | string>;
+};
+type BulkGame = Pick<Game, "id" | "name" | "category" | "ageGroup" | "durationSeconds" | "componentName"> & { alreadyAssigned: boolean };
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
 const AGE_GROUPS = [
@@ -81,6 +91,17 @@ export default function GamesPage() {
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [studentLoading, setStudentLoading] = useState(false);
   const [previewing, setPreviewing] = useState<Game | null>(null);
+  const [reviewing, setReviewing] = useState<Game | null>(null);
+  const [reviews, setReviews] = useState<GameReview[]>([]);
+  const [reviewResult, setReviewResult] = useState<GameReview | null>(null);
+  const [reviewText, setReviewText] = useState("");
+  const [recommendation, setRecommendation] = useState("");
+  const [success, setSuccess] = useState("");
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkStudents, setBulkStudents] = useState<Student[]>([]);
+  const [bulkStudentId, setBulkStudentId] = useState("");
+  const [bulkGames, setBulkGames] = useState<BulkGame[]>([]);
+  const [selectedBulkGames, setSelectedBulkGames] = useState<string[]>([]);
 
   const request = async (path: string, init?: RequestInit) => {
     const response = await fetch(`${API}/${path}`, {
@@ -246,6 +267,54 @@ export default function GamesPage() {
     }
   };
 
+  const saveReview = async (status: "REVIEWED" | "NEEDS_FOLLOW_UP") => {
+    if (!reviewing || !reviewResult || !reviewText.trim()) return;
+    setBusy("review-save");
+    try {
+      await request(`games/${reviewing.id}/reviews/${reviewResult.id}`, { method: "PATCH", body: JSON.stringify({ reviewStatus: status, schoolReview: reviewText, recommendation }) });
+      setReviews(await request(`games/${reviewing.id}/reviews`)); setReviewResult(null); setReviewText(""); setRecommendation("");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to save the school review."); }
+    finally { setBusy(""); }
+  };
+
+  const openBulkAssign = async () => {
+    setSuccess("");
+    if (!ageGroupFilter) { setError("Please select an age group to assign all games."); return; }
+    const gamesForAge = games.filter((game) => game.ageGroup === ageGroupFilter && game.isActive);
+    if (!gamesForAge.length) { setError(`No active games are available for ${ageGroupFilter}.`); return; }
+    setError(""); setBulkOpen(true); setBulkStudentId(""); setBulkGames([]); setSelectedBulkGames([]); setStudentLoading(true);
+    try { setBulkStudents(await request(`games/bulk-eligible-students?ageGroup=${encodeURIComponent(ageGroupFilter)}`)); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to load eligible students."); }
+    finally { setStudentLoading(false); }
+  };
+
+  const chooseBulkStudent = async (studentId: string) => {
+    if (bulkStudentId === studentId) {
+      setBulkStudentId("");
+      setBulkGames([]);
+      setSelectedBulkGames([]);
+      setBusy("");
+      return;
+    }
+
+    setBulkStudentId(studentId); setBusy("bulk-options");
+    try {
+      const payload = await request(`games/bulk-assignment-options?ageGroup=${encodeURIComponent(ageGroupFilter)}&studentId=${encodeURIComponent(studentId)}`);
+      const rows: BulkGame[] = payload.games || []; setBulkGames(rows); setSelectedBulkGames(rows.filter((game) => !game.alreadyAssigned).map((game) => game.id));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to load bulk assignment options."); }
+    finally { setBusy(""); }
+  };
+
+  const bulkAssign = async () => {
+    if (!ageGroupFilter || !bulkStudentId || !selectedBulkGames.length) return;
+    setBusy("bulk-assign"); setError("");
+    try {
+      const result = await request("games/bulk-assign", { method: "POST", body: JSON.stringify({ ageGroup: ageGroupFilter, studentId: bulkStudentId, gameIds: selectedBulkGames }) });
+      setSuccess(result.message); setBulkOpen(false); await load();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to assign the selected games."); }
+    finally { setBusy(""); }
+  };
+
   return (
     <div className="mx-auto max-w-[1440px] space-y-6 pb-12">
       <header className="relative overflow-hidden rounded-[28px] border border-[#cfe9e2] bg-gradient-to-br from-[#073c42] via-[#006f68] to-[#00a68e] px-6 py-7 shadow-[0_18px_50px_rgba(0,93,82,.16)] sm:px-8 sm:py-8">
@@ -299,6 +368,7 @@ export default function GamesPage() {
           </button>
         </div>
       )}
+      {success && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-800"><CheckCircle2 className="h-4 w-4" />{success}</div>}
 
       <section className="overflow-visible rounded-[24px] border border-[#d8e9e5] bg-white shadow-[0_12px_40px_rgba(7,40,45,.06)]">
         <div className="flex flex-col justify-between gap-4 border-b border-[#e5efec] px-5 py-5 sm:flex-row sm:items-center sm:px-6">
@@ -323,6 +393,9 @@ export default function GamesPage() {
                 </option>
               ))}
             </select>
+            <button type="button" onClick={() => void openBulkAssign()} className="keep-white inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#007f70] px-4 py-2.5 text-[10px] font-black text-white shadow-sm transition hover:bg-[#006b5e]">
+              <ListChecks className="keep-white h-4 w-4" /> Assign All Games
+            </button>
             <label className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#82939e]" />
               <input
@@ -376,14 +449,6 @@ export default function GamesPage() {
                       {game.cognitiveSkill || game.category}
                     </p>
                   </div>
-                  <span
-                    className={`absolute right-3 top-3 z-20 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[8px] font-black uppercase backdrop-blur ${game.isActive ? "border-white/30 bg-white/90 text-emerald-700" : "border-white/20 bg-slate-900/50 text-white"}`}
-                  >
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${game.isActive ? "bg-emerald-500" : "bg-slate-400"}`}
-                    />
-                    {game.isActive ? "Active" : "Disabled"}
-                  </span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -448,20 +513,13 @@ export default function GamesPage() {
                     value={`${game.assignmentCount || 0} batches`}
                   />
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[#e8f0ee] pt-4">
+                <div className="mt-4 border-t border-[#e8f0ee] pt-4">
                   <button
                     disabled={!game.isActive}
                     onClick={() => setPreviewing(game)}
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#b9dcd4] bg-white px-4 py-2.5 text-[10px] font-black text-[#007f70] transition hover:border-[#008f7d] hover:bg-[#f0f8f5] disabled:opacity-40"
+                    className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#b9dcd4] bg-white px-4 py-2.5 text-[10px] font-black text-[#007f70] transition hover:border-[#008f7d] hover:bg-[#f0f8f5] disabled:opacity-40"
                   >
                     <Eye className="h-3.5 w-3.5" /> Preview
-                  </button>
-                  <button
-                    disabled={!game.isActive}
-                    onClick={() => void openAssignment(game)}
-                    className="keep-white inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#007f70] px-4 py-2.5 text-[10px] font-black shadow-md shadow-[#007f70]/15 transition hover:bg-[#006b5e] disabled:opacity-40"
-                  >
-                    <Send className="keep-white h-3.5 w-3.5" /> Assign
                   </button>
                 </div>
               </article>
@@ -534,6 +592,55 @@ export default function GamesPage() {
               {busy && <Loader2 className="h-4 w-4 animate-spin" />} Save game
             </button>
           </div>
+        </Modal>
+      )}
+      {bulkOpen && (
+        <Modal title={`Assign all ${ageGroupFilter} games`} onClose={() => setBulkOpen(false)}>
+          <div className="mb-5 flex items-center gap-2" aria-label="Assignment progress">
+            <div className="flex flex-1 items-center gap-2 rounded-xl bg-[#eaf7f3] px-3 py-2.5 text-[#007f70]">
+              <span className="keep-white grid h-6 w-6 place-items-center rounded-full bg-[#007f70] text-[9px] font-black text-white">1</span>
+              <span className="text-[9px] font-black uppercase tracking-wider">Choose student</span>
+            </div>
+            <div className={`flex flex-1 items-center gap-2 rounded-xl px-3 py-2.5 ${bulkStudentId ? "bg-[#eaf7f3] text-[#007f70]" : "bg-[#f4f7f6] text-[#93a29f]"}`}>
+              <span className={`grid h-6 w-6 place-items-center rounded-full text-[9px] font-black ${bulkStudentId ? "keep-white bg-[#007f70] text-white" : "bg-[#dfe8e5] text-[#657773]"}`}>2</span>
+              <span className="text-[9px] font-black uppercase tracking-wider">Review games</span>
+            </div>
+          </div>
+          <div className="relative overflow-hidden rounded-2xl border border-[#cde8e1] bg-gradient-to-br from-[#edf9f5] to-white p-4 sm:p-5">
+            <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-[#00a88f]/10" />
+            <div className="relative flex items-center gap-4">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#007f70] text-white shadow-md shadow-[#007f70]/20"><Users className="keep-white h-5 w-5" /></span>
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#008f7d]">Eligible age group</p>
+                <p className="mt-1 text-base font-black text-[#071633]">{ageGroupFilter}</p>
+                <p className="mt-0.5 text-[9px] text-[#71818d]">Only matching students and games are shown.</p>
+              </div>
+            </div>
+          </div>
+          <div className="mt-5">
+            <div className="flex items-end justify-between gap-3">
+              <div><p className="text-xs font-black text-[#071633]">Choose a student</p><p className="mt-1 text-[9px] text-[#81919c]">Select one student to see available games.</p></div>
+              <span className="rounded-full bg-[#f0f5f4] px-2.5 py-1 text-[8px] font-black text-[#647771]">{bulkStudents.length} eligible</span>
+            </div>
+            {studentLoading ? <div className="grid h-24 place-items-center"><Loader2 className="h-5 w-5 animate-spin text-[#007f70]" /></div> : bulkStudents.length === 0 ? (
+              <div className="mt-3 rounded-xl border border-[#d7e7e3] bg-[#f7fbfa] p-4 text-xs font-bold text-[#71818d]">No eligible {ageGroupFilter} students are available.</div>
+            ) : <div className="mt-3 grid gap-2 sm:grid-cols-2">{bulkStudents.map((student) => {
+              const selected = bulkStudentId === student.id;
+              return <button key={student.id} disabled={student.allGamesAssigned} aria-pressed={selected} onClick={() => void chooseBulkStudent(student.id)} className={`group flex items-center justify-between rounded-xl border p-3 text-left transition ${student.allGamesAssigned ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-65" : selected ? "border-[#008f7d] bg-[#edf9f5] shadow-sm ring-1 ring-[#008f7d]/20" : "border-[#dce9e6] bg-white hover:border-[#9dccbf] hover:bg-[#fbfdfc]"}`}><span className="flex items-center gap-3"><span className={`grid h-9 w-9 place-items-center rounded-full text-[9px] font-black ${selected ? "bg-[#007f70] text-white" : "bg-[#edf3f1] text-[#607080]"}`}>{student.studentFirstName[0]}{student.studentLastName[0]}</span><span><span className="block text-[10px] font-black text-[#071633]">{student.studentFirstName} {student.studentLastName}</span><span className="mt-1 block text-[8px] font-bold uppercase tracking-wide text-[#81919c]">{student.grade || student.ageGroup} · {student.status}</span></span></span>{student.allGamesAssigned ? <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[8px] font-black text-slate-600">Already assigned</span> : <span className={`grid h-6 w-6 place-items-center rounded-full border transition ${selected ? "border-[#007f70] bg-[#007f70] text-white" : "border-[#cbdad6] bg-white group-hover:border-[#76b9aa]"}`}>{selected && <CheckCircle2 className="keep-white h-4 w-4" />}</span>}</button>;
+            })}</div>}
+          </div>
+          {bulkStudentId && <div className="mt-5 border-t border-[#e5efec] pt-5">
+            <div className="flex items-center justify-between"><p className="text-xs font-black text-[#071633]">Games for {ageGroupFilter}</p>{bulkGames.length > 0 && <button onClick={() => setSelectedBulkGames(bulkGames.filter((game) => !game.alreadyAssigned).map((game) => game.id))} className="text-[9px] font-black text-[#007f70]">Select all available</button>}</div>
+            {busy === "bulk-options" ? <div className="grid h-28 place-items-center"><Loader2 className="h-5 w-5 animate-spin text-[#007f70]" /></div> : <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">{bulkGames.map((game) => {
+              const selected = selectedBulkGames.includes(game.id);
+              return <button key={game.id} disabled={game.alreadyAssigned} onClick={() => setSelectedBulkGames((current) => selected ? current.filter((id) => id !== game.id) : [...current, game.id])} className={`flex w-full items-center justify-between rounded-xl border p-3 text-left ${game.alreadyAssigned ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-70" : selected ? "border-[#008f7d] bg-[#edf9f5]" : "border-[#dce9e6] bg-white"}`}><div><p className="text-[10px] font-black text-[#071633]">{game.name}</p><p className="mt-1 text-[8px] text-[#81919c]">{game.category} · {game.ageGroup}</p></div><span className={`rounded-full px-2.5 py-1 text-[8px] font-black ${game.alreadyAssigned ? "bg-slate-200 text-slate-600" : selected ? "bg-[#007f70] text-white" : "bg-white text-slate-500 ring-1 ring-slate-200"}`}>{game.alreadyAssigned ? "Already Assigned" : selected ? "Selected" : "Not selected"}</span></button>;
+            })}</div>}
+          </div>}
+          {bulkStudentId && bulkGames.length > 0 && <div className="mt-5 rounded-2xl border border-[#dce9e6] bg-[#f7faf9] p-4 text-[10px]">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><Summary label="Selected Age Group" value={ageGroupFilter} /><Summary label="Student" value={bulkStudents.find((student) => student.id === bulkStudentId) ? `${bulkStudents.find((student) => student.id === bulkStudentId)!.studentFirstName} ${bulkStudents.find((student) => student.id === bulkStudentId)!.studentLastName}` : "—"} /><Summary label="Total Games" value={String(bulkGames.length)} /><Summary label="Selected Games" value={String(selectedBulkGames.length)} /></div>
+            <button onClick={() => void bulkAssign()} disabled={!selectedBulkGames.length || busy === "bulk-assign"} className="keep-white mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#007f70] px-5 text-xs font-black text-white disabled:bg-slate-200 disabled:text-slate-500">{busy === "bulk-assign" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Assign All</button>
+          </div>}
+          {!bulkStudentId && <div className="mt-5 flex flex-col gap-3 border-t border-[#e5efec] pt-4 sm:flex-row sm:items-center sm:justify-between"><p className="flex items-center gap-2 text-[9px] font-bold text-[#71818d]"><span className="grid h-7 w-7 place-items-center rounded-lg bg-[#f0f4f3] text-[#8b9b97]"><Users className="h-4 w-4" /></span>Select a student to continue</p><button disabled className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#dbe8e5] px-5 text-xs font-black text-[#8ba19b]"><Send className="h-4 w-4" /> Continue to games</button></div>}
         </Modal>
       )}
       {assigning && (
@@ -637,7 +744,7 @@ export default function GamesPage() {
                           {student.studentFirstName} {student.studentLastName}
                         </p>
                         <p className="mt-0.5 text-[8px] font-bold text-[#81919c]">
-                          {student.ageGroup} · {student.status}
+                          {student.grade || student.ageGroup} · {student.status}
                         </p>
                       </div>
                     </div>
@@ -688,6 +795,33 @@ export default function GamesPage() {
                 : "Select students to assign"}
             </button>
           </div>
+        </Modal>
+      )}
+      {reviewing && (
+        <Modal title={`${reviewing.name} results & school review`} onClose={() => { setReviewing(null); setReviewResult(null); }}>
+          {busy === "reviews" ? <div className="grid h-40 place-items-center"><Loader2 className="h-6 w-6 animate-spin text-[#007f70]" /></div> : reviews.length === 0 ? (
+            <div className="rounded-2xl border border-[#d7e7e3] bg-[#f7fbfa] p-6 text-center text-xs font-bold text-[#71818d]">No assignments or results yet. Assign this game to a student first.</div>
+          ) : <div className="space-y-3">
+            {reviews.map((result) => <div key={result.id} className="rounded-2xl border border-[#dce9e6] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div><p className="text-xs font-black text-[#071633]">{result.student ? `${result.student.studentFirstName} ${result.student.studentLastName}` : "Student"}</p><p className="mt-1 text-[9px] text-[#71818d]">{result.student?.grade || ""} · {result.status.replaceAll("_", " ")}</p></div>
+                <div className="text-right"><p className="text-lg font-black text-[#007f70]">{result.status === "COMPLETED" ? `${Math.round(result.percentage)}%` : "—"}</p><p className="text-[8px] font-black uppercase text-[#81919c]">{result.reviewStatus.replaceAll("_", " ")}</p></div>
+              </div>
+              {result.status === "COMPLETED" && <MetricGrid metrics={result.performanceMetrics || {}} compact />}
+              {result.schoolReview && <p className="mt-3 rounded-xl bg-[#f3f8f7] p-3 text-[10px] leading-5 text-[#405762]">{result.schoolReview}</p>}
+              <button disabled={result.status !== "COMPLETED"} onClick={() => { setReviewResult(result); setReviewText(result.schoolReview || ""); setRecommendation(result.recommendation || ""); }} className="mt-3 rounded-lg bg-[#007f70] px-3 py-2 text-[9px] font-black text-white disabled:bg-slate-200 disabled:text-slate-500">{result.status === "COMPLETED" ? (result.reviewStatus === "PENDING" ? "Review result" : "Update review") : "Awaiting completion"}</button>
+            </div>)}
+          </div>}
+          {reviewResult && <div className="mt-5 space-y-3 border-t border-[#e5efec] pt-5">
+            <p className="text-xs font-black text-[#071633]">School evaluation</p>
+            <div className="rounded-2xl border border-[#dce9e6] bg-[#f7faf9] p-4">
+              <div className="mb-3 flex items-center justify-between"><div><p className="text-[9px] font-black uppercase tracking-wider text-[#007f70]">Game performance</p><p className="mt-1 text-xs font-black text-[#071633]">{reviewResult.gameName || reviewing.name}</p></div><span className="text-xl font-black text-[#007f70]">{Math.round(reviewResult.percentage)}%</span></div>
+              <MetricGrid metrics={reviewResult.performanceMetrics || {}} />
+            </div>
+            <textarea value={reviewText} onChange={(event) => setReviewText(event.target.value)} placeholder="Performance review and observations" rows={4} className="w-full rounded-xl border border-[#d5e7e2] p-3 text-xs outline-none focus:border-[#009b87]" />
+            <textarea value={recommendation} onChange={(event) => setRecommendation(event.target.value)} placeholder="Recommended next steps (optional)" rows={2} className="w-full rounded-xl border border-[#d5e7e2] p-3 text-xs outline-none focus:border-[#009b87]" />
+            <div className="flex justify-end gap-2"><button disabled={!reviewText.trim() || busy === "review-save"} onClick={() => void saveReview("NEEDS_FOLLOW_UP")} className="rounded-xl border border-amber-300 px-4 py-2.5 text-[10px] font-black text-amber-700 disabled:opacity-40">Needs follow-up</button><button disabled={!reviewText.trim() || busy === "review-save"} onClick={() => void saveReview("REVIEWED")} className="rounded-xl bg-[#007f70] px-4 py-2.5 text-[10px] font-black text-white disabled:opacity-40">Publish review</button></div>
+          </div>}
         </Modal>
       )}
       {previewing &&
@@ -795,6 +929,30 @@ function DashboardStat({ value, label }: { value: number; label: string }) {
       </p>
     </div>
   );
+}
+
+function Summary({ label, value }: { label: string; value: string }) {
+  return <div><p className="text-[8px] font-black uppercase tracking-wide text-[#81919c]">{label}</p><p className="mt-1 font-black text-[#071633]">{value}</p></div>;
+}
+
+function MetricGrid({ metrics, compact = false }: { metrics: Record<string, number | string>; compact?: boolean }) {
+  const entries = Object.entries(metrics).filter(([, value]) => value !== null && value !== undefined);
+  const visible = compact ? entries.slice(0, 4) : entries;
+  if (!visible.length) return <p className="mt-3 text-[9px] font-bold text-[#81919c]">Detailed analytics are being processed.</p>;
+  return <div className={`mt-3 grid gap-2 ${compact ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-3"}`}>
+    {visible.map(([key, value]) => <div key={key} className="rounded-xl border border-[#deebe8] bg-white px-3 py-2.5"><p className="text-[7px] font-black uppercase tracking-wide text-[#81919c]">{metricLabel(key)}</p><p className="mt-1 text-[11px] font-black text-[#173244]">{metricValue(key, value)}</p></div>)}
+  </div>;
+}
+
+function metricLabel(key: string) {
+  return key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replaceAll("average", "Avg.").replaceAll("Percentage", "%");
+}
+
+function metricValue(key: string, value: number | string) {
+  if (typeof value === "string") return value.replaceAll("_", " ");
+  if (/time/i.test(key)) return `${value >= 100 ? (value / 1000).toFixed(2) : value.toFixed(2)}${value >= 100 ? "s" : "s"}`;
+  if (/score|percentage|accuracy|alignment|consistency|attention|memory|potential|stability|efficiency/i.test(key)) return `${Math.round(value * 10) / 10}%`;
+  return Number.isInteger(value) ? String(value) : String(Math.round(value * 10) / 10);
 }
 
 function GameArtwork({ componentName }: { componentName: string }) {

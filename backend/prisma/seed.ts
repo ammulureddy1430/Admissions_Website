@@ -221,10 +221,10 @@ async function main() {
       parentId: parent.id,
       studentFirstName: 'Diya',
       studentLastName: 'Sharma',
-      studentDob: new Date('2021-09-20'),
+      studentDob: new Date('2022-09-20'),
       studentGender: 'FEMALE',
       grade: 'Nursery',
-      status: 'DRAFT',
+      status: 'ASSESSMENT',
       paymentStatus: 'PENDING',
       fatherName: 'Rahul Sharma',
       fatherOccupation: 'Software Engineer',
@@ -235,6 +235,10 @@ async function main() {
       city: 'New Delhi',
       state: 'Delhi',
       zipCode: '110075',
+      studentEmail: 'diya@school.demo',
+      assessmentAccessEnabled: true,
+      assessmentRequired: true,
+      accessCode: 'DIYA123',
     }
   });
 

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { Roles } from '../../auth/guards/roles.decorator';
@@ -26,6 +26,21 @@ export class GamePlayController {
   @Get('parent/games')
   @Roles(Role.PARENT)
   parentGames(@SchoolId() schoolId: string, @Req() req: any) { return this.service.parentGames(schoolId, req.user.id); }
+  @Post('parent/games/:assignmentId/reassessment-request')
+  @Roles(Role.PARENT)
+  requestGameReassessment(@Param('assignmentId') assignmentId: string, @Body() body: { childId: string; reason?: string }, @SchoolId() schoolId: string, @Req() req: any) {
+    return this.service.requestGameReassessment(assignmentId, body.childId, schoolId, req.user.id, body.reason);
+  }
+  @Get('game-reassessment-requests')
+  @Roles(Role.SCHOOL_ADMIN, Role.PRINCIPAL, Role.TEACHER, Role.ADMISSIONS_STAFF)
+  gameReassessmentRequests(@SchoolId() schoolId: string, @Query('status') status?: string) {
+    return this.service.gameReassessmentRequests(schoolId, status);
+  }
+  @Patch('game-reassessment-requests/:resultId')
+  @Roles(Role.SCHOOL_ADMIN, Role.PRINCIPAL, Role.TEACHER, Role.ADMISSIONS_STAFF)
+  decideGameReassessment(@Param('resultId') resultId: string, @Body() body: { decision: 'APPROVED' | 'REJECTED' }, @SchoolId() schoolId: string, @Req() req: any) {
+    return this.service.decideGameReassessment(resultId, body.decision, schoolId, req.user.id);
+  }
   @Post('parent/games/:assignmentId/start')
   @Roles(Role.PARENT)
   parentStart(@Param('assignmentId') assignmentId: string, @Body() body: { childId: string }, @SchoolId() schoolId: string, @Req() req: any) {

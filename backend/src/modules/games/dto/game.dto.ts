@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsDateString, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { ArrayMinSize, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export class CreateGameDto {
   @IsString() name!: string;
@@ -30,4 +30,16 @@ export class AssignRealTimeGameDto {
   @IsArray() @IsString({ each: true }) studentIds!: string[];
   @IsOptional() @IsDateString() startsAt?: string;
   @IsOptional() @IsDateString() endsAt?: string;
+}
+
+export class BulkAssignRealTimeGamesDto {
+  @IsString() ageGroup!: string;
+  @IsUUID() studentId!: string;
+  @IsArray() @ArrayMinSize(1) @IsUUID('4', { each: true }) gameIds!: string[];
+}
+
+export class ReviewGameResultDto {
+  @IsIn(['PENDING', 'REVIEWED', 'NEEDS_FOLLOW_UP']) reviewStatus!: string;
+  @IsString() schoolReview!: string;
+  @IsOptional() @IsString() recommendation?: string;
 }

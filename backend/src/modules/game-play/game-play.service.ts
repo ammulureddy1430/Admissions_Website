@@ -152,17 +152,32 @@ export class GamePlayService {
       orderBy: { createdAt: 'desc' },
     });
     const seen = new Set<string>();
-    return assignments.flatMap((assignment) => assignment.targetIds
+    const rows = assignments.flatMap((assignment) => assignment.targetIds
       .filter((studentId) => childIds.includes(studentId))
       .map((studentId) => {
-        const key = `${assignment.generatedGameId}:${studentId}`;
+        const gameIdentity = assignment.generatedGame?.templateId || assignment.generatedGame?.engineKey || assignment.generatedGame?.title || assignment.generatedGameId;
+        const key = `${gameIdentity}:${studentId}`;
         if (seen.has(key)) return null;
         seen.add(key);
         const child = children.find((row) => row.id === studentId)!;
         const result = assignment.results.find((row) => row.studentId === studentId) || null;
-        return { ...assignment, child, result, availability: this.availability(assignment, result) };
+        const { results: _results, ...safeAssignment } = assignment;
+        const reviewIsFinal = result?.reviewStatus === 'REVIEWED' || result?.reviewStatus === 'NEEDS_FOLLOW_UP';
+        const parentResult = result ? {
+          ...result,
+          totalScore: reviewIsFinal ? result.totalScore : null,
+          percentage: reviewIsFinal ? result.percentage : null,
+          passed: reviewIsFinal ? result.passed : null,
+          reviewStatus: reviewIsFinal ? result.reviewStatus : 'PENDING',
+          schoolReview: reviewIsFinal ? result.schoolReview : null,
+          recommendation: reviewIsFinal ? result.recommendation : null,
+        } : null;
+        return { ...safeAssignment, child, result: parentResult, availability: this.availability(assignment, result) };
       })
       .filter(Boolean));
+    return this.withSequentialAvailability(rows).sort((a: any, b: any) =>
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
   }
   async parentStart(assignmentId: string, childId: string, schoolId: string, parentId: string, restart = false) {
     await this.parentChild(childId, schoolId, parentId);
@@ -171,6 +186,53 @@ export class GamePlayService {
     });
     if (!assignment) throw new ForbiddenException('This game is not assigned to your child.');
     return this.start(assignmentId, schoolId, childId, restart);
+  }
+  async requestGameReassessment(assignmentId: string, childId: string, schoolId: string, parentId: string, reason?: string) {
+    await this.parentChild(childId, schoolId, parentId);
+    const result = await this.prisma.gameResult.findFirst({
+      where: { gameAssignmentId: assignmentId, studentId: childId, gameAssignment: { gameAssessment: { schoolId } } },
+      include: { gameAssignment: true },
+    });
+    if (!result || result.status !== 'COMPLETED') throw new BadRequestException('The game must be completed before requesting re-assessment.');
+    if (!['REVIEWED', 'NEEDS_FOLLOW_UP'].includes(result.reviewStatus)) throw new BadRequestException('Please wait until the school publishes its review.');
+    if (result.reassessmentRequestStatus) throw new BadRequestException('The one-time re-assessment request has already been used for this game.');
+    return this.prisma.gameResult.update({
+      where: { id: result.id },
+      data: { reassessmentRequestStatus: 'PENDING', reassessmentRequestedAt: new Date(), reassessmentReason: reason?.trim() || null },
+    });
+  }
+
+  async gameReassessmentRequests(schoolId: string, status?: string) {
+    const results = await this.prisma.gameResult.findMany({
+      where: {
+        gameAssignment: { gameAssessment: { schoolId } },
+        reassessmentRequestStatus: status && status !== 'ALL' ? status : { not: null },
+      },
+      include: { gameAssignment: { include: { generatedGame: { include: { template: { include: { category: true } } } }, gameAssessment: true } } },
+      orderBy: { reassessmentRequestedAt: 'desc' },
+    });
+    const students = await this.prisma.application.findMany({
+      where: { schoolId, id: { in: results.map(result => result.studentId) } },
+      include: { parent: { select: { firstName: true, lastName: true } } },
+    });
+    return results.map(result => ({ ...result, student: students.find(student => student.id === result.studentId) || null }));
+  }
+
+  async decideGameReassessment(resultId: string, decision: 'APPROVED' | 'REJECTED', schoolId: string, userId: string) {
+    if (!['APPROVED', 'REJECTED'].includes(decision)) throw new BadRequestException('Decision must be APPROVED or REJECTED.');
+    const result = await this.prisma.gameResult.findFirst({
+      where: { id: resultId, gameAssignment: { gameAssessment: { schoolId } } },
+      include: { gameAssignment: true },
+    });
+    if (!result) throw new NotFoundException('Game re-assessment request not found.');
+    if (result.reassessmentRequestStatus !== 'PENDING') throw new BadRequestException('This request has already been decided.');
+    return this.prisma.$transaction(async tx => {
+      const updated = await tx.gameResult.update({
+        where: { id: result.id },
+        data: { reassessmentRequestStatus: decision, reassessmentDecidedAt: new Date(), reassessmentDecidedById: userId },
+      });
+      return updated;
+    });
   }
   async parentSubmit(assignmentId: string, sessionId: string, childId: string, schoolId: string, parentId: string) {
     await this.parentChild(childId, schoolId, parentId);
@@ -202,10 +264,13 @@ export class GamePlayService {
       include: { generatedGame: { include: { template: true } }, gameAssessment: true, results: { where: { studentId }, include: { attempts: true } } },
       orderBy: { createdAt: 'desc' },
     });
-    return direct.map((assignment) => {
+    const rows = direct.map((assignment) => {
       const result = assignment.results[0] || null;
       return { ...assignment, availability: this.availability(assignment, result), result };
     });
+    return this.withSequentialAvailability(rows, studentId).sort((a: any, b: any) =>
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
   }
   async tutorial(assignmentId: string, schoolId: string, studentId: string) {
     const assignment = await this.assignmentForStudent(assignmentId, schoolId, studentId);
@@ -219,7 +284,7 @@ export class GamePlayService {
     const configuration = game.configuration as Record<string, any>;
     const correctPoints = Number(configuration?.scoringRules?.correct ?? 10);
     const incorrectPoints = Number(configuration?.scoringRules?.incorrect ?? 0);
-    const maxScore = game.questionIds.length * correctPoints;
+    const maxScore = game.questionIds.length ? game.questionIds.length * correctPoints : 100;
     const content = {
       category: game.template?.category?.name || copy.category,
       icon: copy.icon,
@@ -304,6 +369,7 @@ export class GamePlayService {
   }
   async startPractice(assignmentId: string, schoolId: string, studentId: string) {
     const assignment = await this.assignmentForStudent(assignmentId, schoolId, studentId);
+    await this.assertSequentialAccess(assignment, schoolId, studentId);
     if (!assignment.generatedGame) throw new BadRequestException('The assigned game is unavailable.');
     return this.runtime.start({
       engineKey: assignment.generatedGame.engineKey,
@@ -334,6 +400,8 @@ export class GamePlayService {
   }
   async start(assignmentId: string, schoolId: string, studentId: string, restart = false, bypassTutorial = false) {
     const assignment = await this.assignmentForStudent(assignmentId, schoolId, studentId);
+    await this.assertSequentialAccess(assignment, schoolId, studentId);
+    const savedResult = assignment.results[0] || null;
     const tutorialProgress = await this.prisma.gameTutorialProgress.findUnique({
       where: { studentId_assessmentId: { studentId, assessmentId: assignmentId } },
     });
@@ -341,7 +409,7 @@ export class GamePlayService {
     if (!bypassTutorial && !tutorialProgress?.tutorialViewed && !skipAllowed) {
       throw new BadRequestException('Complete the game tutorial before starting the assessment.');
     }
-    const availability = this.availability(assignment);
+    const availability = this.availability(assignment, savedResult);
     if (!availability.available) throw new BadRequestException(availability.reason);
     if (!assignment.generatedGame) throw new BadRequestException('The assigned game is unavailable.');
     const masterGame = await this.prisma.game.findUnique({ where: { componentName: assignment.generatedGame?.engineKey || '' }, select: { id: true } });
@@ -361,14 +429,15 @@ export class GamePlayService {
     });
     if (active && !restart) return this.runtime.state(active.id, schoolId, { id: studentId, role: 'STUDENT' as any });
     if (restart && !assignment.allowRestart) throw new ForbiddenException('Restart is not permitted for this assignment.');
-    if (attempts >= assignment.maxAttempts) throw new BadRequestException('Maximum attempts reached.');
-    const attempt = await this.prisma.gameAttempt.create({ data: { gameResultId: result.id, attemptNumber: attempts + 1, state: { status: 'STARTED' } } });
+    const permittedAttempts = assignment.maxAttempts + (result.reassessmentRequestStatus === 'APPROVED' ? 1 : 0);
+    if (attempts >= permittedAttempts) throw new BadRequestException('Maximum attempts reached.');
     const session = await this.runtime.start({
       engineKey: assignment.generatedGame.engineKey,
       questionIds: assignment.generatedGame.questionIds,
       configuration: { ...(assignment.generatedGame.configuration as Record<string, unknown>), timeLimitMinutes: assignment.timeLimitMinutes },
       mode: 'ASSIGNMENT',
     }, schoolId, studentId);
+    const attempt = await this.prisma.gameAttempt.create({ data: { gameResultId: result.id, attemptNumber: attempts + 1, state: { status: 'STARTED' } } });
     await this.prisma.$transaction([
       this.prisma.gameRuntimeSession.update({ where: { id: session.id }, data: { generatedGameId: assignment.generatedGame.id, gameResultId: result.id } }),
       this.prisma.gameResult.update({ where: { id: result.id }, data: { status: 'IN_PROGRESS', startedAt: result.startedAt || new Date() } }),
@@ -535,13 +604,60 @@ export class GamePlayService {
     if (!child) throw new ForbiddenException('This student is not linked to your parent account.');
     return child;
   }
+  private sequenceGroup(assignment: any) {
+    return String(assignment.gameAssessment?.settings?.source || '').startsWith('REAL_TIME_GAMES') ? 'GAMES' : 'ASSESSMENTS';
+  }
+  private withSequentialAvailability(assignments: any[], studentId?: string) {
+    const groups = new Map<string, any[]>();
+    for (const assignment of assignments) {
+      const childId = studentId || assignment.child?.id || assignment.result?.studentId;
+      const key = `${childId}:${this.sequenceGroup(assignment)}`;
+      const group = groups.get(key) || [];
+      group.push(assignment);
+      groups.set(key, group);
+    }
+    for (const group of groups.values()) {
+      group.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      let waitingForPrevious = false;
+      group.forEach((assignment, index) => {
+        assignment.sequence = { position: index + 1, total: group.length };
+        if (waitingForPrevious && assignment.result?.status !== 'COMPLETED') {
+          assignment.availability = { ...assignment.availability, available: false, reason: 'Complete the previous game first.', sequenceLocked: true };
+        }
+        if (assignment.result?.status !== 'COMPLETED') waitingForPrevious = true;
+      });
+    }
+    return assignments;
+  }
+  private async assertSequentialAccess(assignment: any, schoolId: string, studentId: string) {
+    if (assignment.results?.[0]?.status === 'IN_PROGRESS') return;
+    const source = String(assignment.gameAssessment?.settings?.source || '');
+    const regularGame = source.startsWith('REAL_TIME_GAMES');
+    const earlier = await this.prisma.gameAssignment.findMany({
+      where: {
+        id: { not: assignment.id },
+        createdAt: { lt: assignment.createdAt },
+        status: 'ASSIGNED',
+        gameAssessment: { schoolId },
+        OR: [{ targetType: 'STUDENT', targetIds: { has: studentId } }, { results: { some: { studentId } } }],
+      },
+      include: { gameAssessment: true, results: { where: { studentId }, select: { status: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    const incomplete = earlier.find((candidate) =>
+      String(candidate.gameAssessment?.settings && (candidate.gameAssessment.settings as any).source || '').startsWith('REAL_TIME_GAMES') === regularGame
+      && candidate.results[0]?.status !== 'COMPLETED',
+    );
+    if (incomplete) throw new BadRequestException('Complete the previous game first. Games must be played in their assigned order.');
+  }
   private availability(assignment: any, result?: any) {
     const now = new Date();
     if (assignment.status !== 'ASSIGNED') return { available: false, reason: 'Assignment is not active.' };
     if (assignment.startDate && now < assignment.startDate) return { available: false, reason: 'Assignment has not started.' };
     if (assignment.endDate && now > assignment.endDate) return { available: false, reason: 'Assignment has ended.' };
     const attemptsUsed = Number(result?.attempts?.length || 0);
-    if (result?.status !== 'IN_PROGRESS' && attemptsUsed >= assignment.maxAttempts) {
+    const permittedAttempts = Number(assignment.maxAttempts || 1) + (result?.reassessmentRequestStatus === 'APPROVED' ? 1 : 0);
+    if (result?.status !== 'IN_PROGRESS' && attemptsUsed >= permittedAttempts) {
       return { available: false, reason: 'Maximum attempts reached.', attemptsUsed };
     }
     return { available: true, reason: null, attemptsUsed };

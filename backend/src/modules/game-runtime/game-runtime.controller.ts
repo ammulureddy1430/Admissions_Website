@@ -33,4 +33,22 @@ export class GameRuntimeController {
   action(@Param('id') id: string, @Body() dto: RuntimeActionDto, @SchoolId() schoolId: string, @Req() req: any) {
     return this.service.action(id, dto, schoolId, req.user);
   }
+
+  @Post('sessions/:id/recording-upload-url')
+  @Roles(Role.STUDENT, Role.PARENT)
+  recordingUploadUrl(@Param('id') id: string, @Body('contentType') contentType: string, @SchoolId() schoolId: string, @Req() req: any) {
+    return this.service.recordingUploadUrl(id, schoolId, req.user, contentType);
+  }
+
+  @Post('sessions/:id/recording-ready')
+  @Roles(Role.STUDENT, Role.PARENT)
+  recordingReady(@Param('id') id: string, @Body('objectKey') objectKey: string, @Body('contentType') contentType: string, @SchoolId() schoolId: string, @Req() req: any) {
+    return this.service.recordingReady(id, schoolId, req.user, objectKey, contentType);
+  }
+
+  @Get('sessions/:id/recording-url')
+  @Roles(Role.SCHOOL_ADMIN, Role.PRINCIPAL, Role.TEACHER, Role.ADMISSIONS_STAFF)
+  recordingPlaybackUrl(@Param('id') id: string, @SchoolId() schoolId: string) {
+    return this.service.recordingPlaybackUrl(id, schoolId);
+  }
 }

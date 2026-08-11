@@ -286,41 +286,53 @@ model GameAssignment {
 }
 
 model GameResult {
-  id                      String                   @id @default(uuid())
-  gameAssignmentId        String
-  gameAssignment          GameAssignment           @relation(fields: [gameAssignmentId], references: [id], onDelete: Cascade)
-  studentId               String
-  gameId                  String?
-  game                    Game?                    @relation(fields: [gameId], references: [id], onDelete: SetNull)
-  assessmentId            String?
-  assessment              GameAssessment?          @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
-  status                  String                   @default("NOT_STARTED")
-  totalScore              Float                    @default(0)
-  percentage              Float                    @default(0)
-  passed                  Boolean?
-  startedAt               DateTime?
-  completedAt             DateTime?
-  attempts                GameAttempt[]
-  runtimeSessions         GameRuntimeSession[]
-  rewards                 GameReward[]
-  certificate             GameCertificate?
-  followLightsAnalytics   FollowLightsAnalytics?
-  ballStackAnalytics      BallStackAnalytics?
-  soundDetectiveAnalytics SoundDetectiveAnalytics?
-  colorPathAnalytics      ColorPathAnalytics?
-  magicPaintAnalytics     MagicPaintAnalytics?
-  trainTrackAnalytics     TrainTrackAnalytics?
-  packageSorterAnalytics  PackageSorterAnalytics?
-  rescueMissionAnalytics  RescueMissionAnalytics?
-  parkingEscapeAnalytics  ParkingEscapeAnalytics?
-  waterPipelineAnalytics  WaterPipelineAnalytics?
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
+  id                        String                   @id @default(uuid())
+  gameAssignmentId          String
+  gameAssignment            GameAssignment           @relation(fields: [gameAssignmentId], references: [id], onDelete: Cascade)
+  studentId                 String
+  gameId                    String?
+  game                      Game?                    @relation(fields: [gameId], references: [id], onDelete: SetNull)
+  assessmentId              String?
+  assessment                GameAssessment?          @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+  status                    String                   @default("NOT_STARTED")
+  totalScore                Float                    @default(0)
+  percentage                Float                    @default(0)
+  passed                    Boolean?
+  startedAt                 DateTime?
+  completedAt               DateTime?
+  reviewStatus              String                   @default("PENDING")
+  schoolReview              String?                  @db.Text
+  recommendation            String?                  @db.Text
+  reviewedById              String?
+  reviewedAt                DateTime?
+  reassessmentRequestStatus String?
+  reassessmentRequestedAt   DateTime?
+  reassessmentDecidedAt     DateTime?
+  reassessmentDecidedById   String?
+  reassessmentReason        String?                  @db.Text
+  attempts                  GameAttempt[]
+  runtimeSessions           GameRuntimeSession[]
+  rewards                   GameReward[]
+  certificate               GameCertificate?
+  followLightsAnalytics     FollowLightsAnalytics?
+  ballStackAnalytics        BallStackAnalytics?
+  soundDetectiveAnalytics   SoundDetectiveAnalytics?
+  colorPathAnalytics        ColorPathAnalytics?
+  magicPaintAnalytics       MagicPaintAnalytics?
+  trainTrackAnalytics       TrainTrackAnalytics?
+  packageSorterAnalytics    PackageSorterAnalytics?
+  rescueMissionAnalytics    RescueMissionAnalytics?
+  parkingEscapeAnalytics    ParkingEscapeAnalytics?
+  waterPipelineAnalytics    WaterPipelineAnalytics?
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
 
   @@unique([gameAssignmentId, studentId])
   @@index([studentId, status])
   @@index([gameId, studentId])
   @@index([assessmentId, studentId])
+  @@index([reviewStatus])
+  @@index([reassessmentRequestStatus])
 }
 
 model FollowLightsAnalytics {

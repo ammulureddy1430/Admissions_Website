@@ -1,5 +1,7 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { Prisma, Role } from '@prisma/client';
+import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { PrismaService } from '../../prisma.service';
 import { RuntimeActionDto, StartRuntimeDto } from './dto/game-runtime.dto';
 import { randomInt } from 'crypto';
@@ -27,9 +29,66 @@ const ENGINES = [
   ['WATER_PIPELINE','Water Pipeline'],
 ] as const;
 
+// These catalog games generate their own rounds and cognitive metrics at
+// runtime. Unlike question-driven templates, they do not require AI question
+// records or question mappings.
+const SELF_CONTAINED_ENGINES = new Set([
+  'FOLLOW_THE_LIGHTS', 'BALL_STACK', 'SOUND_DETECTIVE', 'COLOR_PATH',
+  'MAGIC_PAINT', 'TRAIN_TRACK_BUILDER', 'PACKAGE_SORTER', 'RESCUE_MISSION',
+  'PARKING_ESCAPE', 'WATER_PIPELINE',
+]);
+
 @Injectable()
 export class GameRuntimeService {
+  private readonly recordingStorage = new S3Client({
+    region: 'us-east-1',
+    endpoint: `http://${process.env.MINIO_ENDPOINT || 'localhost'}:${process.env.MINIO_PORT || 9000}`,
+    credentials: { accessKeyId: process.env.MINIO_ACCESS_KEY || 'admin', secretAccessKey: process.env.MINIO_SECRET_KEY || 'adminpassword' },
+    forcePathStyle: true,
+  });
+  private readonly recordingBucket = process.env.MINIO_BUCKET || 'admissionsos';
   constructor(private readonly prisma: PrismaService) {}
+
+  async recordingUploadUrl(id: string, schoolId: string, user: { id: string; role: Role }, contentType?: string) {
+    const session = await this.owned(id, schoolId, user);
+    if (session.mode !== 'ASSIGNMENT') throw new BadRequestException('Gameplay recording is only available for assigned games.');
+    const mimeType = contentType === 'video/webm;codecs=vp9' ? contentType : 'video/webm';
+    const objectKey = `tenants/${schoolId}/gameplay-recordings/${session.id}.webm`;
+    try {
+      const uploadUrl = await getSignedUrl(this.recordingStorage, new PutObjectCommand({ Bucket: this.recordingBucket, Key: objectKey, ContentType: mimeType }), { expiresIn: 1800 });
+      return { uploadUrl, contentType: mimeType, objectKey };
+    } catch {
+      throw new ServiceUnavailableException('Gameplay recording storage is unavailable.');
+    }
+  }
+
+  async recordingReady(id: string, schoolId: string, user: { id: string; role: Role }, objectKey: string, contentType?: string) {
+    const session = await this.owned(id, schoolId, user);
+    const expectedKey = `tenants/${schoolId}/gameplay-recordings/${session.id}.webm`;
+    if (objectKey !== expectedKey) throw new BadRequestException('Gameplay recording path is invalid.');
+    try {
+      const object = await this.recordingStorage.send(new HeadObjectCommand({ Bucket: this.recordingBucket, Key: objectKey }));
+      if (!object.ContentLength) throw new BadRequestException('The gameplay recording is empty.');
+      const runtime = (session.runtimeState || {}) as Record<string, unknown>;
+      await this.prisma.gameRuntimeSession.update({ where: { id: session.id }, data: { runtimeState: { ...runtime, recordingObjectKey: objectKey, recordingMimeType: contentType || 'video/webm', recordingSize: Number(object.ContentLength) } as Prisma.InputJsonValue } });
+      return { saved: true, size: Number(object.ContentLength) };
+    } catch (error) {
+      if (error instanceof BadRequestException) throw error;
+      throw new ServiceUnavailableException('The gameplay recording upload could not be verified.');
+    }
+  }
+
+  async recordingPlaybackUrl(id: string, schoolId: string) {
+    const session = await this.prisma.gameRuntimeSession.findFirst({ where: { id, schoolId, gameResultId: { not: null } } });
+    const runtime = (session?.runtimeState || {}) as Record<string, unknown>;
+    const objectKey = typeof runtime.recordingObjectKey === 'string' ? runtime.recordingObjectKey : '';
+    if (!session || !objectKey) throw new NotFoundException('No gameplay recording is available for this session.');
+    try {
+      return { url: await getSignedUrl(this.recordingStorage, new GetObjectCommand({ Bucket: this.recordingBucket, Key: objectKey }), { expiresIn: 900 }) };
+    } catch {
+      throw new ServiceUnavailableException('Gameplay recording playback is unavailable.');
+    }
+  }
 
   async definitions(schoolId: string) {
     await this.prisma.gameEngineDefinition.createMany({
@@ -47,7 +106,9 @@ export class GameRuntimeService {
     const engine = await this.prisma.gameEngineDefinition.findFirst({ where: { schoolId, engineKey: dto.engineKey, status: 'ACTIVE' } });
     if (!engine) throw new BadRequestException('Unsupported or disabled game engine.');
     const ids = [...new Set(dto.questionIds)];
-    if (!ids.length) throw new BadRequestException('At least one approved mapped question is required.');
+    if (!ids.length && !SELF_CONTAINED_ENGINES.has(dto.engineKey)) {
+      throw new BadRequestException('At least one approved mapped question is required.');
+    }
     const questions = await this.prisma.gameAIQuestion.findMany({
       where: { schoolId, id: { in: ids }, status: 'APPROVED', gameMapping: { isNot: null } }, include: { options: true },
     });
@@ -153,6 +214,7 @@ export class GameRuntimeService {
     if (action === 'BALL_STACK_COMPLETE') return this.ballStackComplete(session, dto.payload, schoolId, user);
     if (action === 'SOUND_DETECTIVE_COMPLETE') return this.soundDetectiveComplete(session, dto.payload, schoolId, user);
     if (action === 'COLOR_PATH_COMPLETE') return this.colorPathComplete(session, dto.payload, schoolId, user);
+    if (action === 'MAGIC_PAINT_PROGRESS') return this.magicPaintProgress(session, dto.payload, schoolId, user);
     if (action === 'MAGIC_PAINT_COMPLETE') return this.magicPaintComplete(session, dto.payload, schoolId, user);
     if (action === 'TRAIN_TRACK_COMPLETE') return this.trainTrackComplete(session, dto.payload, schoolId, user);
     if (action === 'PACKAGE_SORTER_COMPLETE') return this.packageSorterComplete(session, dto.payload, schoolId, user);
@@ -160,6 +222,7 @@ export class GameRuntimeService {
     if (action === 'PARKING_ESCAPE_COMPLETE') return this.parkingEscapeComplete(session, dto.payload, schoolId, user);
     if (action === 'WATER_PIPELINE_COMPLETE') return this.waterPipelineComplete(session, dto.payload, schoolId, user);
     if (action === 'SECURITY_VIOLATION') return this.securityViolation(session, dto.payload, schoolId, user);
+    if (action === 'RECORDING_STOPPED') return this.recordingStopped(session, schoolId, user);
     if (action === 'COMPLETE') return this.transition(id, 'COMPLETED', { completedAt: new Date() }, 'COMPLETED', dto.payload, schoolId, user);
     throw new BadRequestException('Unsupported runtime action.');
   }
@@ -252,6 +315,17 @@ export class GameRuntimeService {
     const listeningScore = clamp(accuracy * 0.6 + completionPercentage * 0.4);
     const overallScore = clamp(auditoryRecognitionScore * 0.5 + listeningScore * 0.5);
     const completionStatus = String(input.endReason || 'COMPLETED');
+    const roundResponses = Array.isArray(input.roundResponses) ? input.roundResponses.slice(0, 20).map((row: any, index: number) => ({
+      questionId: `sound-round-${index + 1}`,
+      number: index + 1,
+      questionText: 'Which picture matches the sound you heard?',
+      options: Array.isArray(row?.options) ? row.options.slice(0, 8).map((option: unknown) => String(option).slice(0, 100)) : [],
+      correctAnswer: String(row?.correctAnswer || 'Unknown sound').slice(0, 100),
+      answer: String(row?.studentAnswer || 'Not answered').slice(0, 100),
+      correct: Boolean(row?.correct),
+      points: row?.correct ? 25 : 0,
+      timeTaken: Math.max(0, Math.round((Number(row?.responseTimeMs) || 0) / 1000)),
+    })) : [];
 
     const cognitiveAnalytics = {
       roundsPlayed,
@@ -276,11 +350,18 @@ export class GameRuntimeService {
         runtimeState: {
           ...((session.runtimeState || {}) as Record<string, unknown>),
           cognitiveAnalytics,
+          answers: roundResponses,
+          correct: roundResponses.filter((row: any) => row.correct).length,
+          incorrect: roundResponses.filter((row: any) => !row.correct).length,
         } as Prisma.InputJsonValue,
       },
     });
 
-    await this.event(session.id, 'SOUND_DETECTIVE_COMPLETED', cognitiveAnalytics);
+    await this.event(session.id, 'SOUND_DETECTIVE_COMPLETED', {
+      ...cognitiveAnalytics,
+      capturedRounds: roundResponses.length,
+      roundResponses,
+    });
     return { state: await this.state(session.id, schoolId, user) };
   }
 
@@ -316,6 +397,32 @@ export class GameRuntimeService {
     const averageCompletionTime=number('averageCompletionTime',120000); const interactionConsistency=clamp(number('interactionConsistency',100)); const completionPercentage=clamp(number('completionPercentage',100)); const creativityScore=clamp(number('creativityScore',100)); const causeEffectScore=clamp(number('causeEffectScore',100)); const overallScore=clamp((creativityScore+causeEffectScore)/2); const elapsedSeconds=Math.min(120,number('elapsedSeconds',120)); const completionStatus=objectsCompleted>=5||elapsedSeconds>=119?'COMPLETED':'ENDED';
     const cognitiveAnalytics={objectsCompleted,colorsUsed,interactionsPerObject,averageCompletionTime,interactionConsistency,completionPercentage,creativityScore,causeEffectScore,overallScore,completionStatus};
     await this.prisma.gameRuntimeSession.update({where:{id:session.id},data:{status:'COMPLETED',completedAt:new Date(),score:overallScore,elapsedSeconds,runtimeState:{...((session.runtimeState||{}) as Record<string,unknown>),cognitiveAnalytics} as Prisma.InputJsonValue}}); await this.event(session.id,'MAGIC_PAINT_COMPLETED',cognitiveAnalytics); return {state:await this.state(session.id,schoolId,user)};
+  }
+
+  private async magicPaintProgress(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
+    if (session.engine.engineKey !== 'MAGIC_PAINT' || session.status !== 'RUNNING') throw new BadRequestException('Magic Paint progress requires an active session.');
+    const input = (payload || {}) as Record<string, any>;
+    const number = (key: string, max = 100000) => Math.max(0, Math.min(max, Number(input[key]) || 0));
+    const livePerformance = {
+      objectsCompleted: number('objectsCompleted', 1000),
+      colorsUsed: Array.isArray(input.colorsUsed) ? [...new Set(input.colorsUsed.map(String))].slice(0, 7) : [],
+      interactionsPerObject: Array.isArray(input.interactionsPerObject) ? input.interactionsPerObject.map((value: unknown) => Math.max(0, Math.min(100, Number(value) || 0))).slice(0, 1000) : [],
+      averageCompletionTime: number('averageCompletionTime', 120000),
+      interactionConsistency: number('interactionConsistency', 100),
+      completionPercentage: number('completionPercentage', 100),
+      creativityScore: number('creativityScore', 100),
+      causeEffectScore: number('causeEffectScore', 100),
+      overallScore: number('overallScore', 100),
+      completionStatus: 'IN PROGRESS',
+    };
+    const elapsedSeconds = Math.min(120, number('elapsedSeconds', 120));
+    await this.prisma.gameRuntimeSession.update({ where: { id: session.id }, data: {
+      score: livePerformance.overallScore,
+      elapsedSeconds,
+      runtimeState: { ...((session.runtimeState || {}) as Record<string, unknown>), livePerformance } as Prisma.InputJsonValue,
+    } });
+    await this.event(session.id, 'MAGIC_PAINT_PROGRESS', { objectsCompleted: livePerformance.objectsCompleted, elapsedSeconds });
+    return { state: await this.state(session.id, schoolId, user) };
   }
 
   private async trainTrackComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
@@ -473,6 +580,27 @@ export class GameRuntimeService {
       ...security,
       terminated,
     });
+    return this.state(session.id, schoolId, user);
+  }
+
+  private async recordingStopped(session: any, schoolId: string, user: { id: string; role: Role }) {
+    if (session.status !== 'RUNNING') return this.state(session.id, schoolId, user);
+    const runtime = (session.runtimeState || {}) as Record<string, any>;
+    const current = (runtime.security || {}) as Record<string, number>;
+    const security = {
+      ...current,
+      totalWarnings: Number(current.totalWarnings || 0) + 1,
+      recordingStopped: true,
+    };
+    await this.prisma.gameRuntimeSession.update({
+      where: { id: session.id },
+      data: {
+        status: 'PAUSED',
+        pausedAt: new Date(),
+        runtimeState: { ...runtime, security, interruptionReason: 'SCREEN_RECORDING_STOPPED' } as Prisma.InputJsonValue,
+      },
+    });
+    await this.event(session.id, 'SCREEN_RECORDING_STOPPED', { security, paused: true });
     return this.state(session.id, schoolId, user);
   }
 

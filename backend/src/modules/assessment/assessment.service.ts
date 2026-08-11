@@ -941,7 +941,7 @@ export class AssessmentService {
       }),
       this.prisma.gameResult.findMany({
         where: {
-          status: 'COMPLETED',
+          status: { in: ['IN_PROGRESS', 'COMPLETED'] },
           gameAssignment: { gameAssessment: { schoolId } },
         },
         include: {
@@ -952,8 +952,7 @@ export class AssessmentService {
             },
           },
           runtimeSessions: {
-            where: { status: 'COMPLETED' },
-            orderBy: { completedAt: 'desc' },
+            orderBy: { updatedAt: 'desc' },
             take: 1,
           },
           attempts: {
@@ -984,17 +983,76 @@ export class AssessmentService {
     ]);
     const studentById = new Map(students.map((student) => [student.id, student]));
     const gameQuestionById = new Map(gameQuestions.map((question) => [question.id, question]));
-    const gameSubmissions = gameResults.map((result) => {
+    const uniqueGameResults = new Map<string, (typeof gameResults)[number]>();
+    for (const result of gameResults) {
+      const gameIdentity = result.gameAssignment.generatedGame?.templateId
+        || result.gameAssignment.generatedGame?.engineKey
+        || result.gameAssignment.generatedGame?.title
+        || result.gameId;
+      const key = `${result.studentId}:${gameIdentity}`;
+      const existing = uniqueGameResults.get(key);
+      const resultRank = result.status === 'COMPLETED' ? 2 : 1;
+      const existingRank = existing?.status === 'COMPLETED' ? 2 : 1;
+      if (!existing || resultRank > existingRank || (resultRank === existingRank && result.updatedAt > existing.updatedAt)) {
+        uniqueGameResults.set(key, result);
+      }
+    }
+    const gameSubmissions = [...uniqueGameResults.values()].map((result) => {
       const session = result.runtimeSessions[0];
       const runtime = (session?.runtimeState || {}) as Record<string, any>;
       const security = (runtime.security || {}) as Record<string, number>;
       const assessment = result.gameAssignment.gameAssessment;
       const score = result.attempts[0]?.scores[0];
+      const savedRuntimeAnswers = Array.isArray(runtime.answers) ? runtime.answers : [];
+      const analytics = (runtime.cognitiveAnalytics || runtime.livePerformance || {}) as Record<string, any>;
+      const sessionConfiguration = (session?.configuration || {}) as Record<string, any>;
+      const configuredCorrectPoints = Number(sessionConfiguration.scoringRules?.correct);
+      const maximumRoundPoints = Number.isFinite(configuredCorrectPoints) ? configuredCorrectPoints : null;
+      const recordedRounds = Number(analytics.roundsPlayed || analytics.totalSequences || analytics.totalBallsDropped || 0);
+      const recordedCorrect = Number(analytics.correctResponses || analytics.correctTaps || analytics.correctSelections || analytics.successfulPlacements || 0);
+      const recordedIncorrect = Number(analytics.incorrectResponses || analytics.wrongTaps || analytics.incorrectSelections || analytics.failedPlacements || 0);
+      const responseTotalMatchesRounds = !recordedRounds || recordedCorrect + recordedIncorrect === recordedRounds;
+      const scoreFormulaMatches = analytics.auditoryRecognitionScore === undefined || analytics.listeningScore === undefined
+        || Math.abs(Number(analytics.overallScore || 0) - (Number(analytics.auditoryRecognitionScore) + Number(analytics.listeningScore)) / 2) < 0.11;
+      const completionFormulaMatches = analytics.completionPercentage === undefined
+        || Math.abs(Number(analytics.completionPercentage) - Math.min(100, Number(session?.elapsedSeconds || 0) / 120 * 100)) < 0.11;
+      const roundEvidenceCaptured = recordedRounds > 0 && savedRuntimeAnswers.length === recordedRounds;
+      const roundTotalsMatch = !roundEvidenceCaptured || (
+        savedRuntimeAnswers.filter((answer: any) => Boolean(answer.correct)).length === recordedCorrect
+        && savedRuntimeAnswers.filter((answer: any) => !answer.correct).length === recordedIncorrect
+      );
+      const questionReview = (session?.questionIds || []).length
+        ? (session?.questionIds || []).map((questionId: string, index: number) => {
+          const question = gameQuestionById.get(questionId);
+          const answer = savedRuntimeAnswers.find((row: any) => row.questionId === questionId);
+          return {
+            number: index + 1, questionId, questionText: question?.questionText || 'Not available',
+            options: question?.options?.map((option) => ({ key: option.optionKey, text: option.optionText })) || [],
+            studentAnswer: answer?.answer ?? 'Not available', correctAnswer: question?.correctAnswer || '',
+            correct: answer?.correct === undefined ? null : Boolean(answer.correct),
+            points: answer?.points === undefined ? null : Number(answer.points), maxPoints: maximumRoundPoints,
+            timeTaken: answer?.timeTaken === undefined ? null : Number(answer.timeTaken),
+            explanation: question?.explanation || null,
+          };
+        })
+        : savedRuntimeAnswers.map((answer: any, index: number) => ({
+          number: Number(answer.number || index + 1), questionId: String(answer.questionId || `game-round-${index + 1}`),
+          questionText: String(answer.questionText || 'Game round'),
+          options: Array.isArray(answer.options) ? answer.options.map((option: any, optionIndex: number) => ({ key: String(optionIndex + 1), text: String(option) })) : [],
+          studentAnswer: answer.answer === undefined ? 'Not available' : answer.answer, correctAnswer: String(answer.correctAnswer || ''),
+          correct: answer.correct === undefined ? null : Boolean(answer.correct),
+          points: answer.points === undefined ? null : Number(answer.points), maxPoints: maximumRoundPoints,
+          timeTaken: answer.timeTaken === undefined ? null : Number(answer.timeTaken), explanation: null,
+        }));
       return {
         id: `game:${result.id}`,
         submissionType: 'GAME',
-        status: 'EVALUATED',
-        submittedAt: result.completedAt,
+        status: result.status === 'COMPLETED'
+          ? 'EVALUATED'
+          : session?.status === 'PAUSED' && runtime.interruptionReason === 'SCREEN_RECORDING_STOPPED'
+            ? 'INTERRUPTED'
+            : 'IN_PROGRESS',
+        submittedAt: result.completedAt || result.startedAt,
         timeTaken: score?.timeTaken ?? session?.elapsedSeconds ?? 0,
         totalWarnings: Number(security.totalWarnings || 0),
         tabSwitchCount: Number(security.tabSwitchCount || 0),
@@ -1013,37 +1071,34 @@ export class AssessmentService {
         },
         gameResult: {
           id: result.id,
+          gameId: result.gameId,
           gameName: result.gameAssignment.generatedGame?.title || result.gameAssignment.generatedGame?.template?.name || 'Game assessment',
           engineKey: result.gameAssignment.generatedGame?.engineKey,
-          score: result.totalScore,
-          percentage: result.percentage,
-          passed: result.passed,
+          status: result.status,
+          score: result.status === 'COMPLETED' ? result.totalScore : Number(session?.score || 0),
+          percentage: result.status === 'COMPLETED' ? result.percentage : Number(session?.score || 0),
+          passed: result.status === 'COMPLETED' ? result.passed : null,
           completedAt: result.completedAt,
-          correct: Number(runtime.correct || 0),
-          incorrect: Number(runtime.incorrect || 0),
-          answered: Array.isArray(runtime.answers) ? runtime.answers.length : 0,
+          correct: Number(runtime.correct || runtime.cognitiveAnalytics?.correctResponses || runtime.cognitiveAnalytics?.correctSelections || runtime.cognitiveAnalytics?.correctTaps || 0),
+          incorrect: Number(runtime.incorrect || runtime.cognitiveAnalytics?.incorrectResponses || runtime.cognitiveAnalytics?.incorrectSelections || runtime.cognitiveAnalytics?.wrongTaps || 0),
+          answered: Array.isArray(runtime.answers) && runtime.answers.length ? runtime.answers.length : Number(runtime.cognitiveAnalytics?.roundsPlayed ?? runtime.cognitiveAnalytics?.totalSequences ?? 0),
+          reviewStatus: result.reviewStatus,
+          schoolReview: result.schoolReview,
+          recommendation: result.recommendation,
+          reviewedAt: result.reviewedAt,
+          recordingSessionId: typeof runtime.recordingObjectKey === 'string' ? session?.id || null : null,
           aiReview: ((result.attempts[0]?.state || {}) as Record<string, any>).aiReview || null,
-          review: (session?.questionIds || []).map((questionId: string, index: number) => {
-            const question = gameQuestionById.get(questionId);
-            const answer = Array.isArray(runtime.answers)
-              ? runtime.answers.find((row: any) => row.questionId === questionId)
-              : null;
-            return {
-              number: index + 1,
-              questionId,
-              questionText: question?.questionText || 'Question unavailable',
-              options: question?.options?.map((option) => ({
-                key: option.optionKey,
-                text: option.optionText,
-              })) || [],
-              studentAnswer: answer?.answer || 'Not answered',
-              correctAnswer: question?.correctAnswer || '',
-              correct: Boolean(answer?.correct),
-              points: Number(answer?.points || 0),
-              timeTaken: Number(answer?.timeTaken || 0),
-              explanation: question?.explanation || null,
-            };
-          }),
+          review: questionReview,
+          reviewCaptureStatus: questionReview.length ? 'AVAILABLE' : (session?.questionIds || []).length ? 'MISSING' : 'LEGACY_NOT_CAPTURED',
+          performanceMetrics: runtime.cognitiveAnalytics || {},
+          dataVerification: {
+            level: roundEvidenceCaptured && roundTotalsMatch && responseTotalMatchesRounds && scoreFormulaMatches && completionFormulaMatches ? 'ROUND_VERIFIED' : 'AGGREGATE_ONLY',
+            sessionId: session?.id || null, recordedAt: session?.completedAt || result.completedAt,
+            checks: { responseTotalMatchesRounds, scoreFormulaMatches, completionFormulaMatches, roundEvidenceCaptured, roundTotalsMatch },
+            message: roundEvidenceCaptured && roundTotalsMatch && responseTotalMatchesRounds && scoreFormulaMatches && completionFormulaMatches
+              ? 'Every recorded round is available and the aggregate calculations match the saved session events.'
+              : 'Aggregate calculations are consistent, but this legacy attempt has no saved round events, so exact answers cannot be independently verified.',
+          },
         },
       };
     });
@@ -1083,12 +1138,26 @@ export class AssessmentService {
       };
     });
     const assessment = result.gameAssignment.gameAssessment;
+    const metrics = (runtime.cognitiveAnalytics || {}) as Record<string, any>;
+    const rounds = Number(metrics.roundsPlayed || metrics.totalSequences || metrics.totalBallsDropped || 0);
+    const correctResponses = Number(metrics.correctResponses || metrics.correctTaps || metrics.correctSelections || metrics.successfulPlacements || 0);
+    const averageResponse = Number(metrics.averageResponseTime || metrics.averageReactionTime || 0);
+    const metricStrengths = [
+      rounds ? `Completed ${rounds} game round${rounds === 1 ? '' : 's'}.` : null,
+      averageResponse ? `Maintained an average response time of ${(averageResponse / 1000).toFixed(2)} seconds.` : null,
+      Number(metrics.highestDifficulty || 0) ? `Reached difficulty level ${Number(metrics.highestDifficulty)}.` : null,
+    ].filter(Boolean);
+    const metricImprovements = [
+      rounds ? `Improve response accuracy; ${correctResponses} of ${rounds} recorded responses were correct.` : null,
+      Number(metrics.listeningScore || 0) < 60 && metrics.listeningScore !== undefined ? `Build listening consistency beyond the current ${Number(metrics.listeningScore || 0).toFixed(1)}% score.` : null,
+      Number(metrics.auditoryRecognitionScore || 0) < 60 && metrics.auditoryRecognitionScore !== undefined ? `Practise auditory recognition beyond the current ${Number(metrics.auditoryRecognitionScore || 0).toFixed(1)}% score.` : null,
+    ].filter(Boolean);
     const fallback = {
       overallSummary: result.passed
         ? `The student demonstrated a satisfactory understanding of ${assessment.subject}, answering ${Number(runtime.correct || 0)} of ${session.questionIds.length} questions correctly.`
         : `The student needs additional support in ${assessment.subject}, particularly on the concepts missed in this game assessment.`,
-      strengths: answerRows.filter((row) => row.correct).slice(0, 3).map((row) => `Correctly answered: ${row.question}`),
-      improvementAreas: answerRows.filter((row) => !row.correct).slice(0, 3).map((row) => `Review: ${row.question}`),
+      strengths: answerRows.length ? answerRows.filter((row) => row.correct).slice(0, 3).map((row) => `Correctly answered: ${row.question}`) : metricStrengths,
+      improvementAreas: answerRows.length ? answerRows.filter((row) => !row.correct).slice(0, 3).map((row) => `Review: ${row.question}`) : metricImprovements,
       teacherRemarks: result.passed
         ? 'Reinforce the successful concepts and provide one extension activity.'
         : 'Re-teach the missed concepts with simple worked examples, then reassess.',
@@ -1107,6 +1176,7 @@ Game: ${result.gameAssignment.generatedGame?.title || 'Game assessment'}
 Score: ${result.totalScore}
 Percentage: ${result.percentage}
 Answers: ${JSON.stringify(answerRows)}
+Real-time game metrics: ${JSON.stringify(metrics)}
 
 Return STRICT raw JSON with this shape:
 {

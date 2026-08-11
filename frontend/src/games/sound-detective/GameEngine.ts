@@ -22,6 +22,8 @@ export const SOUND_ITEMS: SoundItem[] = [
 export const GAME_DURATION_SECONDS = 120; // 2 minutes
 
 export class SoundDetectiveEngine {
+  constructor(private readonly practiceOnly = false) {}
+
   private round = 0;
   private currentTarget: SoundItem | null = null;
   private currentOptions: SoundItem[] = [];
@@ -39,7 +41,11 @@ export class SoundDetectiveEngine {
     // 1. Determine target category and candidate items (only easy recognizable items)
     // Cat is intentionally excluded: the synthesized meow is not reliably
     // recognizable enough for a high-stakes early-years assessment.
-    const easyIds = ["dog", "bird", "cow", "car_horn", "train", "bell", "drum"];
+    // Practice uses a separate example sound that is never selected as a
+    // scored assessment target, so the mock cannot reveal a real answer.
+    const easyIds = this.practiceOnly
+      ? ["cat"]
+      : ["dog", "bird", "cow", "car_horn", "train", "bell", "drum"];
     const targetCandidates = SOUND_ITEMS.filter((item) => easyIds.includes(item.id));
 
     // Exclude already played targets to avoid repetitions
@@ -55,7 +61,11 @@ export class SoundDetectiveEngine {
     this.playedTargets.add(target.id);
 
     // 2. Select 3 distractors from different categories
-    const otherCategories = SOUND_ITEMS.filter((item) => item.category !== target.category);
+    const assessmentTargetIds = new Set(["dog", "bird", "cow", "car_horn", "train", "bell", "drum"]);
+    const optionPool = this.practiceOnly
+      ? SOUND_ITEMS.filter((item) => !assessmentTargetIds.has(item.id))
+      : SOUND_ITEMS;
+    const otherCategories = optionPool.filter((item) => item.category !== target.category);
     
     // Select 3 distractors, each from a unique category if possible
     const uniqueDistractors: SoundItem[] = [];

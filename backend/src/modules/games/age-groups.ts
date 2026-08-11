@@ -33,6 +33,15 @@ export function birthDateMatchesAgeGroup(dateOfBirth: Date, ageGroup: string, no
   return age >= minimum && age < maximum;
 }
 
+export function studentMatchesAgeGroup(grade: string, dateOfBirth: Date, ageGroup: string) {
+  const targetAgeGroup = normalizeGameAgeGroup(ageGroup);
+  const gradeAgeGroup = normalizeGameAgeGroup(grade);
+  if (!targetAgeGroup) return false;
+  return gradeAgeGroup
+    ? gradeAgeGroup === targetAgeGroup
+    : birthDateMatchesAgeGroup(dateOfBirth, targetAgeGroup);
+}
+
 export function legacyGradesForAgeGroup(ageGroup: string) {
   const normalized = normalizeGameAgeGroup(ageGroup);
   return Object.entries(LEGACY_GRADE_TO_AGE_GROUP)

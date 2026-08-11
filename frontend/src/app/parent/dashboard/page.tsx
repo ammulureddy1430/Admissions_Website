@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -25,7 +25,8 @@ import {
   Trash2,
   X,
   Gamepad2,
-  Play
+  Play,
+  RotateCcw
 } from "lucide-react";
 import { GameRuntimePlayer } from "@/components/game-runtime-player";
 
@@ -108,11 +109,15 @@ export default function ParentDashboard() {
   // States
   const [applications, setApplications] = useState<any[]>([]);
   const [assignedGames, setAssignedGames] = useState<any[]>([]);
+  const [selectedGameChildId, setSelectedGameChildId] = useState("all");
+  const [selectedGameContentType, setSelectedGameContentType] = useState<"games" | "assessments">("games");
   const [gameRuntime, setGameRuntime] = useState<any | null>(null);
   const [activeGameAssignment, setActiveGameAssignment] = useState<any | null>(null);
   const [gameBusy, setGameBusy] = useState<string | null>(null);
   const [gameError, setGameError] = useState<string | null>(null);
   const [runtimeTutorial, setRuntimeTutorial] = useState<any | null>(null);
+  const [gameSequenceDeadline, setGameSequenceDeadline] = useState<number | null>(null);
+  const sequenceDeadlineRef = useRef<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [downloadingDocument, setDownloadingDocument] = useState<string | null>(null);
@@ -124,11 +129,58 @@ export default function ParentDashboard() {
   const [demoPaymentMethod, setDemoPaymentMethod] = useState<"upi" | "card">("upi");
   const [selectedUpiApp, setSelectedUpiApp] = useState<"gpay" | "phonepe" | "paytm">("gpay");
   const applicationsList = applications.length > 0 ? applications : mockParentApplications;
+  const gameChildren = useMemo(() => {
+    const children = new Map<string, any>();
+    assignedGames.forEach((assignment) => {
+      if (assignment.child?.id && !children.has(assignment.child.id)) {
+        children.set(assignment.child.id, assignment.child);
+      }
+    });
+    return Array.from(children.values()).sort((a, b) =>
+      `${a.studentFirstName} ${a.studentLastName}`.localeCompare(`${b.studentFirstName} ${b.studentLastName}`),
+    );
+  }, [assignedGames]);
+  const childAssignedGames = useMemo(
+    () => selectedGameChildId === "all"
+      ? assignedGames
+      : assignedGames.filter((assignment) => assignment.child?.id === selectedGameChildId),
+    [assignedGames, selectedGameChildId],
+  );
+  const isRegularGame = (assignment: any) =>
+    String(assignment.gameAssessment?.settings?.source || "").startsWith("REAL_TIME_GAMES");
+  const visibleAssignedGames = childAssignedGames.filter((assignment) =>
+    selectedGameContentType === "games" ? isRegularGame(assignment) : !isRegularGame(assignment),
+  );
+  const regularGameCount = childAssignedGames.filter(isRegularGame).length;
+  const gameAssessmentCount = childAssignedGames.length - regularGameCount;
+  const selectedGameChild = gameChildren.find((child) => child.id === selectedGameChildId);
+  const visibleGameStats = {
+    ready: visibleAssignedGames.filter((assignment) => assignment.result?.status !== "COMPLETED" && assignment.availability?.available).length,
+    completed: visibleAssignedGames.filter((assignment) => assignment.result?.status === "COMPLETED").length,
+    pending: visibleAssignedGames.filter((assignment) => assignment.result?.status === "COMPLETED" && !["REVIEWED", "NEEDS_FOLLOW_UP"].includes(assignment.result?.reviewStatus)).length,
+  };
 
   useEffect(() => {
     document.body.classList.toggle("payment-modal-open", Boolean(demoPayment));
     return () => document.body.classList.remove("payment-modal-open");
   }, [demoPayment]);
+
+  useEffect(() => {
+    if (!gameSequenceDeadline) return;
+    sequenceDeadlineRef.current = gameSequenceDeadline;
+    const timer = window.setInterval(() => {
+      if (Date.now() < gameSequenceDeadline) return;
+      window.clearInterval(timer);
+      sequenceDeadlineRef.current = null;
+      setGameSequenceDeadline(null);
+      setGameRuntime(null);
+      setRuntimeTutorial(null);
+      setActiveGameAssignment(null);
+      setGameError("The 10-minute game session has ended. Ask the school to assign a new session if games remain.");
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+    }, 500);
+    return () => window.clearInterval(timer);
+  }, [gameSequenceDeadline]);
 
   // AI Chat states
   const [chatMessages, setChatMessages] = useState<any[]>([
@@ -231,7 +283,9 @@ export default function ParentDashboard() {
       },
     });
     if (!response.ok) throw new Error("Assigned games could not be refreshed.");
-    setAssignedGames(await response.json());
+    const games = await response.json();
+    setAssignedGames(games);
+    return games;
   };
 
   const parentGameRequest = async (path: string, init: RequestInit = {}) => {
@@ -250,10 +304,32 @@ export default function ParentDashboard() {
     return payload;
   };
 
-  const openGameTutorial = async (assignment: any) => {
+  const requestGameReassessment = async (assignment: any) => {
+    if (!window.confirm("Send your one-time re-assessment request to the school?")) return;
     setGameBusy(assignment.id);
     setGameError(null);
     try {
+      await parentGameRequest(`game-assessments/parent/games/${assignment.id}/reassessment-request`, {
+        method: "POST",
+        body: JSON.stringify({ childId: assignment.child.id }),
+      });
+      await refreshAssignedGames();
+    } catch (error: any) {
+      setGameError(error.message || "The re-assessment request could not be sent.");
+    } finally {
+      setGameBusy(null);
+    }
+  };
+
+  const openGameTutorial = async (assignment: any, continueSequence = false) => {
+    setGameBusy(assignment.id);
+    setGameError(null);
+    try {
+      if (isRegularGame(assignment) && !continueSequence && !sequenceDeadlineRef.current) {
+        const deadline = Date.now() + 10 * 60 * 1000;
+        sequenceDeadlineRef.current = deadline;
+        setGameSequenceDeadline(deadline);
+      }
       if (!document.fullscreenElement) {
         await document.documentElement.requestFullscreen?.().catch(() => undefined);
       }
@@ -273,6 +349,10 @@ export default function ParentDashboard() {
       setRuntimeTutorial(tutorial);
       setGameRuntime(session);
     } catch (gameRequestError) {
+      if (!continueSequence) {
+        sequenceDeadlineRef.current = null;
+        setGameSequenceDeadline(null);
+      }
       setGameError(gameRequestError instanceof Error ? gameRequestError.message : "The tutorial could not be opened.");
       if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
     } finally {
@@ -290,8 +370,20 @@ export default function ParentDashboard() {
       setGameRuntime(null);
       setRuntimeTutorial(null);
       setActiveGameAssignment(null);
-      await refreshAssignedGames();
-      window.alert(`Game complete! Score ${result.score}. ${result.rewards?.xpEarned || 0} XP earned.`);
+      const refreshedGames = await refreshAssignedGames();
+      const sequenceActive = isRegularGame(activeGameAssignment) && Number(sequenceDeadlineRef.current) > Date.now();
+      const nextGame = sequenceActive
+        ? refreshedGames
+          .filter((assignment: any) => assignment.child?.id === activeGameAssignment.child.id && isRegularGame(assignment) && assignment.result?.status !== "COMPLETED")
+          .sort((a: any, b: any) => Number(a.sequence?.position || 0) - Number(b.sequence?.position || 0))[0]
+        : null;
+      if (nextGame) {
+        window.setTimeout(() => void openGameTutorial(nextGame, true), 250);
+      } else {
+        sequenceDeadlineRef.current = null;
+        setGameSequenceDeadline(null);
+        window.alert(`Game sequence complete! Final score ${result.score}. ${result.rewards?.xpEarned || 0} XP earned.`);
+      }
     } catch (gameRequestError) {
       setGameError(gameRequestError instanceof Error ? gameRequestError.message : "The game result could not be saved.");
     }
@@ -707,41 +799,94 @@ export default function ParentDashboard() {
           ].map(stat => { const Icon = stat.icon; return <div key={stat.label} className="flex items-center justify-between rounded-2xl border border-[#dceae6] bg-white p-5 shadow-[0_10px_30px_rgba(28,65,56,.06)]"><div><p className="text-[10px] font-bold uppercase tracking-wider text-[#71818d]">{stat.label}</p><p className="mt-1 text-2xl font-black text-[#071633]">{stat.value}</p></div><span className={`rounded-xl border p-2.5 ${stat.color}`}><Icon className="h-4 w-4" /></span></div>; })}
         </div>
 
-        <section className="space-y-4 rounded-2xl border border-[#dceae6] bg-white p-5 shadow-[0_10px_30px_rgba(28,65,56,.06)]">
-          <div className="flex items-center justify-between gap-3">
+        <section className="overflow-hidden rounded-2xl border border-[#dceae6] bg-white shadow-[0_10px_30px_rgba(28,65,56,.06)]">
+          <div className="flex flex-col gap-4 border-b border-[#e4efec] p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="text-lg font-extrabold text-[#071633]">Assigned to your children</h3>
+              <p className="mt-1 text-[11px] font-medium text-[#71818d]">Choose a child, then switch between learning games and formal game-based assessments.</p>
             </div>
-            <span className="rounded-full bg-[#e6f7f2] px-3 py-1 text-[10px] font-extrabold text-[#007f70]">{assignedGames.length} assigned</span>
+            <span className="rounded-full bg-[#e6f7f2] px-3 py-1 text-[10px] font-extrabold text-[#007f70]">{assignedGames.length} {assignedGames.length === 1 ? "game" : "games"}</span>
           </div>
+
+          {gameChildren.length > 0 && <div className="border-b border-[#e4efec] bg-[#f8fbfa] px-5 pt-4">
+            <div className="flex gap-2 overflow-x-auto pb-4" role="tablist" aria-label="Choose a child">
+              <button type="button" role="tab" aria-selected={selectedGameChildId === "all"} onClick={() => setSelectedGameChildId("all")} className={`min-w-fit rounded-xl border px-4 py-3 text-left transition-all ${selectedGameChildId === "all" ? "border-[#007f70] bg-[#007f70] text-white shadow-sm" : "border-[#d8e7e3] bg-white text-[#526474] hover:border-[#8fc9bd]"}`}>
+                <span className="block text-xs font-extrabold">All children</span>
+                <span className={`mt-0.5 block text-[9px] font-bold ${selectedGameChildId === "all" ? "text-[#bff3e7]" : "text-[#8a9aa5]"}`}>{assignedGames.length} games</span>
+              </button>
+              {gameChildren.map((child) => {
+                const childGames = assignedGames.filter((assignment) => assignment.child?.id === child.id);
+                const childReady = childGames.filter((assignment) => assignment.result?.status !== "COMPLETED" && assignment.availability?.available).length;
+                const selected = selectedGameChildId === child.id;
+                return <button key={child.id} type="button" role="tab" aria-selected={selected} onClick={() => setSelectedGameChildId(child.id)} className={`flex min-w-[180px] items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all ${selected ? "border-[#007f70] bg-[#007f70] text-white shadow-sm" : "border-[#d8e7e3] bg-white text-[#526474] hover:border-[#8fc9bd]"}`}>
+                  <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-black ${selected ? "bg-white/15 text-white" : "bg-[#e6f7f2] text-[#007f70]"}`}>{child.studentFirstName?.charAt(0)}{child.studentLastName?.charAt(0)}</span>
+                  <span className="min-w-0"><span className="block truncate text-xs font-extrabold">{child.studentFirstName} {child.studentLastName}</span><span className={`mt-0.5 block truncate text-[9px] font-bold ${selected ? "text-[#bff3e7]" : "text-[#8a9aa5]"}`}>{child.grade} · {childGames.length} games{childReady ? ` · ${childReady} ready` : ""}</span></span>
+                </button>;
+              })}
+            </div>
+          </div>}
+
+          <div className="space-y-4 p-5">
           {gameError && <div role="alert" className="game-assessment-alert--error rounded-xl border p-3 text-xs font-bold">{gameError}</div>}
           {assignedGames.length ? (
+            <>
+            <div className="grid gap-3 sm:grid-cols-2" role="tablist" aria-label="Assignment type">
+              <button type="button" role="tab" aria-selected={selectedGameContentType === "games"} onClick={() => setSelectedGameContentType("games")} className={`flex items-center justify-between rounded-xl border p-4 text-left transition-all ${selectedGameContentType === "games" ? "border-[#007f70] bg-[#edf9f6] ring-1 ring-[#007f70]" : "border-[#dceae6] bg-white hover:border-[#8fc9bd]"}`}>
+                <span className="block text-sm font-extrabold text-[#071633]">Games</span>
+                <span className="ml-4 inline-flex min-w-[88px] shrink-0 items-center justify-center rounded-full border border-[#8bd8c6] bg-[#d9fff5] px-3.5 py-2 text-xs font-black text-[#064e45] shadow-sm">{regularGameCount} assigned</span>
+              </button>
+              <button type="button" role="tab" aria-selected={selectedGameContentType === "assessments"} onClick={() => setSelectedGameContentType("assessments")} className={`flex items-center justify-between rounded-xl border p-4 text-left transition-all ${selectedGameContentType === "assessments" ? "border-[#6d5bd0] bg-[#f5f3ff] ring-1 ring-[#6d5bd0]" : "border-[#dceae6] bg-white hover:border-[#b8afe8]"}`}>
+                <span className="block text-sm font-extrabold text-[#071633]">Game-based assessments</span>
+                <span className="ml-4 inline-flex min-w-[88px] shrink-0 items-center justify-center rounded-full border border-[#c5baf5] bg-[#eee9ff] px-3.5 py-2 text-xs font-black text-[#362a78] shadow-sm">{gameAssessmentCount} assigned</span>
+              </button>
+            </div>
+            <div className="flex flex-col gap-3 rounded-xl border border-[#dceae6] bg-[#f8fbfa] p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div><p className="text-sm font-extrabold text-[#071633]">{selectedGameChild ? `${selectedGameChild.studentFirstName}'s ${selectedGameContentType === "games" ? "games" : "game-based assessments"}` : `Family ${selectedGameContentType === "games" ? "games" : "game-based assessments"}`}</p><p className="mt-0.5 text-[10px] font-medium text-[#71818d]">{selectedGameChild ? `${selectedGameChild.grade} · ${visibleAssignedGames.length} assigned` : `${gameChildren.length} children · ${visibleAssignedGames.length} assigned`}</p></div>
+              <div className="flex flex-wrap gap-2 text-[9px] font-extrabold"><span className="rounded-full bg-blue-100 px-2.5 py-1.5 text-blue-700">{visibleGameStats.ready} ready</span><span className="rounded-full bg-amber-100 px-2.5 py-1.5 text-amber-700">{visibleGameStats.pending} awaiting review</span><span className="rounded-full bg-emerald-100 px-2.5 py-1.5 text-emerald-700">{visibleGameStats.completed} completed</span></div>
+            </div>
             <div className="grid gap-3 md:grid-cols-2">
-              {assignedGames.map((assignment) => (
+              {[...visibleAssignedGames].sort((a, b) => Number(a.sequence?.position || 0) - Number(b.sequence?.position || 0)).map((assignment) => {
+                const completed = assignment.result?.status === "COMPLETED";
+                const requestStatus = assignment.result?.reassessmentRequestStatus;
+                const approvedReplay = completed && requestStatus === "APPROVED" && assignment.availability?.available;
+                return (
                 <article key={`${assignment.generatedGameId}-${assignment.child.id}`} className="rounded-xl border border-[#dceae6] bg-[#fafdfc] p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#e6f7f2] text-[#007f70]"><Gamepad2 className="h-4 w-4" /></span>
-                    <span className={`rounded-full px-2 py-1 text-[9px] font-extrabold ${assignment.availability?.available ? "bg-emerald-100 text-emerald-700" : assignment.availability?.reason === "Maximum attempts reached." ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"}`}>{assignment.availability?.available ? "READY" : assignment.availability?.reason === "Maximum attempts reached." ? "ATTEMPTS REACHED" : "LOCKED"}</span>
+                    <span className="grid h-9 min-w-9 place-items-center rounded-xl bg-[#e6f7f2] px-2 text-[10px] font-black text-[#007f70]">{assignment.sequence?.position || <Gamepad2 className="h-4 w-4" />}</span>
+                    <span className={`rounded-full px-2 py-1 text-[9px] font-extrabold ${completed ? "bg-emerald-100 text-emerald-700" : assignment.availability?.available ? "bg-blue-100 text-blue-700" : assignment.availability?.reason === "Maximum attempts reached." ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"}`}>{completed ? "COMPLETED" : assignment.availability?.available ? assignment.result?.status === "IN_PROGRESS" ? "IN PROGRESS" : "READY TO PLAY" : assignment.availability?.reason === "Maximum attempts reached." ? "ATTEMPTS REACHED" : "LOCKED"}</span>
                   </div>
                   <h4 className="mt-3 text-sm font-extrabold text-[#071633]">{assignment.generatedGame?.title}</h4>
-                  <p className="mt-1 text-[10px] font-semibold text-[#607080]">For {assignment.child.studentFirstName} {assignment.child.studentLastName} · {assignment.child.grade}</p>
-                  <p className="mt-2 text-[10px] text-[#71818d]">{assignment.generatedGame?.template?.category?.name || "Learning game"} · {assignment.maxAttempts} attempts · Pass {assignment.passingScore}%</p>
-                  {assignment.availability?.reason === "Maximum attempts reached." ? <p className="mt-3 text-[10px] font-extrabold text-rose-700">Maximum attempts reached</p> : assignment.result?.status !== "COMPLETED" && <p className="mt-3 text-[10px] font-extrabold text-[#007f70]">{assignment.result?.status === "IN_PROGRESS" ? "In progress" : "Ready for the student to play"}</p>}
-                  <div className="mt-4 flex gap-2">
+                  {assignment.sequence?.total > 1 && <p className="mt-1 text-[9px] font-black uppercase tracking-wider text-[#8a9aa5]">Game {assignment.sequence.position} of {assignment.sequence.total}</p>}
+                  <p className="mt-1 text-[10px] font-semibold text-[#607080]">{selectedGameChild ? assignment.child.grade : `For ${assignment.child.studentFirstName} ${assignment.child.studentLastName} · ${assignment.child.grade}`}</p>
+                  <p className="mt-2 text-[10px] text-[#71818d]">{assignment.generatedGame?.template?.category?.name || "Learning game"} · {assignment.maxAttempts} {assignment.maxAttempts === 1 ? "attempt" : "attempts"} · Pass {assignment.passingScore}%</p>
+                  {assignment.result?.status === "COMPLETED" && <div className="mt-3 rounded-xl border border-[#cfe5df] bg-white p-3">
+                    {assignment.result.reviewStatus === "REVIEWED" || assignment.result.reviewStatus === "NEEDS_FOLLOW_UP" ? <div className="flex items-center justify-between gap-3"><span className="text-[10px] font-extrabold text-[#607080]">Published game result</span><span className="text-xs font-black text-[#007f70]">{Math.round(Number(assignment.result.percentage) || 0)}%</span></div> : <div><p className="text-[10px] font-extrabold text-[#607080]">School review pending</p><p className="mt-1 text-[9px] leading-4 text-[#71818d]">The score will appear after the school completes its review.</p></div>}
+                    {(assignment.result.reviewStatus === "REVIEWED" || assignment.result.reviewStatus === "NEEDS_FOLLOW_UP") && assignment.result.schoolReview && <div className="mt-3 border-t border-[#e2eeeb] pt-3"><p className="text-[9px] font-black uppercase tracking-wider text-[#007f70]">School review</p><p className="mt-1 text-[10px] leading-5 text-[#526474]">{assignment.result.schoolReview}</p><span className={`mt-2 inline-block rounded-full px-2 py-1 text-[8px] font-black uppercase ${assignment.result.reviewStatus === "REVIEWED" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{assignment.result.reviewStatus === "REVIEWED" ? "Reviewed" : "Needs follow-up"}</span></div>}
+                  </div>}
+                  {completed && requestStatus === "PENDING" && <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-[10px] font-extrabold text-amber-800">Re-assessment request pending school approval</p>}
+                  {completed && requestStatus === "REJECTED" && <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-[10px] font-extrabold text-rose-700">Re-assessment request was not approved</p>}
+                  {approvedReplay && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-[10px] font-extrabold text-emerald-700">One additional attempt approved</p>}
+                  {!completed && (assignment.availability?.sequenceLocked ? <p className="mt-3 rounded-lg bg-slate-100 px-3 py-2 text-[10px] font-extrabold text-slate-600">🔒 Complete game {Math.max(1, Number(assignment.sequence?.position || 1) - 1)} first</p> : assignment.availability?.reason === "Maximum attempts reached." ? <p className="mt-3 text-[10px] font-extrabold text-rose-700">Maximum attempts reached</p> : <p className="mt-3 text-[10px] font-extrabold text-[#007f70]">{assignment.result?.status === "IN_PROGRESS" ? "Continue the current game" : "Ready for the student to play"}</p>)}
+                  {!completed && <div className="mt-4 flex gap-2">
                     <button type="button" disabled={!assignment.availability?.available || gameBusy === assignment.id} onClick={() => void openGameTutorial(assignment)} className="keep-white inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#007f70] px-4 py-2.5 text-xs font-extrabold text-white hover:bg-[#006b5e] disabled:opacity-50">
                       {gameBusy === assignment.id ? <Loader2 className="keep-white h-4 w-4 animate-spin" /> : <Play className="keep-white h-4 w-4" />}
-                      {assignment.result?.status === "IN_PROGRESS" ? "Resume game" : "View tutorial"}
+                      {assignment.result?.status === "IN_PROGRESS" ? "Resume game" : "Start game"}
                     </button>
-                  </div>
+                  </div>}
+                  {approvedReplay && <button type="button" disabled={gameBusy === assignment.id} onClick={() => void openGameTutorial(assignment)} className="keep-white mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#007f70] px-4 py-2.5 text-xs font-extrabold text-white hover:bg-[#006b5e] disabled:opacity-50"><Play className="keep-white h-4 w-4" />Start re-assessment</button>}
+                  {completed && (assignment.result.reviewStatus === "REVIEWED" || assignment.result.reviewStatus === "NEEDS_FOLLOW_UP") && !requestStatus && <button type="button" disabled={gameBusy === assignment.id} onClick={() => void requestGameReassessment(assignment)} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#007f70] bg-white px-4 py-2.5 text-xs font-extrabold text-[#007f70] hover:bg-[#edf9f6] disabled:opacity-50"><RotateCcw className="h-4 w-4" />Request re-assessment (one time)</button>}
                 </article>
-              ))}
+              )})}
             </div>
+            {visibleAssignedGames.length === 0 && <div className="rounded-xl border border-dashed border-[#cfe1dd] bg-[#fafdfc] p-7 text-center"><Gamepad2 className="mx-auto h-6 w-6 text-[#8aa19b]" /><p className="mt-2 text-xs font-bold text-[#526474]">No {selectedGameContentType === "games" ? "games" : "game-based assessments"} are assigned for this selection.</p><p className="mt-1 text-[10px] text-[#8a9aa5]">Try another child or switch the assignment type above.</p></div>}
+            </>
           ) : (
             <div className="rounded-xl border border-dashed border-[#cfe1dd] bg-[#fafdfc] p-5 text-center">
               <Gamepad2 className="mx-auto h-6 w-6 text-[#8aa19b]" />
               <p className="mt-2 text-xs font-bold text-[#607080]">No games have been assigned yet.</p>
             </div>
           )}
+          </div>
         </section>
 
         {/* Active applications list */}
@@ -934,7 +1079,7 @@ export default function ParentDashboard() {
         </div>
       </div>
 
-      {gameRuntime && <GameRuntimePlayer initial={gameRuntime} tutorial={runtimeTutorial} request={parentGameRequest} onClose={() => { setGameRuntime(null); setRuntimeTutorial(null); setActiveGameAssignment(null); }} onComplete={completeAssignedGame} secureMode />}
+      {gameRuntime && <GameRuntimePlayer initial={gameRuntime} tutorial={runtimeTutorial} request={parentGameRequest} onClose={() => { setGameRuntime(null); setRuntimeTutorial(null); setActiveGameAssignment(null); sequenceDeadlineRef.current = null; setGameSequenceDeadline(null); }} onComplete={completeAssignedGame} secureMode sequenceDeadline={gameSequenceDeadline} />}
 
       {demoPayment && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#071633]/70 p-4 backdrop-blur-sm">

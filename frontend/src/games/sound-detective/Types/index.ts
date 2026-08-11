@@ -34,6 +34,17 @@ export interface RawGameMetrics {
   highestDifficulty: number; // 1 to 5
   elapsedSeconds: number;
   endReason: "TIME_LIMIT_REACHED" | "COMPLETED";
+  roundResponses: SoundRoundResponse[];
+}
+
+export interface SoundRoundResponse {
+  round: number;
+  questionText: string;
+  options: string[];
+  correctAnswer: string;
+  studentAnswer: string;
+  correct: boolean;
+  responseTimeMs: number;
 }
 
 export interface SoundDetectiveScores extends RawGameMetrics {

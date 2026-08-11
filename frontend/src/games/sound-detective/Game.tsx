@@ -15,14 +15,16 @@ const MAX_ROUNDS = 4;
 export default function SoundDetectiveGame({
   disabled = false,
   sound = true,
+  practiceOnly = false,
   onComplete,
 }: {
   disabled?: boolean;
   sound?: boolean;
   durationSeconds?: number;
+  practiceOnly?: boolean;
   onComplete: (metrics: SoundDetectiveScores) => void | Promise<void>;
 }) {
-  const engine = useRef(new SoundDetectiveEngine());
+  const engine = useRef(new SoundDetectiveEngine(practiceOnly));
   const sounds = useRef<SoundManager | null>(null);
   const analytics = useRef(new SoundDetectiveAnalyticsService(onComplete));
   const cancelled = useRef(false);
@@ -43,6 +45,7 @@ export default function SoundDetectiveGame({
     highestDifficulty: 1,
     elapsedSeconds: 0,
     endReason: "COMPLETED",
+    roundResponses: [],
   });
 
   // Phases: 'instructions' | 'ready' | 'listen' | 'choices' | 'complete'
@@ -182,6 +185,15 @@ export default function SoundDetectiveGame({
             isSelecting.current = true;
             metrics.current.incorrectResponses += 1;
             metrics.current.reactionTimes.push(ROUND_TIME_LIMIT * 1000);
+            metrics.current.roundResponses.push({
+              round,
+              questionText: "Which picture matches the sound you heard?",
+              options: options.map((item) => item.label),
+              correctAnswer: target?.label || "Unknown sound",
+              studentAnswer: "Not answered",
+              correct: false,
+              responseTimeMs: ROUND_TIME_LIMIT * 1000,
+            });
 
             if (metrics.current.roundsPlayed >= MAX_ROUNDS) {
               void finish("COMPLETED");
@@ -196,7 +208,7 @@ export default function SoundDetectiveGame({
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [disabled, phase, showRoundIntro, isAudioPlaying, beginRound, finish]);
+  }, [disabled, phase, showRoundIntro, isAudioPlaying, beginRound, finish, options, round, target]);
 
   // Handle card selection
   const selectCard = (choice: SoundItem, eventTime: number) => {
@@ -207,6 +219,15 @@ export default function SoundDetectiveGame({
     metrics.current.reactionTimes.push(rt);
 
     const correct = engine.current.isCorrect(choice.id);
+    metrics.current.roundResponses.push({
+      round,
+      questionText: "Which picture matches the sound you heard?",
+      options: options.map((item) => item.label),
+      correctAnswer: target?.label || "Unknown sound",
+      studentAnswer: choice.label,
+      correct,
+      responseTimeMs: Math.round(rt),
+    });
 
     if (correct) {
       metrics.current.correctResponses += 1;
@@ -248,7 +269,7 @@ export default function SoundDetectiveGame({
             SOUND DETECTIVE
           </h1>
           <p className="text-sm font-black text-[#ff793f] uppercase tracking-widest mb-6">
-            Listening Assessment
+            {practiceOnly ? "Practice round · Not scored" : "Listening Assessment"}
           </p>
 
           <div className="bg-[#fffcf4] border-2 border-[#ffe9c7] rounded-2xl p-5 text-left mb-8 space-y-4">

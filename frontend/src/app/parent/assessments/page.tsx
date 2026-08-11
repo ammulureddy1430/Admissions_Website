@@ -32,11 +32,6 @@ import {
 } from "lucide-react";
 
 const PENDING_EXIT_SUBMISSION_KEY = "pendingAssessmentExitSubmission";
-// Presentation-only demo cleanup: keep the assessment and all related records,
-// but do not show this legacy result card in the Parent Portal list.
-const HIDDEN_PARENT_DEMO_ASSESSMENT_IDS = new Set([
-  "1de0443d-026b-4f18-84e6-635cd64282c7",
-]);
 const displaySlot = (slot: { slotName?: string; startTime?: string; endTime?: string }) => {
   const name = slot.slotName || "";
   if (/mid[- ]morning/i.test(name)) {
@@ -1761,9 +1756,7 @@ export default function ParentAssessments() {
   const writtenQuestions = takingExam?.questions?.filter((q: any) => !q.isListening) || [];
   const listeningQuestions = takingExam?.questions?.filter((q: any) => q.isListening) || [];
 
-  const visibleAssessments = assessments.filter(
-    (assessment) => !HIDDEN_PARENT_DEMO_ASSESSMENT_IDS.has(assessment.id),
-  );
+  const visibleAssessments = assessments;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">

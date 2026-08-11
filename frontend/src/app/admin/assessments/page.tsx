@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import fixWebmDuration from "fix-webm-duration";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import {
@@ -10,10 +11,11 @@ import {
   CheckCircle, 
   Calendar, 
   ArrowLeft, 
+  ArrowRight,
+  AlertTriangle,
   BookOpen, 
   Users, 
   Check, 
-  AlertCircle,
   Loader2,
   Trash2,
   Eye,
@@ -51,6 +53,59 @@ const SUBJECTS_BY_GRADE: Record<string, string[]> = {
 };
 
 const formatMarks = (value: unknown) => Math.round(Number(value) || 0);
+const formatGameMetricLabel = (key: string) => ({
+  colorsUsed: "Colors explored",
+  interactionsPerObject: "Interactions by object",
+  averageCompletionTime: "Average object time",
+  interactionConsistency: "Interaction consistency",
+  causeEffectScore: "Cause-and-effect score",
+  objectsCompleted: "Objects completed",
+} as Record<string, string>)[key] || key.replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+const formatGameMetricValue = (key: string, value: unknown) => {
+  if (typeof value === "string") return value.replaceAll("_", " ");
+  if (Array.isArray(value)) {
+    if (!value.length) return "Not available";
+    if (key === "interactionsPerObject") return value.map((item) => `${Number(item) || 0}`).join(" · ");
+    return value.map((item) => String(item).replaceAll("_", " ")).join(", ");
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) return "Not available";
+  const number = Number(value || 0);
+  if (/time/i.test(key)) return `${number >= 100 ? (number / 1000).toFixed(2) : number.toFixed(1)}s`;
+  if (/score|percentage|accuracy|alignment|consistency|attention|memory|potential|stability|efficiency/i.test(key)) return `${Math.round(number * 10) / 10}%`;
+  return Number.isInteger(number) ? String(number) : String(Math.round(number * 10) / 10);
+};
+const formatSavedResponse = (value: unknown): string => {
+  if (value === null || value === undefined || value === "") return "Not available";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value).replaceAll("_", " ");
+  if (Array.isArray(value)) return value.length ? value.map(formatSavedResponse).join(" → ") : "Not available";
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const response = record.response && typeof record.response === "object" ? record.response as Record<string, unknown> : record;
+    const parts = Object.entries(response)
+      .filter(([key, item]) => item !== null && item !== undefined && !/url|image|audio/i.test(key))
+      .map(([key, item]) => `${formatGameMetricLabel(key)}: ${formatSavedResponse(item)}`);
+    return parts.length ? parts.join(" · ") : "Not available";
+  }
+  return "Not available";
+};
+const findSavedMedia = (value: unknown, kind: "image" | "audio"): string | null => {
+  if (!value || typeof value !== "object") return null;
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof item === "string" && new RegExp(kind, "i").test(key) && /url|src/i.test(key)) return item;
+    const nested = findSavedMedia(item, kind);
+    if (nested) return nested;
+  }
+  return null;
+};
+const paintColorName = (color: string) => ({
+  "#ff4f64": "Red",
+  "#19c37d": "Green",
+  "#3b82f6": "Blue",
+  "#ffd229": "Yellow",
+  "#9b5de5": "Purple",
+  "#ff8a34": "Orange",
+  "#16c1c8": "Teal",
+} as Record<string, string>)[color.toLowerCase()] || "Saved color";
 const displaySlot = (slot: { slotName?: string; startTime?: string; endTime?: string }) => {
   const name = slot.slotName || "";
   if (/mid[- ]morning/i.test(name)) {
@@ -115,6 +170,7 @@ export default function AdminAssessments() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [reassignmentRequests, setReassignmentRequests] = useState<any[]>([]);
+  const [gameReassessmentRequests, setGameReassessmentRequests] = useState<any[]>([]);
   const [requestFilter, setRequestFilter] = useState("PENDING");
   const [approvingRequest, setApprovingRequest] = useState<any | null>(null);
   const [reassignmentQuestionPreview, setReassignmentQuestionPreview] = useState<any[]>([]);
@@ -135,6 +191,12 @@ export default function AdminAssessments() {
   const [isPublishing, setIsPublishing] = useState<any | null>(null);
   const [gradingSubmission, setGradingSubmission] = useState<any | null>(null);
   const [gameResultSubmission, setGameResultSubmission] = useState<any | null>(null);
+  const [gameResponseReviewOpen, setGameResponseReviewOpen] = useState(false);
+  const [gameResponseReviewIndex, setGameResponseReviewIndex] = useState(0);
+  const [gameSchoolReview, setGameSchoolReview] = useState("");
+  const [gameReviewSaving, setGameReviewSaving] = useState(false);
+  const [gameNoteSaveState, setGameNoteSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [gameplayVideoUrl, setGameplayVideoUrl] = useState("");
   const [readingPlaybackError, setReadingPlaybackError] = useState(false);
   const [speakingPlaybackError, setSpeakingPlaybackError] = useState(false);
 
@@ -238,6 +300,30 @@ export default function AdminAssessments() {
     fetchData();
     loadSourceDocuments();
   }, [schoolId, token, activeTab, requestFilter]);
+
+  useEffect(() => {
+    if (!schoolId || !token || activeTab !== "submissions") return;
+    let active = true;
+    const refreshMonitoring = async () => {
+      try {
+        const response = await fetch("http://localhost:5001/assessments/submissions/list", {
+          cache: "no-store",
+          headers: { "x-tenant-id": schoolId, Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) return;
+        const rows = await response.json();
+        if (active) setSubmissions(rows);
+      } catch {
+        // Preserve the last successful monitoring snapshot during a brief network interruption.
+      }
+    };
+    void refreshMonitoring();
+    const timer = window.setInterval(refreshMonitoring, 3000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [activeTab, schoolId, token]);
 
   const loadSourceDocuments = async () => {
     if (!schoolId || !token) return;
@@ -349,23 +435,105 @@ export default function AdminAssessments() {
         "Authorization": `Bearer ${token}`
       };
       
-      const [templatesRes, submissionsRes, appsRes, requestsRes] = await Promise.all([
+      const [templatesRes, submissionsRes, appsRes, requestsRes, gameRequestsRes] = await Promise.all([
         fetch("http://localhost:5001/assessments", { headers }),
         fetch("http://localhost:5001/assessments/submissions/list", { headers }),
         fetch("http://localhost:5001/application", { headers }),
-        fetch(`http://localhost:5001/assessments/reassignment-requests/list?status=${requestFilter}`, { headers })
+        fetch(`http://localhost:5001/assessments/reassignment-requests/list?status=${requestFilter}`, { headers }),
+        fetch(`http://localhost:5001/game-assessments/game-reassessment-requests?status=${requestFilter}`, { headers })
       ]);
 
       if (templatesRes.ok) setTemplates(await templatesRes.json());
       if (submissionsRes.ok) setSubmissions(await submissionsRes.json());
       if (appsRes.ok) setApplications(await appsRes.json());
       if (requestsRes.ok) setReassignmentRequests(await requestsRes.json());
+      if (gameRequestsRes.ok) setGameReassessmentRequests(await gameRequestsRes.json());
     } catch (err) {
       console.error(err);
     } finally {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    const resultId = gameResultSubmission?.gameResult?.id;
+    if (!resultId || !schoolId || !token) return;
+    let active = true;
+    const refreshLiveResult = async () => {
+      try {
+        const response = await fetch("http://localhost:5001/assessments/submissions/list", { headers: { "x-tenant-id": schoolId, Authorization: `Bearer ${token}` } });
+        if (!response.ok) return;
+        const rows = await response.json();
+        const latest = rows.find((row: any) => row.submissionType === "GAME" && row.gameResult?.id === resultId);
+        if (!active || !latest) return;
+        setGameResultSubmission(latest);
+        setSubmissions(rows);
+      } catch {
+        // Keep the last valid result visible if a polling request is interrupted.
+      }
+    };
+    void refreshLiveResult();
+    const timer = window.setInterval(refreshLiveResult, 3000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [gameResultSubmission?.gameResult?.id, schoolId, token]);
+
+  useEffect(() => {
+    const sessionId = gameResultSubmission?.gameResult?.recordingSessionId;
+    if (!sessionId || gameResultSubmission?.gameResult?.status !== "COMPLETED") {
+      setGameplayVideoUrl("");
+      return;
+    }
+    let active = true;
+    let objectUrl = "";
+    void fetch(`http://localhost:5001/game-assessments/engine/sessions/${sessionId}/recording-url`, {
+      headers: { "x-tenant-id": schoolId, Authorization: `Bearer ${token}` },
+    }).then(async (response) => {
+      if (!response.ok) return;
+      const payload = await response.json();
+      if (!payload?.url || !active) return;
+      try {
+        const recordingResponse = await fetch(payload.url);
+        if (!recordingResponse.ok) throw new Error("Recording download failed");
+        const rawBlob = await recordingResponse.blob();
+        const durationMs = Math.max(1000, Number(gameResultSubmission?.timeTaken || 0) * 1000);
+        const playableBlob = await fixWebmDuration(rawBlob, durationMs, { logger: false });
+        if (!active) return;
+        objectUrl = URL.createObjectURL(playableBlob);
+        setGameplayVideoUrl(objectUrl);
+      } catch {
+        if (active) setGameplayVideoUrl(payload.url);
+      }
+    }).catch(() => undefined);
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [gameResultSubmission?.gameResult?.recordingSessionId, gameResultSubmission?.gameResult?.status, gameResultSubmission?.timeTaken, schoolId, token]);
+
+  useEffect(() => {
+    const gameId = gameResultSubmission?.gameResult?.gameId;
+    const resultId = gameResultSubmission?.gameResult?.id;
+    const savedNote = gameResultSubmission?.gameResult?.schoolReview || "";
+    if (!gameId || !resultId || gameResultSubmission?.gameResult?.status !== "COMPLETED" || gameSchoolReview === savedNote) return;
+    setGameNoteSaveState("saving");
+    const timer = window.setTimeout(async () => {
+      const currentStatus = gameResultSubmission?.gameResult?.reviewStatus;
+      const reviewStatus = currentStatus === "REVIEWED" || currentStatus === "NEEDS_FOLLOW_UP" ? currentStatus : "PENDING";
+      try {
+        const response = await fetch(`http://localhost:5001/games/${gameId}/reviews/${resultId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", "x-tenant-id": schoolId, Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ reviewStatus, schoolReview: gameSchoolReview }),
+        });
+        if (!response.ok) throw new Error("Unable to save note");
+        setGameResultSubmission((current: any) => current ? ({ ...current, gameResult: { ...current.gameResult, schoolReview: gameSchoolReview, reviewStatus } }) : current);
+        setGameNoteSaveState("saved");
+      } catch {
+        setGameNoteSaveState("error");
+      }
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [gameSchoolReview, gameResultSubmission?.gameResult?.gameId, gameResultSubmission?.gameResult?.id, gameResultSubmission?.gameResult?.reviewStatus, gameResultSubmission?.gameResult?.schoolReview, gameResultSubmission?.gameResult?.status, schoolId, token]);
 
   const fetchBookings = async (id: string) => {
     if (!id) {
@@ -590,6 +758,26 @@ export default function AdminAssessments() {
       alert("The request was rejected and the parent was notified.");
     } catch (e: any) {
       alert(e.message || "Unable to reject this request.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const decideGameReassessment = async (request: any, decision: "APPROVED" | "REJECTED") => {
+    const label = decision === "APPROVED" ? "approve one additional attempt" : "reject this request";
+    if (!window.confirm(`Are you sure you want to ${label}?`)) return;
+    setActionLoading(true);
+    try {
+      const response = await fetch(`http://localhost:5001/game-assessments/game-reassessment-requests/${request.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-tenant-id": schoolId, "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ decision }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.message || "The request could not be updated.");
+      await fetchData();
+    } catch (error: any) {
+      alert(error.message || "The request could not be updated.");
     } finally {
       setActionLoading(false);
     }
@@ -1405,28 +1593,31 @@ export default function AdminAssessments() {
     }
   };
 
-  const handleGameAIReview = async () => {
-    if (!gameResultSubmission?.gameResult?.id) return;
-    setAiLoading(true);
+  const saveGameSchoolReview = async (reviewStatus: "REVIEWED" | "NEEDS_FOLLOW_UP") => {
+    const gameId = gameResultSubmission?.gameResult?.gameId;
+    const resultId = gameResultSubmission?.gameResult?.id;
+    if (!gameId || !resultId || !gameSchoolReview.trim()) return;
+    setGameReviewSaving(true);
     try {
-      const response = await fetch(`http://localhost:5001/assessments/game-submissions/${gameResultSubmission.gameResult.id}/ai-review`, {
-        method: "POST",
+      const response = await fetch(`http://localhost:5001/games/${gameId}/reviews/${resultId}`, {
+        method: "PATCH",
         headers: {
+          "Content-Type": "application/json",
           "x-tenant-id": schoolId,
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify({ reviewStatus, schoolReview: gameSchoolReview.trim() }),
       });
       const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.message || "AI game review failed");
+      if (!response.ok) throw new Error(payload?.message || "Unable to save the school review.");
       setGameResultSubmission((current: any) => current ? ({
         ...current,
-        gameResult: { ...current.gameResult, aiReview: payload },
+        gameResult: { ...current.gameResult, reviewStatus, schoolReview: gameSchoolReview.trim(), reviewedAt: payload.reviewedAt },
       }) : current);
     } catch (error) {
-      console.error(error);
-      alert(error instanceof Error ? error.message : "AI game review is currently unavailable.");
+      alert(error instanceof Error ? error.message : "Unable to save the school review.");
     } finally {
-      setAiLoading(false);
+      setGameReviewSaving(false);
     }
   };
 
@@ -2668,7 +2859,7 @@ export default function AdminAssessments() {
               onClick={() => setActiveTab("requests")}
               className={`pb-3 px-6 text-xs font-bold transition-all relative ${activeTab === "requests" ? "text-[#007f70]" : "text-[#607080] hover:text-[#007f70]"}`}
             >
-              Assessment Re-Requests ({reassignmentRequests.length})
+              Assessment Re-Requests ({reassignmentRequests.length + gameReassessmentRequests.length})
               {activeTab === "requests" && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#007f70] rounded-t-full" />}
             </button>
             <button
@@ -2853,21 +3044,25 @@ export default function AdminAssessments() {
                             <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
                               s.status === 'PUBLISHED' || s.status === 'EVALUATED' ? 'bg-emerald-100 text-emerald-800' :
                               s.status === 'REVIEWED' ? 'bg-sky-100 text-sky-800' :
+                              s.status === 'INTERRUPTED' ? 'bg-amber-100 text-amber-800' :
                               s.status === 'UNDER_REVIEW' ? 'bg-amber-100 text-amber-800' :
                               s.status === 'SUBMITTED' ? 'bg-indigo-100 text-indigo-800' :
                               'bg-slate-100 text-slate-800'
                             }`}>
                               {s.status === 'PUBLISHED' || s.status === 'EVALUATED' ? <CheckCircle2 className="h-3 w-3" /> :
                                s.status === 'REVIEWED' ? <CheckCircle2 className="h-3 w-3 text-sky-500" /> :
+                               s.status === 'INTERRUPTED' ? <AlertTriangle className="h-3 w-3 text-amber-600" /> :
                                s.status === 'UNDER_REVIEW' ? <Clock className="h-3 w-3 text-amber-500" /> :
                                s.status === 'SUBMITTED' ? <Clock className="h-3 w-3" /> :
                                null}
-                              {String(s.status).replaceAll("_", " ")}
+                              {s.status === "INTERRUPTED" ? "Recording interrupted" : String(s.status).replaceAll("_", " ")}
                             </span>
                           </td>
                           <td className="p-4">
-                            {['SUBMITTED', 'UNDER_REVIEW', 'REVIEWED', 'PUBLISHED', 'EVALUATED'].includes(s.status) && (
+                            {s.status === "INTERRUPTED" && <div className="flex flex-col gap-0.5"><span className="text-[10px] font-bold text-amber-700">Recording stopped</span><span className="text-[9px] text-[#71818d]">Student must resume the assessment</span></div>}
+                            {['IN_PROGRESS', 'SUBMITTED', 'UNDER_REVIEW', 'REVIEWED', 'PUBLISHED', 'EVALUATED'].includes(s.status) && (
                               <div className="flex flex-col gap-0.5">
+                                {s.status === "IN_PROGRESS" && <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wide text-blue-700"><i className="h-2 w-2 animate-pulse rounded-full bg-blue-500" /> Monitoring live</span>}
                                 <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${
                                   s.totalWarnings > 0 ? 'text-amber-600' : 'text-emerald-600'
                                 }`}>
@@ -2885,12 +3080,12 @@ export default function AdminAssessments() {
                             )}
                           </td>
                           <td className="p-4">
-                            {s.timeTaken ? `${Math.floor(s.timeTaken / 60)}m ${s.timeTaken % 60}s` : "In Progress"}
+                            {s.status === "INTERRUPTED" ? "Not completed" : s.timeTaken ? `${Math.floor(s.timeTaken / 60)}m ${s.timeTaken % 60}s` : "In Progress"}
                           </td>
                           <td className="p-4 text-right">
                             {s.submissionType === "GAME" ? (
                               <button
-                                onClick={() => setGameResultSubmission(s)}
+                                onClick={() => { setGameResponseReviewOpen(false); setGameResponseReviewIndex(0); setGameSchoolReview(s.gameResult?.schoolReview || ""); setGameResultSubmission(s); }}
                                 className="bg-[#007f70] hover:bg-[#00665a] text-white px-3 py-1.5 rounded-lg text-[11px] font-bold shadow-sm transition-colors"
                               >
                                 View Game Score
@@ -2923,7 +3118,11 @@ export default function AdminAssessments() {
                   </button>
                 ))}
               </div>
-              <div className="bg-white border border-[#dceae6] rounded-2xl shadow-sm overflow-hidden">
+              {gameReassessmentRequests.length > 0 && <div className="bg-white border border-[#dceae6] rounded-2xl shadow-sm overflow-hidden">
+                <div className="border-b border-[#dceae6] px-4 py-3"><h3 className="text-xs font-extrabold text-[#071633]">Game re-assessment requests</h3><p className="mt-1 text-[10px] text-[#71818d]">Each game permits only one parent request. Approval unlocks one additional attempt.</p></div>
+                <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-left text-xs"><thead><tr className="bg-[#f8fbf9] text-[#607080]"><th className="p-3">Student</th><th className="p-3">Parent</th><th className="p-3">Class</th><th className="p-3">Game</th><th className="p-3">Previous Result</th><th className="p-3">Requested</th><th className="p-3">Status</th><th className="p-3 text-right">Actions</th></tr></thead><tbody className="divide-y divide-[#dceae6]">{gameReassessmentRequests.map(request => <tr key={request.id}><td className="p-3 font-bold">{request.student?.studentFirstName} {request.student?.studentLastName}</td><td className="p-3">{request.student?.parent?.firstName} {request.student?.parent?.lastName}</td><td className="p-3">{request.student?.grade}</td><td className="p-3">{request.gameAssignment?.generatedGame?.title}</td><td className="p-3 font-bold">{Math.round(Number(request.percentage) || 0)}%</td><td className="p-3">{request.reassessmentRequestedAt ? new Date(request.reassessmentRequestedAt).toLocaleDateString() : "—"}</td><td className="p-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${request.reassessmentRequestStatus === "PENDING" ? "bg-amber-100 text-amber-800" : request.reassessmentRequestStatus === "APPROVED" ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>{request.reassessmentRequestStatus}</span></td><td className="p-3"><div className="flex justify-end gap-2">{request.reassessmentRequestStatus === "PENDING" && <><button disabled={actionLoading} onClick={() => void decideGameReassessment(request, "APPROVED")} className="rounded-lg bg-[#007f70] px-3 py-1.5 text-[10px] font-bold text-white disabled:opacity-50">Approve</button><button disabled={actionLoading} onClick={() => void decideGameReassessment(request, "REJECTED")} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-[10px] font-bold text-red-700 disabled:opacity-50">Reject</button></>}</div></td></tr>)}</tbody></table></div>
+              </div>}
+              {reassignmentRequests.length > 0 && <div className="bg-white border border-[#dceae6] rounded-2xl shadow-sm overflow-hidden">
                 {reassignmentRequests.length === 0 ? (
                   <div className="text-center py-20">
                     <RotateCcw className="h-10 w-10 text-[#71818d] mx-auto opacity-40" />
@@ -2961,7 +3160,8 @@ export default function AdminAssessments() {
                     </table>
                   </div>
                 )}
-              </div>
+              </div>}
+              {reassignmentRequests.length === 0 && gameReassessmentRequests.length === 0 && <div className="rounded-2xl border border-[#dceae6] bg-white py-20 text-center shadow-sm"><RotateCcw className="mx-auto h-10 w-10 text-[#71818d] opacity-40" /><p className="mt-2 text-xs font-bold text-[#71818d]">No {requestFilter.toLowerCase()} re-assessment requests.</p></div>}
             </div>
           ) : (
              <div className="space-y-6">
@@ -3981,11 +4181,7 @@ export default function AdminAssessments() {
                 </h3>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => void handleGameAIReview()} disabled={aiLoading} className="inline-flex items-center gap-1.5 rounded-xl bg-[#007f70] px-3 py-2 text-[10px] font-black text-white shadow-sm hover:bg-[#00665a] disabled:opacity-60">
-                  {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                  {gameResultSubmission.gameResult?.aiReview ? "Regenerate AI Review" : "Grade with AI"}
-                </button>
-                <button onClick={() => setGameResultSubmission(null)} className="rounded-lg border border-[#dceae6] p-2 text-[#607080] hover:bg-white" aria-label="Close game result">
+                <button onClick={() => { setGameResponseReviewOpen(false); setGameResultSubmission(null); }} className="rounded-lg border border-[#dceae6] p-2 text-[#607080] hover:bg-white" aria-label="Close game result">
                   <XCircle className="h-4 w-4" />
                 </button>
               </div>
@@ -3996,93 +4192,125 @@ export default function AdminAssessments() {
                 <p className="mt-1 text-sm font-black text-[#071633]">{gameResultSubmission.gameResult?.gameName}</p>
                 <p className="mt-1 text-xs text-[#607080]">{gameResultSubmission.assessment?.subject} · {gameResultSubmission.application?.grade}</p>
               </div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-xl border border-[#dceae6] bg-[#fafdfc] p-3"><span className="text-[9px] font-bold text-[#71818d]">SCORE</span><strong className="mt-1 block text-lg text-[#071633]">{gameResultSubmission.gameResult?.score}</strong></div>
-                <div className="rounded-xl border border-[#dceae6] bg-[#fafdfc] p-3"><span className="text-[9px] font-bold text-[#71818d]">PERCENT</span><strong className="mt-1 block text-lg text-[#071633]">{Math.round(gameResultSubmission.gameResult?.percentage || 0)}%</strong></div>
-                <div className="rounded-xl border border-[#dceae6] bg-[#fafdfc] p-3"><span className="text-[9px] font-bold text-[#71818d]">CORRECT</span><strong className="mt-1 block text-lg text-[#071633]">{gameResultSubmission.gameResult?.correct || 0}</strong></div>
+              <div className={`grid grid-cols-2 gap-3 ${gameResultSubmission.gameResult?.engineKey === "BALL_STACK" ? "sm:grid-cols-4" : "sm:grid-cols-5"}`}>
+                <div className="rounded-xl border border-[#dceae6] bg-[#fafdfc] p-3"><span className="text-[9px] font-bold text-[#71818d]">OVERALL SCORE</span><strong className="mt-1 block text-lg text-[#071633]">{gameResultSubmission.gameResult?.score ?? "Not available"}{gameResultSubmission.gameResult?.engineKey === "BALL_STACK" ? "%" : ""}</strong></div>
+                {gameResultSubmission.gameResult?.engineKey !== "BALL_STACK" && <div className="rounded-xl border border-[#dceae6] bg-[#fafdfc] p-3"><span className="text-[9px] font-bold text-[#71818d]">PERCENT</span><strong className="mt-1 block text-lg text-[#071633]">{Math.round(gameResultSubmission.gameResult?.percentage || 0)}%</strong></div>}
+                <div className="rounded-xl border border-[#dceae6] bg-[#fafdfc] p-3"><span className="text-[9px] font-bold text-[#71818d]">{gameResultSubmission.gameResult?.engineKey === "MAGIC_PAINT" ? "OBJECTS COMPLETED" : gameResultSubmission.gameResult?.engineKey === "BALL_STACK" ? "SUCCESSFUL PLACEMENTS" : "CORRECT"}</span><strong className="mt-1 block text-lg text-[#071633]">{gameResultSubmission.gameResult?.engineKey === "MAGIC_PAINT" ? (gameResultSubmission.gameResult?.performanceMetrics?.objectsCompleted ?? "Not available") : gameResultSubmission.gameResult?.engineKey === "BALL_STACK" ? (gameResultSubmission.gameResult?.performanceMetrics?.successfulPlacements ?? "Not available") : (gameResultSubmission.gameResult?.correct || 0)}</strong></div>
+                <div className="rounded-xl border border-[#dceae6] bg-[#fafdfc] p-3"><span className="text-[9px] font-bold text-[#71818d]">{gameResultSubmission.gameResult?.engineKey === "MAGIC_PAINT" ? "COLORS EXPLORED" : gameResultSubmission.gameResult?.engineKey === "BALL_STACK" ? "FAILED PLACEMENTS" : "INCORRECT"}</span><strong className="mt-1 block text-lg text-[#071633]">{gameResultSubmission.gameResult?.engineKey === "MAGIC_PAINT" ? (Array.isArray(gameResultSubmission.gameResult?.performanceMetrics?.colorsUsed) ? gameResultSubmission.gameResult.performanceMetrics.colorsUsed.length : "Not available") : gameResultSubmission.gameResult?.engineKey === "BALL_STACK" ? (gameResultSubmission.gameResult?.performanceMetrics?.failedPlacements ?? "Not available") : (gameResultSubmission.gameResult?.incorrect || 0)}</strong></div>
                 <div className="rounded-xl border border-[#dceae6] bg-[#fafdfc] p-3"><span className="text-[9px] font-bold text-[#71818d]">TIME</span><strong className="mt-1 block text-sm text-[#071633]">{Math.floor((gameResultSubmission.timeTaken || 0) / 60)}m {(gameResultSubmission.timeTaken || 0) % 60}s</strong></div>
               </div>
               <div className="flex items-center justify-between rounded-xl border border-[#dceae6] p-3 text-xs">
                 <span className="font-bold text-[#607080]">Result</span>
-                <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase ${gameResultSubmission.gameResult?.passed ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
-                  {gameResultSubmission.gameResult?.passed ? "Passed" : "Needs review"}
+                <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase ${gameResultSubmission.gameResult?.status !== "COMPLETED" ? "bg-blue-100 text-blue-800" : gameResultSubmission.gameResult?.passed ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                  {gameResultSubmission.gameResult?.status !== "COMPLETED" ? "In progress" : gameResultSubmission.gameResult?.passed ? "Passed" : "Below target"}
                 </span>
               </div>
               <div className="text-[10px] text-[#71818d]">
                 Monitoring: {gameResultSubmission.totalWarnings || 0} warnings · {gameResultSubmission.tabSwitchCount || 0} tab switches · {gameResultSubmission.fullscreenExitCount || 0} fullscreen exits
               </div>
-              {gameResultSubmission.gameResult?.aiReview && (
-                <section className="rounded-xl border border-[#9bd9cc] bg-[#f0faf7] p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <h4 className="inline-flex items-center gap-1.5 text-xs font-black text-[#006f62]"><Sparkles className="h-4 w-4" /> AI grading review</h4>
-                    <span className="rounded-full bg-white px-2.5 py-1 text-[9px] font-black text-[#007f70]">{gameResultSubmission.gameResult.aiReview.recommendedStatus?.replaceAll("_", " ")}</span>
-                  </div>
-                  <p className="mt-3 text-xs font-medium leading-5 text-[#34475a]">{gameResultSubmission.gameResult.aiReview.overallSummary}</p>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-lg bg-white p-3">
-                      <p className="text-[9px] font-black uppercase tracking-wider text-[#007f70]">Strengths</p>
-                      <ul className="mt-2 space-y-1 text-[10px] leading-4 text-[#526474]">
-                        {(gameResultSubmission.gameResult.aiReview.strengths || []).map((item: string, index: number) => <li key={index}>• {item}</li>)}
-                      </ul>
+              {gameResultSubmission.gameResult?.review?.length > 0 && <button
+                type="button"
+                onClick={() => { setGameResponseReviewIndex(0); setGameResponseReviewOpen(true); }}
+                className="flex min-h-12 w-full items-center justify-between rounded-xl border border-[#9bd9cc] bg-[#f0faf7] px-4 py-3 text-left transition hover:border-[#55b9a7] hover:bg-[#e8f7f3]"
+              >
+                <span><span className="block text-xs font-black text-[#006f62]">View Student Responses</span><span className="mt-1 block text-[9px] text-[#607080]">Review each saved round one at a time.</span></span>
+                <ArrowRight className="h-4 w-4 text-[#007f70]" />
+              </button>}
+              {Object.keys(gameResultSubmission.gameResult?.performanceMetrics || {}).length > 0 && (
+                <section className="rounded-xl border border-[#9bd9cc] bg-[#f5fbf9] p-4">
+                  <div className="flex items-center justify-between gap-3"><div><h4 className="text-xs font-black text-[#006f62]">Real-time game performance</h4><p className="mt-1 text-[9px] text-[#607080]">Automatically synchronized from the saved game session.</p></div><span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[9px] font-black text-emerald-700">SAVED SESSION</span></div>
+                  {gameResultSubmission.gameResult?.engineKey === "MAGIC_PAINT" ? <div className="mt-3 space-y-3">
+                    <div className="rounded-xl border border-[#cde8e1] bg-white p-4"><p className="text-xs font-black text-[#071633]">What this result means</p><p className="mt-1 text-[10px] leading-5 text-[#526474]">The student completed a creative painting activity. There were no right or wrong answers. Review how fully, quickly, and consistently the student interacted with the objects.</p></div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-xl border border-[#dceae6] bg-white p-4"><div className="flex items-center justify-between"><p className="text-[9px] font-black uppercase tracking-wide text-[#71818d]">Task completion</p><b className="text-sm text-[#007f70]">{formatGameMetricValue("completionPercentage", gameResultSubmission.gameResult.performanceMetrics.completionPercentage)}</b></div><p className="mt-2 text-xs font-bold text-[#071633]">Completed {gameResultSubmission.gameResult.performanceMetrics.objectsCompleted ?? "Not available"} painting objects.</p></div>
+                      <div className="rounded-xl border border-[#dceae6] bg-white p-4"><div className="flex items-center justify-between"><p className="text-[9px] font-black uppercase tracking-wide text-[#71818d]">Creative exploration</p><b className="text-sm text-[#007f70]">{formatGameMetricValue("creativityScore", gameResultSubmission.gameResult.performanceMetrics.creativityScore)}</b></div><p className="mt-2 text-xs text-[#526474]">Based on completed objects, variety of colors, and interaction consistency.</p></div>
+                      <div className="rounded-xl border border-[#dceae6] bg-white p-4"><div className="flex items-center justify-between"><p className="text-[9px] font-black uppercase tracking-wide text-[#71818d]">Cause and effect</p><b className="text-sm text-[#007f70]">{formatGameMetricValue("causeEffectScore", gameResultSubmission.gameResult.performanceMetrics.causeEffectScore)}</b></div><p className="mt-2 text-xs text-[#526474]">Shows how successfully the student&apos;s painting actions completed each object.</p></div>
+                      <div className="rounded-xl border border-[#dceae6] bg-white p-4"><div className="flex items-center justify-between"><p className="text-[9px] font-black uppercase tracking-wide text-[#71818d]">Work pattern</p><b className="text-sm text-[#007f70]">{formatGameMetricValue("interactionConsistency", gameResultSubmission.gameResult.performanceMetrics.interactionConsistency)}</b></div><p className="mt-2 text-xs text-[#526474]">Average object time: {formatGameMetricValue("averageCompletionTime", gameResultSubmission.gameResult.performanceMetrics.averageCompletionTime)}.</p></div>
                     </div>
-                    <div className="rounded-lg bg-white p-3">
-                      <p className="text-[9px] font-black uppercase tracking-wider text-amber-700">Improvement areas</p>
-                      <ul className="mt-2 space-y-1 text-[10px] leading-4 text-[#526474]">
-                        {(gameResultSubmission.gameResult.aiReview.improvementAreas || []).map((item: string, index: number) => <li key={index}>• {item}</li>)}
-                      </ul>
-                    </div>
-                  </div>
-
+                    <div className="rounded-xl border border-[#dceae6] bg-white p-4"><p className="text-[9px] font-black uppercase tracking-wide text-[#71818d]">Colors the student explored</p><div className="mt-3 flex flex-wrap gap-2">{Array.isArray(gameResultSubmission.gameResult.performanceMetrics.colorsUsed) && gameResultSubmission.gameResult.performanceMetrics.colorsUsed.length ? gameResultSubmission.gameResult.performanceMetrics.colorsUsed.map((color: string) => <span key={color} className="inline-flex items-center gap-2 rounded-full border border-[#dceae6] bg-[#fafdfc] px-3 py-1.5 text-[9px] font-bold text-[#34475a]"><i className="h-3.5 w-3.5 rounded-full border border-black/10" style={{ backgroundColor: color }} />{paintColorName(color)}</span>) : <span className="text-[10px] text-[#71818d]">Not available</span>}</div></div>
+                  </div> : <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                    {Object.entries(gameResultSubmission.gameResult.performanceMetrics).filter(([key, value]) => value !== null && value !== undefined && (gameResultSubmission.gameResult?.engineKey === "BALL_STACK" ? [
+                      "fineMotorScore",
+                      "precisionScore",
+                      "consistencyScore",
+                      "averageReactionTime",
+                      "towerStabilityScore",
+                    ].includes(key) : ![
+                      "overallScore",
+                      "completionStatus",
+                      "correctSelections",
+                      "incorrectSelections",
+                      "completionPercentage",
+                      "observationScore",
+                    ].includes(key))).map(([key, value]) => (
+                      <div key={key} className="rounded-lg border border-[#dceae6] bg-white p-3"><p className="text-[8px] font-black uppercase tracking-wide text-[#71818d]">{formatGameMetricLabel(key)}</p><p className="mt-1 text-sm font-black text-[#071633]">{formatGameMetricValue(key, value)}</p></div>
+                    ))}
+                  </div>}
                 </section>
               )}
-              <div className="border-t border-[#dceae6] pt-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <h4 className="text-xs font-black text-[#071633]">Question-by-question review</h4>
-                  <span className="text-[10px] font-bold text-[#71818d]">{gameResultSubmission.gameResult?.review?.length || 0} questions</span>
+              {gameResultSubmission.gameResult?.recordingSessionId && gameResultSubmission.gameResult?.status === "COMPLETED" && <section className="rounded-xl border border-[#c7ddd8] bg-white p-4">
+                <div className="flex items-center justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#007f70]">Gameplay evidence</p><h4 className="mt-1 text-xs font-black text-[#071633]">Student gameplay recording</h4><p className="mt-1 text-[9px] text-[#71818d]">Game screen only · no webcam or microphone</p></div><span className="rounded-full bg-emerald-100 px-3 py-1.5 text-[9px] font-black text-emerald-700">SAVED VIDEO</span></div>
+                {gameplayVideoUrl ? <video controls preload="metadata" src={gameplayVideoUrl} className="mt-4 aspect-video w-full rounded-xl border border-[#dceae6] bg-slate-950" aria-label="Student gameplay recording" /> : <div className="mt-4 grid aspect-video place-items-center rounded-xl border border-dashed border-[#cbded9] bg-[#fafdfc] text-[10px] font-bold text-[#71818d]"><Loader2 className="mb-2 h-5 w-5 animate-spin text-[#007f70]" />Preparing gameplay video…</div>}
+              </section>}
+              {gameResultSubmission.gameResult?.status === "COMPLETED" && <section className="rounded-xl border border-[#c7ddd8] bg-white p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#007f70]">Final step</p><h4 className="mt-1 text-xs font-black text-[#071633]">School review</h4><p className="mt-1 text-[9px] leading-4 text-[#71818d]">Review the saved responses, add a short note, and record the school&apos;s decision.</p></div>
+                  <span className={`rounded-full px-3 py-1.5 text-[9px] font-black uppercase ${gameResultSubmission.gameResult?.reviewStatus === "REVIEWED" ? "bg-emerald-100 text-emerald-700" : gameResultSubmission.gameResult?.reviewStatus === "NEEDS_FOLLOW_UP" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>{(gameResultSubmission.gameResult?.reviewStatus || "PENDING").replaceAll("_", " ")}</span>
                 </div>
-                <div className="space-y-3">
-                  {(gameResultSubmission.gameResult?.review || []).map((item: any) => (
-                    <article key={item.questionId} className="rounded-xl border border-[#dceae6] bg-[#fafdfc] p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-[9px] font-black uppercase tracking-wider text-[#007f70]">Question {item.number}</p>
-                          <p className="mt-1 text-xs font-bold leading-5 text-[#071633]">{item.questionText}</p>
-                        </div>
-                        <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[9px] font-black text-[#607080]">{item.points} pts</span>
-                      </div>
-                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                        <div className="rounded-lg border border-[#dceae6] bg-white p-3">
-                          <span className="text-[9px] font-bold uppercase text-[#71818d]">Student answer</span>
-                          <p className="mt-1 text-xs font-bold text-[#071633]">{item.studentAnswer}</p>
-                        </div>
-                        <div className="rounded-lg border border-[#dceae6] bg-white p-3">
-                          <span className="text-[9px] font-bold uppercase text-[#71818d]">Expected answer</span>
-                          <p className="mt-1 text-xs font-bold text-[#071633]">{item.correctAnswer || "Not available"}</p>
-                        </div>
-                      </div>
-                      <div className="mt-2 flex items-center justify-between text-[9px] font-bold text-[#71818d]">
-                        <span>{item.correct ? "Matched expected answer" : item.studentAnswer === "Not answered" ? "Not answered" : "Different from expected answer"}</span>
-                        <span>{item.timeTaken || 0}s</span>
-                      </div>
-                      {gameResultSubmission.gameResult?.aiReview?.questionFeedback?.find((feedback: any) => feedback.questionId === item.questionId)?.feedback && (
-                        <p className="mt-2 rounded-lg bg-[#e9f8f4] px-3 py-2 text-[10px] leading-4 text-[#126b4e]">
-                          <b>AI review:</b> {gameResultSubmission.gameResult.aiReview.questionFeedback.find((feedback: any) => feedback.questionId === item.questionId).feedback}
-                        </p>
-                      )}
-                    </article>
-                  ))}
-                  {!gameResultSubmission.gameResult?.review?.length && (
-                    <p className="rounded-xl border border-dashed border-[#dceae6] p-4 text-center text-[10px] text-[#71818d]">No saved answer details are available for this attempt.</p>
-                  )}
+                <label className="mt-4 block"><span className="flex items-center justify-between gap-3 text-[9px] font-black uppercase tracking-wide text-[#607080]"><span>School note</span><span className={gameNoteSaveState === "error" ? "text-rose-600" : "text-[#007f70]"}>{gameNoteSaveState === "saving" ? "Saving…" : gameNoteSaveState === "saved" ? "Saved" : gameNoteSaveState === "error" ? "Not saved" : "Auto-save on"}</span></span><textarea value={gameSchoolReview} onChange={(event) => setGameSchoolReview(event.target.value)} rows={3} placeholder="Add a brief observation about the student's performance…" className="mt-2 w-full resize-none rounded-xl border border-[#dceae6] bg-[#fafdfc] p-3 text-xs leading-5 text-[#071633] outline-none transition focus:border-[#55b9a7] focus:ring-2 focus:ring-[#55b9a7]/15" /></label>
+                <div className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <button type="button" disabled={!gameSchoolReview.trim() || gameReviewSaving} onClick={() => void saveGameSchoolReview("NEEDS_FOLLOW_UP")} className="min-h-10 rounded-xl border border-amber-300 bg-amber-50 px-4 text-[10px] font-black text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-45">Needs Follow-up</button>
+                  <button type="button" disabled={!gameSchoolReview.trim() || gameReviewSaving} onClick={() => void saveGameSchoolReview("REVIEWED")} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-[#007f70] px-4 text-[10px] font-black text-white transition hover:bg-[#00665a] disabled:cursor-not-allowed disabled:opacity-45">{gameReviewSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />} Mark as Reviewed</button>
                 </div>
-              </div>
+              </section>}
             </div>
             <div className="flex justify-end border-t border-[#dceae6] bg-[#f8fbf9] p-4">
-              <button onClick={() => setGameResultSubmission(null)} className="rounded-xl bg-[#007f70] px-4 py-2 text-xs font-bold text-white hover:bg-[#00665a]">Close</button>
+              <button onClick={() => { setGameResponseReviewOpen(false); setGameResultSubmission(null); }} className="rounded-xl bg-[#007f70] px-4 py-2 text-xs font-bold text-white hover:bg-[#00665a]">Close</button>
             </div>
           </div>
         </div>
       )}
+
+      {gameResultSubmission && gameResponseReviewOpen && (() => {
+        const responses = Array.isArray(gameResultSubmission.gameResult?.review) ? gameResultSubmission.gameResult.review : [];
+        const safeIndex = Math.min(gameResponseReviewIndex, Math.max(0, responses.length - 1));
+        const response = responses[safeIndex];
+        const correctCount = responses.filter((item: { correct?: boolean | null }) => item.correct === true).length;
+        const incorrectCount = responses.filter((item: { correct?: boolean | null }) => item.correct === false).length;
+        const accuracy = responses.length ? Math.round((correctCount / responses.length) * 100) : 0;
+        const imageUrl = response ? findSavedMedia(response, "image") : null;
+        const audioUrl = response ? findSavedMedia(response, "audio") : null;
+        return (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#071633]/65 p-3 backdrop-blur-md sm:p-5">
+            <section className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/70 bg-white shadow-[0_30px_90px_rgba(7,22,51,.35)]">
+              <header className="flex items-center justify-between border-b border-[#dceae6] bg-[#f8fbf9] p-5">
+                <div><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#007f70]">Student responses</p><h3 className="mt-1 text-sm font-black text-[#071633]">{gameResultSubmission.gameResult?.gameName || "Game assessment"}</h3><p className="mt-1 text-[9px] text-[#71818d]">Saved session · synchronized with the live result</p></div>
+                <button onClick={() => setGameResponseReviewOpen(false)} className="grid h-9 w-9 place-items-center rounded-xl border border-[#dceae6] bg-white text-[#607080] hover:bg-[#edf5f3]" aria-label="Close student responses"><XCircle className="h-4 w-4" /></button>
+              </header>
+              <div className="overflow-y-auto p-5 sm:p-6">
+                {response ? (
+                  <article>
+                    <div className="flex items-center justify-between gap-3"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#007f70]">Round {response.number || safeIndex + 1}</p><span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[9px] font-black ${response.correct === true ? "bg-emerald-100 text-emerald-700" : response.correct === false ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"}`}>{response.correct === true ? <CheckCircle2 className="h-3.5 w-3.5" /> : response.correct === false ? <XCircle className="h-3.5 w-3.5" /> : null}{response.correct === true ? "Correct" : response.correct === false ? "Incorrect" : "Not available"}</span></div>
+                    <div className="mt-4 rounded-xl border border-[#dceae6] bg-[#fafdfc] p-4"><p className="text-[9px] font-black uppercase tracking-wide text-[#71818d]">What the student was asked</p><p className="mt-2 text-sm font-bold leading-6 text-[#071633]">{response.questionText || "Not available"}</p>{imageUrl && <img src={imageUrl} alt="Saved visual stimulus" className="mt-3 max-h-48 w-full rounded-xl border border-[#dceae6] bg-white object-contain p-2" />}{audioUrl && <audio controls preload="metadata" src={audioUrl} className="mt-3 w-full" />}</div>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-xl border border-[#bfe4db] bg-[#f2fbf8] p-4"><p className="text-[9px] font-black uppercase tracking-wide text-[#007f70]">Student&apos;s answer</p><p className="mt-2 break-words text-xs font-bold leading-5 text-[#071633]">{formatSavedResponse(response.studentAnswer)}</p></div>
+                      <div className="rounded-xl border border-[#dceae6] bg-white p-4"><p className="text-[9px] font-black uppercase tracking-wide text-[#71818d]">Correct answer</p><p className="mt-2 break-words text-xs font-bold leading-5 text-[#071633]">{formatSavedResponse(response.correctAnswer)}</p></div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-3">
+                      <div className="rounded-xl border border-[#dceae6] p-3"><p className="text-[9px] font-bold uppercase text-[#71818d]">Response time</p><p className="mt-1 text-sm font-black text-[#071633]">{response.timeTaken !== null && response.timeTaken !== undefined && Number.isFinite(Number(response.timeTaken)) ? `${Number(response.timeTaken)}s` : "Not available"}</p></div>
+                      <div className="rounded-xl border border-[#dceae6] p-3"><p className="text-[9px] font-bold uppercase text-[#71818d]">Score</p><p className="mt-1 text-sm font-black text-[#071633]">{response.points !== null && response.points !== undefined && response.maxPoints !== null && response.maxPoints !== undefined ? `${response.points}/${response.maxPoints}` : "Not available"}</p></div>
+                    </div>
+                  </article>
+                ) : <div className="rounded-xl border border-dashed border-[#cbded9] bg-[#fafdfc] p-8 text-center"><p className="text-xs font-black text-[#34475a]">Responses not available</p><p className="mt-2 text-[10px] leading-5 text-[#71818d]">{gameResultSubmission.gameResult?.reviewCaptureStatus === "LEGACY_NOT_CAPTURED" ? "This session was saved before round-level response capture was available. Exact answers cannot be reconstructed." : "No saved response data is available for this session."}</p></div>}
+              </div>
+              <footer className="border-t border-[#dceae6] bg-[#f8fbf9] p-4">
+                {responses.length ? <><div className="mb-3 grid grid-cols-4 gap-2 rounded-xl border border-[#dceae6] bg-white p-3 text-center"><div><b className="block text-xs text-[#071633]">{responses.length}</b><span className="text-[8px] font-bold uppercase text-[#71818d]">Rounds</span></div><div><b className="block text-xs text-emerald-700">{correctCount}</b><span className="text-[8px] font-bold uppercase text-[#71818d]">Correct</span></div><div><b className="block text-xs text-rose-700">{incorrectCount}</b><span className="text-[8px] font-bold uppercase text-[#71818d]">Incorrect</span></div><div><b className="block text-xs text-[#007f70]">{accuracy}%</b><span className="text-[8px] font-bold uppercase text-[#71818d]">Accuracy</span></div></div>
+                <div className="flex items-center justify-between gap-3"><button disabled={safeIndex === 0} onClick={() => setGameResponseReviewIndex((index) => Math.max(0, index - 1))} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[#dceae6] bg-white px-3 text-[10px] font-black text-[#526474] disabled:opacity-40"><ArrowLeft className="h-3.5 w-3.5" /> Previous</button><span className="text-[10px] font-black text-[#607080]">{safeIndex + 1} of {responses.length}</span>{safeIndex === responses.length - 1 ? <button onClick={() => setGameResponseReviewOpen(false)} className="min-h-10 rounded-xl bg-[#007f70] px-4 text-[10px] font-black text-white hover:bg-[#00665a]">Finish</button> : <button onClick={() => setGameResponseReviewIndex((index) => Math.min(responses.length - 1, index + 1))} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[#007f70] px-3 text-[10px] font-black text-white">Next <ArrowRight className="h-3.5 w-3.5" /></button>}</div></> : <div className="flex justify-end"><button onClick={() => setGameResponseReviewOpen(false)} className="min-h-10 rounded-xl bg-[#007f70] px-5 text-[10px] font-black text-white hover:bg-[#00665a]">Close</button></div>}
+              </footer>
+            </section>
+          </div>
+        );
+      })()}
 
       {/* Grading evaluation modal */}
       {gradingSubmission && (

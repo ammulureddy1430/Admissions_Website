@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import fixWebmDuration from "fix-webm-duration";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -64,6 +65,7 @@ export function GameRuntimePlayer({
   secureMode = false,
   tutorial,
   forceRunning = false,
+  sequenceDeadline,
 }: {
   initial: any;
   request: (path: string, init?: RequestInit) => Promise<any>;
@@ -72,6 +74,7 @@ export function GameRuntimePlayer({
   secureMode?: boolean;
   tutorial?: any;
   forceRunning?: boolean;
+  sequenceDeadline?: number | null;
 }) {
   const [state, setState] = useState(() =>
     forceRunning ? { ...initial, status: "RUNNING" } : initial,
@@ -83,6 +86,7 @@ export function GameRuntimePlayer({
     "fullscreen_exit" | "tab_switch" | null
   >(null);
   const [fullscreenRequired, setFullscreenRequired] = useState(false);
+  const [recordingInterrupted, setRecordingInterrupted] = useState(false);
   const totalGameSeconds = Number(initial.configuration?.timeLimitMinutes)
     ? Number(initial.configuration.timeLimitMinutes) * 60
     : Number(
@@ -91,12 +95,91 @@ export function GameRuntimePlayer({
             Number(initial.questionCount || 1),
       );
   const [seconds, setSeconds] = useState(totalGameSeconds);
+  const [sequenceSeconds, setSequenceSeconds] = useState(() =>
+    sequenceDeadline ? Math.max(0, Math.ceil((sequenceDeadline - Date.now()) / 1000)) : 0,
+  );
   const timeoutHandled = useRef(false);
   const securityBusyRef = useRef(false);
   const lastViolationRef = useRef(0);
   const suppressSecurityRef = useRef(false);
   const playerRef = useRef<HTMLDivElement>(null);
   const questionStartedAt = useRef(Date.now());
+  const gameplayRecorderRef = useRef<MediaRecorder | null>(null);
+  const gameplayStreamRef = useRef<MediaStream | null>(null);
+  const gameplayChunksRef = useRef<Blob[]>([]);
+  const gameplayRecordingStartedAtRef = useRef(0);
+  const gameplayFinishingRef = useRef(false);
+  const gameplayUploadRef = useRef<{ uploadUrl: string; contentType: string; objectKey: string } | null>(null);
+
+  useEffect(() => {
+    if (!sequenceDeadline) return;
+    const update = () => setSequenceSeconds(Math.max(0, Math.ceil((sequenceDeadline - Date.now()) / 1000)));
+    update();
+    const timer = window.setInterval(update, 500);
+    return () => window.clearInterval(timer);
+  }, [sequenceDeadline]);
+
+  const startGameplayRecording = async () => {
+    if (state.demo || state.mode !== "ASSIGNMENT" || !navigator.mediaDevices?.getDisplayMedia) return true;
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 15, displaySurface: "browser" },
+        audio: false,
+        preferCurrentTab: true,
+        selfBrowserSurface: "include",
+        surfaceSwitching: "exclude",
+        monitorTypeSurfaces: "exclude",
+      } as DisplayMediaStreamOptions);
+      const contentType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
+      const upload = gameplayUploadRef.current || await request(`game-assessments/engine/sessions/${state.id}/recording-upload-url`, { method: "POST", body: JSON.stringify({ contentType }) });
+      if (!gameplayUploadRef.current) gameplayChunksRef.current = [];
+      gameplayStreamRef.current = stream;
+      gameplayUploadRef.current = upload;
+      const recorder = new MediaRecorder(stream, { mimeType: contentType, videoBitsPerSecond: 1_000_000 });
+      recorder.ondataavailable = (event) => { if (event.data.size) gameplayChunksRef.current.push(event.data); };
+      gameplayRecorderRef.current = recorder;
+      stream.getVideoTracks()[0]?.addEventListener("ended", () => {
+        if (recorder.state === "recording" && !gameplayFinishingRef.current) void action("RECORDING_STOPPED");
+      });
+      return true;
+    } catch {
+      gameplayStreamRef.current?.getTracks().forEach((track) => track.stop());
+      gameplayStreamRef.current = null;
+      gameplayRecorderRef.current = null;
+      alert("Gameplay screen recording is required. Please choose this game tab in the sharing dialog.");
+      return false;
+    }
+  };
+
+  const finishGameplayRecording = async () => {
+    const recorder = gameplayRecorderRef.current;
+    const upload = gameplayUploadRef.current;
+    if (!recorder || !upload) return;
+    gameplayFinishingRef.current = true;
+    await new Promise<void>((resolve) => {
+      recorder.onstop = async () => {
+        try {
+          const rawBlob = new Blob(gameplayChunksRef.current, { type: upload.contentType });
+          const durationMs = Math.max(1, performance.now() - gameplayRecordingStartedAtRef.current);
+          const blob = rawBlob.size
+            ? await fixWebmDuration(rawBlob, durationMs, { logger: false })
+            : rawBlob;
+          if (blob.size) {
+            const stored = await fetch(upload.uploadUrl, { method: "PUT", headers: { "Content-Type": upload.contentType }, body: blob });
+            if (!stored.ok) throw new Error("Gameplay recording upload failed.");
+            await request(`game-assessments/engine/sessions/${state.id}/recording-ready`, { method: "POST", body: JSON.stringify({ objectKey: upload.objectKey, contentType: upload.contentType }) });
+          }
+        } finally {
+          gameplayStreamRef.current?.getTracks().forEach((track) => track.stop());
+          gameplayRecorderRef.current = null;
+          gameplayStreamRef.current = null;
+          resolve();
+        }
+      };
+      if (recorder.state === "inactive") recorder.onstop?.(new Event("stop"));
+      else recorder.stop();
+    });
+  };
 
   useEffect(() => {
     if (state.status !== "RUNNING") return;
@@ -192,16 +275,34 @@ export function GameRuntimePlayer({
     }
   };
   const startGame = async () => {
+    if (!(await startGameplayRecording())) return;
     const element = playerRef.current;
     if (!checkFullscreenState()) {
       const entered = await enterFullscreen(element);
       if (!entered) {
+        gameplayStreamRef.current?.getTracks().forEach((track) => track.stop());
+        gameplayStreamRef.current = null;
+        gameplayRecorderRef.current = null;
         setFullscreenRequired(true);
         return;
       }
     }
     setFullscreenRequired(false);
     await action("START");
+    const recorder = gameplayRecorderRef.current;
+    if (recorder?.state === "inactive") {
+      recorder.start(1000);
+      gameplayRecordingStartedAtRef.current = performance.now();
+    }
+  };
+  const resumeAfterRecordingInterruption = async () => {
+    if (!(await startGameplayRecording())) return;
+    const entered = checkFullscreenState() || await enterFullscreen(playerRef.current);
+    if (!entered) return;
+    await action("RESUME");
+    const recorder = gameplayRecorderRef.current;
+    if (recorder?.state === "inactive") recorder.start(1000);
+    setRecordingInterrupted(false);
   };
   const action = async (actionName: string, payload?: any, visualDelay = 0) => {
     if (state.demo) {
@@ -252,7 +353,7 @@ export function GameRuntimePlayer({
     const applyResult = () => {
       setState(next);
       if (actionName === "ANSWER") {
-        if (next.status === "COMPLETED") onComplete?.(next);
+        if (next.status === "COMPLETED") void finishGameplayRecording().finally(() => onComplete?.(next));
       } else if (
         (actionName === "COMPLETE" ||
           actionName === "MAZE_COMPLETE" ||
@@ -261,16 +362,22 @@ export function GameRuntimePlayer({
           actionName === "SOUND_DETECTIVE_COMPLETE" ||
           actionName === "COLOR_PATH_COMPLETE" ||
           actionName === "MAGIC_PAINT_COMPLETE" ||
-          actionName === "TRAIN_TRACK_COMPLETE") &&
+          actionName === "TRAIN_TRACK_COMPLETE" ||
+          actionName === "PACKAGE_SORTER_COMPLETE" ||
+          actionName === "RESCUE_MISSION_COMPLETE" ||
+          actionName === "PARKING_ESCAPE_COMPLETE" ||
+          actionName === "WATER_PIPELINE_COMPLETE") &&
         next.status === "COMPLETED"
       ) {
-        onComplete?.(next);
+        void finishGameplayRecording().finally(() => onComplete?.(next));
       } else if (
         actionName === "SECURITY_VIOLATION" &&
         next.status === "COMPLETED"
       ) {
         suppressSecurityRef.current = true;
-        onComplete?.(next);
+        void finishGameplayRecording().finally(() => onComplete?.(next));
+      } else if (actionName === "RECORDING_STOPPED" && next.status === "PAUSED") {
+        setRecordingInterrupted(true);
       }
     };
     visualDelay ? window.setTimeout(applyResult, visualDelay) : applyResult();
@@ -436,6 +543,7 @@ export function GameRuntimePlayer({
       }}
       className={`game-runtime-player fixed inset-0 z-[9999] flex h-[100dvh] w-screen flex-col bg-gradient-to-br from-[#071633] via-[#123b5a] to-[#007f70] text-white ${isAdventure ? "is-adventure-game" : ""} ${isBoardGame ? "is-board-game" : ""} ${isBuildingGame ? "is-building-game" : ""} ${isDragDropGame ? "is-drag-drop-game" : ""} ${isFishingGame ? "is-fishing-game" : ""} ${isLogicGame ? "is-logic-game" : ""} ${isMazeGame ? "is-maze-game" : ""} ${isMemoryGame ? "is-memory-game" : ""} ${isRacingGame ? "is-racing-game" : ""} ${isSortingGame ? "is-sorting-game" : ""} ${isTreasureHunt ? "is-treasure-hunt" : ""}`}
     >
+      {sequenceDeadline && <div className="pointer-events-none fixed left-1/2 top-3 z-[10020] -translate-x-1/2 rounded-full border-2 border-white bg-[#b42318] px-4 py-2 text-xs font-black !text-white shadow-xl" style={{ color: "#ffffff" }}><Timer className="mr-1.5 inline h-4 w-4" />Game session {Math.floor(sequenceSeconds / 60)}:{String(sequenceSeconds % 60).padStart(2, "0")}</div>}
       {!isFollowTheLights && !isBallStack && !isSoundDetective && !isColorPath && !isPackageSorter && !isMagicPaint && !isTrainTrackBuilder && (
         <>
           <header className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3">
@@ -537,7 +645,7 @@ export function GameRuntimePlayer({
               onComplete={(metrics) => action("COLOR_PATH_COMPLETE", metrics)}
             />
           ) : isMagicPaint ? (
-            <MagicPaintGame disabled={state.status !== "RUNNING"} sound={sound} durationSeconds={120} onComplete={(metrics) => action("MAGIC_PAINT_COMPLETE", metrics)} />
+            <MagicPaintGame disabled={state.status !== "RUNNING"} sound={sound} durationSeconds={120} onProgress={(metrics) => action("MAGIC_PAINT_PROGRESS", metrics)} onComplete={(metrics) => action("MAGIC_PAINT_COMPLETE", metrics)} />
           ) : isTrainTrackBuilder ? (
             <TrainTrackBuilderGame disabled={state.status !== "RUNNING"} sound={sound} durationSeconds={120} onComplete={(metrics) => action("TRAIN_TRACK_COMPLETE", metrics)} />
           ) : isPackageSorter ? (
@@ -847,6 +955,16 @@ export function GameRuntimePlayer({
           )}
         </section>
       </main>
+      {recordingInterrupted && state.status === "PAUSED" && (
+        <div className="absolute inset-0 z-[70] grid place-items-center bg-slate-950/95 p-4 backdrop-blur-md">
+          <section role="alertdialog" aria-modal="true" aria-label="Screen recording paused" className="w-full max-w-md rounded-3xl bg-white p-6 text-center shadow-2xl sm:p-8">
+            <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-amber-500 text-white"><AlertTriangle className="h-8 w-8" /></div>
+            <h2 className="mt-5 text-xl font-black text-[#071633]">Screen recording stopped</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">The assessment is paused. Recording must remain active until the game is completed.</p>
+            <button type="button" onClick={() => void resumeAfterRecordingInterruption()} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#007f70] px-4 py-3 text-sm font-black text-white"><Play className="h-4 w-4" /> Resume recording and assessment</button>
+          </section>
+        </div>
+      )}
       {secureMode && securityWarning && state.status === "RUNNING" && (
         <div className="absolute inset-0 z-50 grid place-items-center bg-slate-950/90 p-4 backdrop-blur-md">
           <section
@@ -1642,6 +1760,21 @@ function ActualGameTutorialDemo({ preview }: { preview: any }) {
       window.setTimeout(advanceMock, 500);
     },
   };
+  const builtInPracticeEngines = [
+    "FOLLOW_THE_LIGHTS",
+    "BALL_STACK",
+    "SOUND_DETECTIVE",
+    "COLOR_PATH",
+    "MAGIC_PAINT",
+    "TRAIN_TRACK_BUILDER",
+    "PACKAGE_SORTER",
+    "RESCUE_MISSION",
+    "PARKING_ESCAPE",
+    "WATER_PIPELINE",
+  ];
+  if (builtInPracticeEngines.includes(engineKey)) {
+    return <BuiltInGamePractice key={mockAttempt} engineKey={engineKey} />;
+  }
   if (!question)
     return (
       <BuiltInVideoTutorial
@@ -1813,6 +1946,39 @@ function ActualGameTutorialDemo({ preview }: { preview: any }) {
           </section>
         </div>
       )}
+    </div>
+  );
+}
+
+function BuiltInGamePractice({ engineKey }: { engineKey: string }) {
+  const [complete, setComplete] = useState(false);
+  const [attempt, setAttempt] = useState(1);
+  const finish = () => setComplete(true);
+  let game: React.ReactNode;
+
+  if (engineKey === "FOLLOW_THE_LIGHTS") game = <FollowTheLightsGame key={attempt} disabled={false} sound durationSeconds={120} onComplete={finish} />;
+  else if (engineKey === "BALL_STACK") game = <BallStackGame key={attempt} disabled={false} sound durationSeconds={90} onComplete={finish} />;
+  else if (engineKey === "SOUND_DETECTIVE") game = <SoundDetectiveGame key={attempt} disabled={false} sound practiceOnly onComplete={finish} />;
+  else if (engineKey === "COLOR_PATH") game = <ColorPathGame key={attempt} disabled={false} sound durationSeconds={60} onComplete={finish} />;
+  else if (engineKey === "MAGIC_PAINT") game = <MagicPaintGame key={attempt} disabled={false} sound durationSeconds={120} onProgress={() => undefined} onComplete={finish} />;
+  else if (engineKey === "TRAIN_TRACK_BUILDER") game = <TrainTrackBuilderGame key={attempt} disabled={false} sound durationSeconds={120} onComplete={finish} />;
+  else if (engineKey === "PACKAGE_SORTER") game = <PackageSorterGame key={attempt} disabled={false} sound durationSeconds={120} onComplete={finish} />;
+  else if (engineKey === "RESCUE_MISSION") game = <RescueMissionGame key={attempt} disabled={false} sound durationSeconds={120} onComplete={finish} />;
+  else if (engineKey === "PARKING_ESCAPE") game = <ParkingEscapeGame key={attempt} disabled={false} sound durationSeconds={120} onComplete={finish} />;
+  else game = <WaterPipelineGame key={attempt} disabled={false} sound durationSeconds={120} onComplete={finish} />;
+
+  return (
+    <div className="relative h-full w-full overflow-hidden rounded-2xl">
+      {game}
+      {complete && <div className="absolute inset-0 z-50 grid place-items-center bg-[#041728]/90 p-5 backdrop-blur-md">
+        <section className="w-full max-w-sm rounded-3xl border border-white/30 bg-[#0b3045] p-7 text-center shadow-2xl">
+          <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-300" />
+          <p className="mt-4 text-[10px] font-black uppercase tracking-widest !text-cyan-200">Mock attempt {attempt} complete</p>
+          <h3 className="mt-2 text-2xl font-black !text-white">Practice completed</h3>
+          <p className="mt-2 text-sm font-medium leading-5 !text-white">This practice was not scored or submitted. You can repeat it as many times as needed.</p>
+          <button type="button" onClick={() => { setAttempt((value) => value + 1); setComplete(false); }} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-300 px-5 py-3 text-sm font-black text-[#052438]"><RotateCcw className="h-4 w-4" /> Repeat Mock Game</button>
+        </section>
+      </div>}
     </div>
   );
 }
