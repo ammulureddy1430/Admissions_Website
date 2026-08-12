@@ -23,9 +23,9 @@ import "./WaterPipelineSlowFlow.css";
 
 export const WATER_PIPELINE_DURATION_SECONDS = 120;
 
-type Props = { disabled?: boolean; sound?: boolean; durationSeconds?: number; onComplete: (metrics: WaterPipelineMetrics) => void | Promise<void> };
+type Props = { disabled?: boolean; sound?: boolean; durationSeconds?: number; maxRounds?: number; practiceOnly?: boolean; onComplete: (metrics: WaterPipelineMetrics) => void | Promise<void> };
 
-export default function WaterPipelineGame({ disabled = false, sound = true, durationSeconds = WATER_PIPELINE_DURATION_SECONDS, onComplete }: Props) {
+export default function WaterPipelineGame({ disabled = false, sound = true, durationSeconds = WATER_PIPELINE_DURATION_SECONDS, maxRounds = 4, practiceOnly = false, onComplete }: Props) {
   const generator = useRef(new PipelineGenerator());
   const flow = useRef(new WaterFlowEngine());
   const audio = useRef(new SoundManager(sound));
@@ -33,7 +33,7 @@ export default function WaterPipelineGame({ disabled = false, sound = true, dura
   const difficulty = useRef(new DifficultyManager());
   const levelStarted = useRef(Date.now());
   const done = useRef(false);
-  const initial = useRef(generator.current.generate(1));
+  const initial = useRef(practiceOnly ? generator.current.generatePractice() : generator.current.generate(1));
   const [layout, setLayout] = useState<PipelineLayout>(initial.current);
   const [seconds, setSeconds] = useState(durationSeconds);
   const [wet, setWet] = useState<string[]>([]);
@@ -57,13 +57,13 @@ export default function WaterPipelineGame({ disabled = false, sound = true, dura
   }, [onComplete]);
 
   useEffect(() => {
-    if (disabled || done.current) return;
+    if (disabled || done.current || maxRounds === 1) return;
     const timer = window.setInterval(() => setSeconds(value => {
       if (value <= 1) { window.clearInterval(timer); void finish(); return 0; }
       return value - 1;
     }), 1000);
     return () => window.clearInterval(timer);
-  }, [disabled, finish]);
+  }, [disabled, finish, maxRounds]);
 
   useLayoutEffect(() => {
     const alignOutlet = () => {
@@ -116,11 +116,16 @@ export default function WaterPipelineGame({ disabled = false, sound = true, dura
       audio.current.play("finish");
     } else {
       await animation.current.delay(1100);
+      if (maxRounds === 1) {
+        setWet([]);
+        setFlowing(false);
+        return;
+      }
     }
     raw.current.levels_completed++;
     raw.current.solution_times.push((Date.now() - levelStarted.current) / 1000);
     await animation.current.delay(evaluation.complete ? 900 : 450);
-    if (difficulty.current.isFinal(layout.level)) { await finish(); return; }
+    if (raw.current.levels_completed >= maxRounds || difficulty.current.isFinal(layout.level)) { await finish(); return; }
     const level = difficulty.current.next(layout.level);
     const fresh = generator.current.generate(level);
     raw.current.levels_started++;
@@ -134,9 +139,9 @@ export default function WaterPipelineGame({ disabled = false, sound = true, dura
   return <main className="pipeline-game">
     <div className="pipeline-bubbles">{Array.from({ length: 12 }, (_, i) => <i key={i} />)}</div>
     <header className="pipeline-hud">
-      <div className="pipeline-level"><small>WATER PIPELINE</small><b>LEVEL {layout.level} <em>OF 4</em></b><span><i style={{ width: `${layout.level / 4 * 100}%` }} /></span></div>
+      <div className="pipeline-level"><small>WATER PIPELINE</small>{maxRounds > 1 && <><b>LEVEL {layout.level} <em>OF 4</em></b><span><i style={{ width: `${layout.level / 4 * 100}%` }} /></span></>}</div>
       <div className="pipeline-goal"><span>💧</span><div><b>MAKE WATER REACH THE GARDEN</b><small>Tap a pipe to rotate it</small></div><em>🌻</em></div>
-      <div className="pipeline-timer">◷ <b>{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</b></div>
+      {maxRounds > 1 && <div className="pipeline-timer">◷ <b>{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</b></div>}
     </header>
     <section ref={worldRef} className={`pipeline-world rows-${layout.rows}`}>
       <div className="water-tower"><div className="tank"><i /><b>WATER TANK</b><span className="tank-water" /></div><div className="tower-legs" /><div className="tank-riser" /><div className="tank-valve">●</div></div>

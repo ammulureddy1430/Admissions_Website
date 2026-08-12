@@ -371,26 +371,36 @@ export class GamesService implements OnModuleInit {
 
   async bulkAssignmentOptions(ageGroupValue: string, studentId: string, schoolId: string) {
     const ageGroup = normalizeGameAgeGroup(ageGroupValue);
-    if (!ageGroup) throw new BadRequestException('Please select an age group to assign all games.');
+    const allAgeGroups = ageGroupValue?.toUpperCase() === 'ALL';
+    if (!ageGroup && !allAgeGroups) throw new BadRequestException('Please select a valid age group to assign all games.');
+    const student = studentId ? await this.prisma.application.findFirst({
+      where: { id: studentId, schoolId, assessmentRequired: { not: false }, status: { notIn: ['DRAFT', 'REJECTED', 'WITHDRAWN'] } },
+      select: { id: true, grade: true, studentDob: true },
+    }) : null;
+    if (studentId && !student) throw new BadRequestException('The selected student is not eligible for game assignments.');
     const games = await this.prisma.game.findMany({
-      where: { ageGroup, isActive: true, status: 'ACTIVE', gameType: { not: 'ASSESSMENT_ENGINE' } },
+      where: { ...(ageGroup ? { ageGroup } : {}), isActive: true, status: 'ACTIVE', gameType: { not: 'ASSESSMENT_ENGINE' } },
       select: { id: true, name: true, category: true, ageGroup: true, durationSeconds: true, componentName: true }, orderBy: { name: 'asc' },
     });
-    if (!studentId) return { ageGroup, games: games.map((game) => ({ ...game, alreadyAssigned: false })) };
+    const eligibleGames = student && allAgeGroups
+      ? games.filter((game) => studentMatchesAgeGroup(student.grade, student.studentDob, game.ageGroup))
+      : games;
+    if (!studentId) return { ageGroup: ageGroup || 'ALL', games: eligibleGames.map((game) => ({ ...game, alreadyAssigned: false })) };
     const existing = await this.prisma.gameResult.findMany({
-      where: { studentId, gameId: { in: games.map((game) => game.id) }, assessment: { schoolId }, gameAssignment: { status: 'ASSIGNED' } }, select: { gameId: true },
+      where: { studentId, gameId: { in: eligibleGames.map((game) => game.id) }, assessment: { schoolId }, gameAssignment: { status: 'ASSIGNED' } }, select: { gameId: true },
     });
     const assigned = new Set(existing.flatMap((row) => row.gameId ? [row.gameId] : []));
-    return { ageGroup, games: games.map((game) => ({ ...game, alreadyAssigned: assigned.has(game.id) })) };
+    return { ageGroup: ageGroup || 'ALL', games: eligibleGames.map((game) => ({ ...game, alreadyAssigned: assigned.has(game.id) })) };
   }
 
   async bulkEligibleStudents(ageGroupValue: string, schoolId: string) {
     const ageGroup = normalizeGameAgeGroup(ageGroupValue);
-    if (!ageGroup) throw new BadRequestException('Please select a valid age group.');
+    const allAgeGroups = ageGroupValue?.toUpperCase() === 'ALL';
+    if (!ageGroup && !allAgeGroups) throw new BadRequestException('Please select a valid age group.');
 
     const games = await this.prisma.game.findMany({
-      where: { ageGroup, isActive: true, status: 'ACTIVE', gameType: { not: 'ASSESSMENT_ENGINE' } },
-      select: { id: true },
+      where: { ...(ageGroup ? { ageGroup } : {}), isActive: true, status: 'ACTIVE', gameType: { not: 'ASSESSMENT_ENGINE' } },
+      select: { id: true, ageGroup: true },
     });
     if (!games.length) return [];
 
@@ -403,7 +413,9 @@ export class GamesService implements OnModuleInit {
       select: { id: true, studentFirstName: true, studentLastName: true, studentDob: true, grade: true, status: true },
       orderBy: [{ studentFirstName: 'asc' }, { studentLastName: 'asc' }],
     });
-    const eligible = students.filter((student) => studentMatchesAgeGroup(student.grade, student.studentDob, ageGroup));
+    const eligible = students.filter((student) => ageGroup
+      ? studentMatchesAgeGroup(student.grade, student.studentDob, ageGroup)
+      : games.some((game) => studentMatchesAgeGroup(student.grade, student.studentDob, game.ageGroup)));
     const results = await this.prisma.gameResult.findMany({
       where: {
         studentId: { in: eligible.map((student) => student.id) },
@@ -421,30 +433,55 @@ export class GamesService implements OnModuleInit {
       assignedByStudent.set(result.studentId, assigned);
     }
 
-    return eligible.map(({ studentDob: _studentDob, ...student }) => ({
-      ...student,
-      ageGroup,
-      allGamesAssigned: (assignedByStudent.get(student.id)?.size || 0) >= games.length,
-    }));
+    return eligible.map(({ studentDob, ...student }) => {
+      const eligibleGames = ageGroup ? games : games.filter((game) => studentMatchesAgeGroup(student.grade, studentDob, game.ageGroup));
+      const matchedAgeGroups = [...new Set(eligibleGames.map((game) => game.ageGroup))];
+      const assigned = assignedByStudent.get(student.id) || new Set<string>();
+      return {
+        ...student,
+        ageGroup: ageGroup || matchedAgeGroups.join(', '),
+        allGamesAssigned: eligibleGames.length > 0 && eligibleGames.every((game) => assigned.has(game.id)),
+      };
+    });
   }
 
-  async bulkAssign(dto: BulkAssignRealTimeGamesDto, schoolId: string, userId: string) {
+  async bulkAssign(dto: BulkAssignRealTimeGamesDto, schoolId: string, userId: string): Promise<any> {
+    const selectedStudentIds = [...new Set(dto.studentIds?.length ? dto.studentIds : dto.studentId ? [dto.studentId] : [])];
+    if (!selectedStudentIds.length) throw new BadRequestException('Select at least one eligible student.');
+    if (selectedStudentIds.length > 1) {
+      const students = await this.prisma.application.findMany({
+        where: { id: { in: selectedStudentIds }, schoolId, assessmentRequired: { not: false }, status: { notIn: ['DRAFT', 'REJECTED', 'WITHDRAWN'] } },
+        select: { id: true, grade: true, studentDob: true },
+      });
+      if (students.length !== selectedStudentIds.length) throw new BadRequestException('One or more selected students are not eligible for game assignments.');
+      const requestedGames = await this.prisma.game.findMany({ where: { id: { in: dto.gameIds }, isActive: true, status: 'ACTIVE', gameType: { not: 'ASSESSMENT_ENGINE' } }, select: { id: true, ageGroup: true } });
+      const results = [];
+      for (const student of students) {
+        const eligibleGameIds = requestedGames.filter((game) => studentMatchesAgeGroup(student.grade, student.studentDob, game.ageGroup)).map((game) => game.id);
+        if (!eligibleGameIds.length) continue;
+        results.push(await this.bulkAssign({ ageGroup: dto.ageGroup, studentId: student.id, gameIds: eligibleGameIds }, schoolId, userId));
+      }
+      const assignedCount = results.reduce((sum, result) => sum + result.assignedCount, 0);
+      return { studentCount: results.length, assignedCount, results, message: `${assignedCount} assessments assigned successfully to ${results.length} students.` };
+    }
+    const studentId = selectedStudentIds[0];
     const ageGroup = normalizeGameAgeGroup(dto.ageGroup);
-    if (!ageGroup) throw new BadRequestException('Please select a valid age group to assign all games.');
+    const allAgeGroups = dto.ageGroup?.toUpperCase() === 'ALL';
+    if (!ageGroup && !allAgeGroups) throw new BadRequestException('Please select a valid age group to assign all games.');
     const requestedIds = [...new Set(dto.gameIds)];
     const games = await this.prisma.game.findMany({
-      where: { id: { in: requestedIds }, ageGroup, isActive: true, status: 'ACTIVE', gameType: { not: 'ASSESSMENT_ENGINE' } },
+      where: { id: { in: requestedIds }, ...(ageGroup ? { ageGroup } : {}), isActive: true, status: 'ACTIVE', gameType: { not: 'ASSESSMENT_ENGINE' } },
       orderBy: { name: 'asc' },
     });
     if (games.length !== requestedIds.length) {
-      throw new BadRequestException(`Every selected game must be active and belong to the ${ageGroup} age group.`);
+      throw new BadRequestException(ageGroup ? `Every selected game must be active and belong to the ${ageGroup} age group.` : 'Every selected game must be active.');
     }
     const student = await this.prisma.application.findFirst({
-      where: { id: dto.studentId, schoolId, assessmentRequired: { not: false }, status: { notIn: ['DRAFT', 'REJECTED', 'WITHDRAWN'] } },
+      where: { id: studentId, schoolId, assessmentRequired: { not: false }, status: { notIn: ['DRAFT', 'REJECTED', 'WITHDRAWN'] } },
       select: { id: true, studentFirstName: true, studentLastName: true, studentDob: true, grade: true },
     });
-    if (!student || !studentMatchesAgeGroup(student.grade, student.studentDob, ageGroup)) {
-      throw new BadRequestException(`The selected student is not eligible for the ${ageGroup} age group.`);
+    if (!student || games.some((game) => !studentMatchesAgeGroup(student.grade, student.studentDob, game.ageGroup))) {
+      throw new BadRequestException(ageGroup ? `The selected student is not eligible for the ${ageGroup} age group.` : 'One or more selected games do not match the student’s age group.');
     }
     const existing = await this.prisma.gameResult.findMany({
       where: { studentId: student.id, gameId: { in: requestedIds }, assessment: { schoolId }, gameAssignment: { status: 'ASSIGNED' } },
@@ -464,7 +501,7 @@ export class GamesService implements OnModuleInit {
         const template = templates.find((item) => item.templateId === registration.templateCode)!;
         const assessment = await tx.gameAssessment.create({ data: {
           schoolId, createdById: userId, name: `${game.name} Assessment`, description: game.description,
-          assessmentType: 'GAME_BASED', assessmentMode: 'ONLINE', subject: game.category, ageGroup,
+          assessmentType: 'GAME_BASED', assessmentMode: 'ONLINE', subject: game.category, ageGroup: game.ageGroup,
           topics: [registration.cognitiveSkill || game.category], difficulty: game.difficulty, language: 'English',
           numberOfQuestions: 0, numberOfGames: 1, timeLimit: Math.max(1, Math.ceil(game.durationSeconds / 60)),
           passingMarks: 60, attemptLimit: 1, settings: { source: 'REAL_TIME_GAMES_BULK', gameId: game.id }, status: 'PUBLISHED',
@@ -479,19 +516,19 @@ export class GamesService implements OnModuleInit {
           gameAssessmentId: assessment.id, generatedGameId: generated.id, assignedById: userId,
           targetType: 'STUDENT', targetIds: [student.id], maxAttempts: 1,
           timeLimitMinutes: Math.max(1, Math.ceil(game.durationSeconds / 60)), passingScore: 60,
-          assignmentSettings: { deliveryMode: 'SCHOOL', allowTutorialSkip: false, bulkAgeGroup: ageGroup }, status: 'ASSIGNED',
+          assignmentSettings: { deliveryMode: 'SCHOOL', allowTutorialSkip: false, bulkAgeGroup: ageGroup || 'ALL' }, status: 'ASSIGNED',
         } });
         await tx.gameResult.create({ data: { gameAssignmentId: assignment.id, studentId: student.id, gameId: game.id, assessmentId: assessment.id } });
-        await tx.realTimeGameAssignment.create({ data: { schoolId, gameId: game.id, assignedById: userId, ageGroup, studentIds: [student.id] } });
+        await tx.realTimeGameAssignment.create({ data: { schoolId, gameId: game.id, assignedById: userId, ageGroup: game.ageGroup, studentIds: [student.id] } });
         created.push(assignment.id);
       }
       return created;
     });
     return {
-      ageGroup, student: { id: student.id, name: `${student.studentFirstName} ${student.studentLastName}` },
+      ageGroup: ageGroup || 'ALL', student: { id: student.id, name: `${student.studentFirstName} ${student.studentLastName}` },
       requestedGames: requestedIds.length, assignedCount: assignmentIds.length, alreadyAssignedCount: alreadyAssignedIds.size,
       assignedGameIds: newGames.map((game) => game.id), alreadyAssignedGameIds: [...alreadyAssignedIds],
-      message: `${assignmentIds.length} assessments assigned successfully to ${student.studentFirstName} ${student.studentLastName} for the ${ageGroup} age group.`,
+      message: `${assignmentIds.length} assessments assigned successfully to ${student.studentFirstName} ${student.studentLastName}${ageGroup ? ` for the ${ageGroup} age group` : ''}.`,
     };
   }
 

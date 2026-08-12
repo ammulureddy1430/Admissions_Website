@@ -180,15 +180,15 @@ export class GameRuntimeService {
   async action(id: string, dto: RuntimeActionDto, schoolId: string, user: { id: string; role: Role }) {
     const session = await this.owned(id, schoolId, user);
     const action = dto.action.toUpperCase();
-    if (session.engine.engineKey === 'COLOR_PATH' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) {
+    if (session.engine.engineKey === 'COLOR_PATH' && ['PAUSE', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) {
       throw new BadRequestException('Color Path does not allow pause, hints, retries, skips, or question answers.');
     }
-    if (session.engine.engineKey === 'MAGIC_PAINT' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Magic Paint does not allow pause, hints, retries, skips, or question answers.');
-    if (session.engine.engineKey === 'TRAIN_TRACK_BUILDER' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Train Track Builder does not allow pause, hints, retries, skips, or question answers.');
-    if (session.engine.engineKey === 'PACKAGE_SORTER' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Package Sorter does not allow pause, hints, retries, skips, or question answers.');
-    if (session.engine.engineKey === 'RESCUE_MISSION' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Rescue Mission does not allow pause, hints, retries, skips, or question answers.');
-    if (session.engine.engineKey === 'PARKING_ESCAPE' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Parking Escape does not allow pause, hints, answers, or skips.');
-    if (session.engine.engineKey === 'WATER_PIPELINE' && ['PAUSE', 'RESUME', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Water Pipeline does not allow pause, hints, answers, or skips.');
+    if (session.engine.engineKey === 'MAGIC_PAINT' && ['PAUSE', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Magic Paint does not allow pause, hints, retries, skips, or question answers.');
+    if (session.engine.engineKey === 'TRAIN_TRACK_BUILDER' && ['PAUSE', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Train Track Builder does not allow pause, hints, retries, skips, or question answers.');
+    if (session.engine.engineKey === 'PACKAGE_SORTER' && ['PAUSE', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Package Sorter does not allow pause, hints, retries, skips, or question answers.');
+    if (session.engine.engineKey === 'RESCUE_MISSION' && ['PAUSE', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Rescue Mission does not allow pause, hints, retries, skips, or question answers.');
+    if (session.engine.engineKey === 'PARKING_ESCAPE' && ['PAUSE', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Parking Escape does not allow pause, hints, answers, or skips.');
+    if (session.engine.engineKey === 'WATER_PIPELINE' && ['PAUSE', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) throw new BadRequestException('Water Pipeline does not allow pause, hints, answers, or skips.');
     if (action === 'START') return this.transition(session.id, 'RUNNING', { startedAt: session.startedAt || new Date(), pausedAt: null }, 'STARTED', dto.payload, schoolId, user);
     if (action === 'PAUSE') {
       if (session.status !== 'RUNNING') throw new BadRequestException('Only a running game can be paused.');
@@ -228,7 +228,7 @@ export class GameRuntimeService {
   }
 
   private async followLightsComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
-    if (session.engine.engineKey !== 'FOLLOW_THE_LIGHTS' || session.status !== 'RUNNING') {
+    if (session.engine.engineKey !== 'FOLLOW_THE_LIGHTS' || !['RUNNING', 'PAUSED'].includes(session.status)) {
       throw new BadRequestException('Follow the Lights metrics require an active Follow the Lights session.');
     }
     const input = (payload || {}) as Record<string, any>;
@@ -263,7 +263,7 @@ export class GameRuntimeService {
   }
 
   private async ballStackComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
-    if (session.engine.engineKey !== 'BALL_STACK' || session.status !== 'RUNNING') throw new BadRequestException('Ball Stack metrics require an active Ball Stack session.');
+    if (session.engine.engineKey !== 'BALL_STACK' || !['RUNNING', 'PAUSED'].includes(session.status)) throw new BadRequestException('Ball Stack metrics require an active Ball Stack session.');
     const input = (payload || {}) as Record<string, any>;
     const number = (key: string, maximum = 100000) => Math.max(0, Math.min(maximum, Number(input[key]) || 0));
     const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 10) / 10));
@@ -293,7 +293,7 @@ export class GameRuntimeService {
   }
 
   private async soundDetectiveComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
-    if (session.engine.engineKey !== 'SOUND_DETECTIVE' || session.status !== 'RUNNING') {
+    if (session.engine.engineKey !== 'SOUND_DETECTIVE' || !['RUNNING', 'PAUSED'].includes(session.status)) {
       throw new BadRequestException('Sound Detective metrics require an active Sound Detective session.');
     }
     const input = (payload || {}) as Record<string, any>;
@@ -366,7 +366,7 @@ export class GameRuntimeService {
   }
 
   private async colorPathComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
-    if (session.engine.engineKey !== 'COLOR_PATH' || session.status !== 'RUNNING') throw new BadRequestException('Color Path metrics require an active Color Path session.');
+    if (session.engine.engineKey !== 'COLOR_PATH' || !['RUNNING', 'PAUSED'].includes(session.status)) throw new BadRequestException('Color Path metrics require an active Color Path session.');
     const input = (payload || {}) as Record<string, any>;
     const number = (key: string, maximum = 100000) => Math.max(0, Math.min(maximum, Number(input[key]) || 0));
     const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 10) / 10));
@@ -391,7 +391,7 @@ export class GameRuntimeService {
   }
 
   private async magicPaintComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
-    if (session.engine.engineKey !== 'MAGIC_PAINT' || session.status !== 'RUNNING') throw new BadRequestException('Magic Paint metrics require an active Magic Paint session.');
+    if (session.engine.engineKey !== 'MAGIC_PAINT' || !['RUNNING', 'PAUSED'].includes(session.status)) throw new BadRequestException('Magic Paint metrics require an active Magic Paint session.');
     const input=(payload||{}) as Record<string,any>; const number=(key:string,max=100000)=>Math.max(0,Math.min(max,Number(input[key])||0)); const clamp=(value:number)=>Math.max(0,Math.min(100,Math.round(value*10)/10));
     const objectsCompleted=number('objectsCompleted',1000); const colorsUsed=Array.isArray(input.colorsUsed)?[...new Set(input.colorsUsed.map(String))].slice(0,7):[]; const interactionsPerObject=Array.isArray(input.interactionsPerObject)?input.interactionsPerObject.map((n:unknown)=>Math.max(0,Math.min(100,Number(n)||0))).slice(0,1000):[];
     const averageCompletionTime=number('averageCompletionTime',120000); const interactionConsistency=clamp(number('interactionConsistency',100)); const completionPercentage=clamp(number('completionPercentage',100)); const creativityScore=clamp(number('creativityScore',100)); const causeEffectScore=clamp(number('causeEffectScore',100)); const overallScore=clamp((creativityScore+causeEffectScore)/2); const elapsedSeconds=Math.min(120,number('elapsedSeconds',120)); const completionStatus=objectsCompleted>=5||elapsedSeconds>=119?'COMPLETED':'ENDED';
@@ -426,7 +426,7 @@ export class GameRuntimeService {
   }
 
   private async trainTrackComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
-    if (session.engine.engineKey !== 'TRAIN_TRACK_BUILDER' || session.status !== 'RUNNING') throw new BadRequestException('Train Track Builder metrics require an active session.');
+    if (session.engine.engineKey !== 'TRAIN_TRACK_BUILDER' || !['RUNNING', 'PAUSED'].includes(session.status)) throw new BadRequestException('Train Track Builder metrics require an active session.');
     const input=(payload||{}) as Record<string,any>;const number=(key:string,max=100000)=>Math.max(0,Math.min(max,Number(input[key])||0));const clamp=(value:number)=>Math.max(0,Math.min(100,Math.round(value*10)/10));
     const roundsPlayed=number('roundsPlayed',1000),tracksCompleted=number('tracksCompleted',10000),successfulRoutes=Math.min(roundsPlayed,number('successfulRoutes',1000)),correctRotations=number('correctRotations',10000),incorrectRotations=number('incorrectRotations',10000),averageCompletionTime=number('averageCompletionTime',120000),highestDifficulty=Math.min(7,Math.max(1,number('highestDifficulty',7))),elapsedSeconds=Math.min(120,number('elapsedSeconds',120));
     const rotations=correctRotations+incorrectRotations,logicalAccuracy=clamp(rotations?correctRotations/rotations*100:0),routeRate=roundsPlayed?successfulRoutes/roundsPlayed*100:0,difficulty=highestDifficulty/7*100,completionPercentage=clamp(roundsPlayed/7*100),logicalThinkingScore=clamp(logicalAccuracy*.55+routeRate*.3+difficulty*.15),causeEffectScore=clamp(routeRate*.48+logicalAccuracy*.32+completionPercentage*.2),overallScore=clamp((logicalThinkingScore+causeEffectScore)/2),completionStatus=elapsedSeconds>=119||roundsPlayed>=7?'COMPLETED':'PARTIAL';
@@ -435,7 +435,7 @@ export class GameRuntimeService {
   }
 
   private async packageSorterComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
-    if (session.engine.engineKey !== 'PACKAGE_SORTER' || session.status !== 'RUNNING') throw new BadRequestException('Package Sorter metrics require an active session.');
+    if (session.engine.engineKey !== 'PACKAGE_SORTER' || !['RUNNING', 'PAUSED'].includes(session.status)) throw new BadRequestException('Package Sorter metrics require an active session.');
     const input = (payload || {}) as Record<string, any>;
     const number = (key: string, max = 100000) => Math.max(0, Math.min(max, Number(input[key]) || 0));
     const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 10) / 10));
@@ -492,7 +492,7 @@ export class GameRuntimeService {
   }
 
   private async rescueMissionComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
-    if (session.engine.engineKey !== 'RESCUE_MISSION' || session.status !== 'RUNNING') throw new BadRequestException('Rescue Mission metrics require an active session.');
+    if (session.engine.engineKey !== 'RESCUE_MISSION' || !['RUNNING', 'PAUSED'].includes(session.status)) throw new BadRequestException('Rescue Mission metrics require an active session.');
     const input = (payload || {}) as Record<string, any>;
     const number = (key: string, max = 100000) => Math.max(0, Math.min(max, Number(input[key]) || 0));
     const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 10) / 10));
@@ -522,7 +522,7 @@ export class GameRuntimeService {
   }
 
   private async parkingEscapeComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
-    if (session.engine.engineKey !== 'PARKING_ESCAPE' || session.status !== 'RUNNING') throw new BadRequestException('Parking Escape metrics require an active session.');
+    if (session.engine.engineKey !== 'PARKING_ESCAPE' || !['RUNNING', 'PAUSED'].includes(session.status)) throw new BadRequestException('Parking Escape metrics require an active session.');
     const input = (payload || {}) as Record<string, any>;
     const number = (key: string, max = 100000) => Math.max(0, Math.min(max, Number(input[key]) || 0));
     const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value * 10) / 10));
@@ -546,7 +546,7 @@ export class GameRuntimeService {
   }
 
   private async waterPipelineComplete(session: any, payload: unknown, schoolId: string, user: { id: string; role: Role }) {
-    if (session.engine.engineKey !== 'WATER_PIPELINE' || session.status !== 'RUNNING') throw new BadRequestException('Water Pipeline metrics require an active session.');
+    if (session.engine.engineKey !== 'WATER_PIPELINE' || !['RUNNING', 'PAUSED'].includes(session.status)) throw new BadRequestException('Water Pipeline metrics require an active session.');
     const input=(payload||{}) as Record<string,any>,number=(key:string,max=100000)=>Math.max(0,Math.min(max,Number(input[key])||0)),clamp=(value:number)=>Math.max(0,Math.min(100,Math.round(value*10)/10));
     const levelsStarted=number('levels_started',4),levelsCompleted=Math.min(levelsStarted,number('levels_completed',4)),pipesRotated=number('pipes_rotated'),successfulConnections=number('successful_connections'),failedConnections=number('failed_connections'),completedPipelines=Math.min(levelsCompleted,number('completed_pipelines',4)),averageSolutionTime=number('average_solution_time',120),averageRotationsPerLevel=number('average_rotations_per_level'),highestLevel=Math.min(4,Math.max(1,number('highest_level',4))),attempts=successfulConnections+failedConnections,accuracy=attempts?successfulConnections/attempts:0,completion=completedPipelines/4,efficiency=averageRotationsPerLevel?Math.min(1,8/averageRotationsPerLevel):0;
     const logicalReasoningScore=clamp((accuracy*.38+completion*.42+highestLevel/4*.2)*100),problemSolvingScore=clamp((efficiency*.4+completion*.45+(failedConnections?Math.min(1,completedPipelines/failedConnections):1)*.15)*100),completionPercentage=clamp(levelsCompleted/4*100),overallScore=clamp((logicalReasoningScore+problemSolvingScore)/2),completionStatus=String(input.completionStatus||'COMPLETED');
@@ -1028,7 +1028,24 @@ export class GameRuntimeService {
   }
 
   private async event(sessionId: string, eventType: string, payload?: unknown) {
-    const sequence = await this.prisma.gameRuntimeEvent.count({ where: { sessionId } }) + 1;
-    return this.prisma.gameRuntimeEvent.create({ data: { sessionId, eventType, sequence, payload: payload as Prisma.InputJsonValue } });
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const latest = await this.prisma.gameRuntimeEvent.aggregate({
+        where: { sessionId },
+        _max: { sequence: true },
+      });
+      try {
+        return await this.prisma.gameRuntimeEvent.create({
+          data: {
+            sessionId,
+            eventType,
+            sequence: Number(latest._max.sequence || 0) + 1,
+            payload: payload as Prisma.InputJsonValue,
+          },
+        });
+      } catch (error) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002' || attempt === 4) throw error;
+      }
+    }
+    throw new ServiceUnavailableException('The game event could not be recorded.');
   }
 }

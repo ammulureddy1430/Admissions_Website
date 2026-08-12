@@ -9,7 +9,7 @@ import { ColorPathSoundManager } from "./Sounds/SoundManager";
 import type { ColorPathScores, PathStone } from "./Types";
 import "./Styles/Game.css";
 
-export default function ColorPathGame({ disabled = false, sound = true, durationSeconds = COLOR_PATH_DURATION_SECONDS, onComplete }: { disabled?: boolean; sound?: boolean; durationSeconds?: number; onComplete: (metrics: ColorPathScores) => void | Promise<void> }) {
+export default function ColorPathGame({ disabled = false, sound = true, durationSeconds = COLOR_PATH_DURATION_SECONDS, maxRounds = COLOR_PATH_TOTAL_ROUNDS, onComplete }: { disabled?: boolean; sound?: boolean; durationSeconds?: number; maxRounds?: number; onComplete: (metrics: ColorPathScores) => void | Promise<void> }) {
   const [engine] = useState(() => new ColorPathEngine()); const [round, setRound] = useState(() => engine.current());
   const [seconds, setSeconds] = useState(durationSeconds); const [movingTo, setMovingTo] = useState<PathStone | null>(null); const [locked, setLocked] = useState(false);
   const metrics = useRef(engine.emptyMetrics()); const startedAt = useRef(0); const finished = useRef(false); const sounds = useRef<ColorPathSoundManager | null>(null); const analytics = useRef(new ColorPathAnalyticsService(onComplete));
@@ -30,7 +30,7 @@ export default function ColorPathGame({ disabled = false, sound = true, duration
     if (correct) { metrics.current.correctSelections += 1; setMovingTo(stone); sounds.current?.playStep(); } else metrics.current.incorrectSelections += 1;
     const delay = correct ? 560 : 320;
     window.setTimeout(() => {
-      if (metrics.current.roundsPlayed >= COLOR_PATH_TOTAL_ROUNDS) { void finish("ROUNDS_COMPLETED"); return; }
+      if (metrics.current.roundsPlayed >= maxRounds) { void finish("ROUNDS_COMPLETED"); return; }
       setRound(engine.next()); setMovingTo(null); setLocked(false); startedAt.current = eventTime + delay;
     }, delay);
   };

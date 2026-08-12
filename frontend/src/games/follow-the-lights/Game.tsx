@@ -26,11 +26,13 @@ export default function FollowTheLightsGame({
   disabled = false,
   sound = true,
   durationSeconds = GAME_DURATION_SECONDS,
+  maxRounds = 3,
   onComplete,
 }: {
   disabled?: boolean;
   sound?: boolean;
   durationSeconds?: number;
+  maxRounds?: number;
   onComplete: (metrics: CognitiveScores) => void | Promise<void>;
 }) {
   const engine = useRef(new FollowLightsEngine());
@@ -206,7 +208,7 @@ export default function FollowTheLightsGame({
         setNextRoundIn(0);
         if (metrics.current.mistakes >= MAX_MISTAKES) {
           void finish("MISTAKE_LIMIT_REACHED");
-        } else if (round >= 3 && shouldAdvance) {
+        } else if (round >= maxRounds && shouldAdvance) {
           void finish("ROUNDS_COMPLETED");
         } else {
           void beginRound(shouldAdvance);

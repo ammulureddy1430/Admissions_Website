@@ -99,7 +99,7 @@ export default function GamesPage() {
   const [success, setSuccess] = useState("");
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkStudents, setBulkStudents] = useState<Student[]>([]);
-  const [bulkStudentId, setBulkStudentId] = useState("");
+  const [bulkStudentIds, setBulkStudentIds] = useState<string[]>([]);
   const [bulkGames, setBulkGames] = useState<BulkGame[]>([]);
   const [selectedBulkGames, setSelectedBulkGames] = useState<string[]>([]);
 
@@ -279,37 +279,47 @@ export default function GamesPage() {
 
   const openBulkAssign = async () => {
     setSuccess("");
-    if (!ageGroupFilter) { setError("Please select an age group to assign all games."); return; }
-    const gamesForAge = games.filter((game) => game.ageGroup === ageGroupFilter && game.isActive);
-    if (!gamesForAge.length) { setError(`No active games are available for ${ageGroupFilter}.`); return; }
-    setError(""); setBulkOpen(true); setBulkStudentId(""); setBulkGames([]); setSelectedBulkGames([]); setStudentLoading(true);
-    try { setBulkStudents(await request(`games/bulk-eligible-students?ageGroup=${encodeURIComponent(ageGroupFilter)}`)); }
+    const gamesForAge = games.filter((game) => (!ageGroupFilter || game.ageGroup === ageGroupFilter) && game.isActive);
+    const ageGroupLabel = ageGroupFilter || "all age groups";
+    if (!gamesForAge.length) { setError(`No active games are available for ${ageGroupLabel}.`); return; }
+    setError(""); setBulkOpen(true); setBulkStudentIds([]); setBulkGames([]); setSelectedBulkGames([]); setStudentLoading(true);
+    try { setBulkStudents(await request(`games/bulk-eligible-students?ageGroup=${encodeURIComponent(ageGroupFilter || "ALL")}`)); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to load eligible students."); }
     finally { setStudentLoading(false); }
   };
 
   const chooseBulkStudent = async (studentId: string) => {
-    if (bulkStudentId === studentId) {
-      setBulkStudentId("");
+    const nextStudentIds = bulkStudentIds.includes(studentId)
+      ? bulkStudentIds.filter((id) => id !== studentId)
+      : [...bulkStudentIds, studentId];
+    setBulkStudentIds(nextStudentIds);
+    if (!nextStudentIds.length) {
       setBulkGames([]);
       setSelectedBulkGames([]);
       setBusy("");
       return;
     }
 
-    setBulkStudentId(studentId); setBusy("bulk-options");
+    setBusy("bulk-options");
     try {
-      const payload = await request(`games/bulk-assignment-options?ageGroup=${encodeURIComponent(ageGroupFilter)}&studentId=${encodeURIComponent(studentId)}`);
-      const rows: BulkGame[] = payload.games || []; setBulkGames(rows); setSelectedBulkGames(rows.filter((game) => !game.alreadyAssigned).map((game) => game.id));
+      const payloads = await Promise.all(nextStudentIds.map((id) => request(`games/bulk-assignment-options?ageGroup=${encodeURIComponent(ageGroupFilter || "ALL")}&studentId=${encodeURIComponent(id)}`)));
+      const merged = new Map<string, BulkGame & { eligibleStudents: number; assignedStudents: number }>();
+      for (const payload of payloads) for (const game of (payload.games || []) as BulkGame[]) {
+        const current = merged.get(game.id);
+        if (current) { current.eligibleStudents += 1; if (game.alreadyAssigned) current.assignedStudents += 1; }
+        else merged.set(game.id, { ...game, eligibleStudents: 1, assignedStudents: game.alreadyAssigned ? 1 : 0 });
+      }
+      const rows = [...merged.values()].map((game) => ({ ...game, alreadyAssigned: game.assignedStudents >= game.eligibleStudents }));
+      setBulkGames(rows); setSelectedBulkGames(rows.filter((game) => !game.alreadyAssigned).map((game) => game.id));
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to load bulk assignment options."); }
     finally { setBusy(""); }
   };
 
   const bulkAssign = async () => {
-    if (!ageGroupFilter || !bulkStudentId || !selectedBulkGames.length) return;
+    if (!bulkStudentIds.length || !selectedBulkGames.length) return;
     setBusy("bulk-assign"); setError("");
     try {
-      const result = await request("games/bulk-assign", { method: "POST", body: JSON.stringify({ ageGroup: ageGroupFilter, studentId: bulkStudentId, gameIds: selectedBulkGames }) });
+      const result = await request("games/bulk-assign", { method: "POST", body: JSON.stringify({ ageGroup: ageGroupFilter || "ALL", studentIds: bulkStudentIds, gameIds: selectedBulkGames }) });
       setSuccess(result.message); setBulkOpen(false); await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to assign the selected games."); }
     finally { setBusy(""); }
@@ -601,8 +611,8 @@ export default function GamesPage() {
               <span className="keep-white grid h-6 w-6 place-items-center rounded-full bg-[#007f70] text-[9px] font-black text-white">1</span>
               <span className="text-[9px] font-black uppercase tracking-wider">Choose student</span>
             </div>
-            <div className={`flex flex-1 items-center gap-2 rounded-xl px-3 py-2.5 ${bulkStudentId ? "bg-[#eaf7f3] text-[#007f70]" : "bg-[#f4f7f6] text-[#93a29f]"}`}>
-              <span className={`grid h-6 w-6 place-items-center rounded-full text-[9px] font-black ${bulkStudentId ? "keep-white bg-[#007f70] text-white" : "bg-[#dfe8e5] text-[#657773]"}`}>2</span>
+            <div className={`flex flex-1 items-center gap-2 rounded-xl px-3 py-2.5 ${bulkStudentIds.length ? "bg-[#eaf7f3] text-[#007f70]" : "bg-[#f4f7f6] text-[#93a29f]"}`}>
+              <span className={`grid h-6 w-6 place-items-center rounded-full text-[9px] font-black ${bulkStudentIds.length ? "keep-white bg-[#007f70] text-white" : "bg-[#dfe8e5] text-[#657773]"}`}>2</span>
               <span className="text-[9px] font-black uppercase tracking-wider">Review games</span>
             </div>
           </div>
@@ -612,35 +622,35 @@ export default function GamesPage() {
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#007f70] text-white shadow-md shadow-[#007f70]/20"><Users className="keep-white h-5 w-5" /></span>
               <div>
                 <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#008f7d]">Eligible age group</p>
-                <p className="mt-1 text-base font-black text-[#071633]">{ageGroupFilter}</p>
+                <p className="mt-1 text-base font-black text-[#071633]">{ageGroupFilter || "All Age Groups"}</p>
                 <p className="mt-0.5 text-[9px] text-[#71818d]">Only matching students and games are shown.</p>
               </div>
             </div>
           </div>
           <div className="mt-5">
             <div className="flex items-end justify-between gap-3">
-              <div><p className="text-xs font-black text-[#071633]">Choose a student</p><p className="mt-1 text-[9px] text-[#81919c]">Select one student to see available games.</p></div>
+              <div><p className="text-xs font-black text-[#071633]">Choose students</p><p className="mt-1 text-[9px] text-[#81919c]">Select one or more students to see their available games.</p></div>
               <span className="rounded-full bg-[#f0f5f4] px-2.5 py-1 text-[8px] font-black text-[#647771]">{bulkStudents.length} eligible</span>
             </div>
             {studentLoading ? <div className="grid h-24 place-items-center"><Loader2 className="h-5 w-5 animate-spin text-[#007f70]" /></div> : bulkStudents.length === 0 ? (
-              <div className="mt-3 rounded-xl border border-[#d7e7e3] bg-[#f7fbfa] p-4 text-xs font-bold text-[#71818d]">No eligible {ageGroupFilter} students are available.</div>
+              <div className="mt-3 rounded-xl border border-[#d7e7e3] bg-[#f7fbfa] p-4 text-xs font-bold text-[#71818d]">No eligible {ageGroupFilter || "all-age-group"} students are available.</div>
             ) : <div className="mt-3 grid gap-2 sm:grid-cols-2">{bulkStudents.map((student) => {
-              const selected = bulkStudentId === student.id;
-              return <button key={student.id} disabled={student.allGamesAssigned} aria-pressed={selected} onClick={() => void chooseBulkStudent(student.id)} className={`group flex items-center justify-between rounded-xl border p-3 text-left transition ${student.allGamesAssigned ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-65" : selected ? "border-[#008f7d] bg-[#edf9f5] shadow-sm ring-1 ring-[#008f7d]/20" : "border-[#dce9e6] bg-white hover:border-[#9dccbf] hover:bg-[#fbfdfc]"}`}><span className="flex items-center gap-3"><span className={`grid h-9 w-9 place-items-center rounded-full text-[9px] font-black ${selected ? "bg-[#007f70] text-white" : "bg-[#edf3f1] text-[#607080]"}`}>{student.studentFirstName[0]}{student.studentLastName[0]}</span><span><span className="block text-[10px] font-black text-[#071633]">{student.studentFirstName} {student.studentLastName}</span><span className="mt-1 block text-[8px] font-bold uppercase tracking-wide text-[#81919c]">{student.grade || student.ageGroup} · {student.status}</span></span></span>{student.allGamesAssigned ? <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[8px] font-black text-slate-600">Already assigned</span> : <span className={`grid h-6 w-6 place-items-center rounded-full border transition ${selected ? "border-[#007f70] bg-[#007f70] text-white" : "border-[#cbdad6] bg-white group-hover:border-[#76b9aa]"}`}>{selected && <CheckCircle2 className="keep-white h-4 w-4" />}</span>}</button>;
+              const selected = bulkStudentIds.includes(student.id);
+              return <button key={student.id} disabled={student.allGamesAssigned} aria-pressed={selected} onClick={() => void chooseBulkStudent(student.id)} className={`group flex items-center justify-between rounded-xl border p-3 text-left transition ${student.allGamesAssigned ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-65" : selected ? "border-[#008f7d] bg-[#edf9f5] shadow-sm ring-1 ring-[#008f7d]/20" : "border-[#dce9e6] bg-white hover:border-[#9dccbf] hover:bg-[#fbfdfc]"}`}><span className="flex items-center gap-3"><span className={`grid h-9 w-9 place-items-center rounded-full text-[9px] font-black ${selected ? "keep-white bg-[#007f70] text-white" : "bg-[#edf3f1] text-[#607080]"}`}>{student.studentFirstName[0]}{student.studentLastName[0]}</span><span><span className="block text-[10px] font-black text-[#071633]">{student.studentFirstName} {student.studentLastName}</span><span className="mt-1 block text-[8px] font-bold uppercase tracking-wide text-[#667c89]">{student.grade || student.ageGroup} · {student.status}</span></span></span>{student.allGamesAssigned ? <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[8px] font-black text-slate-600">Already assigned</span> : <span className={`grid h-6 w-6 place-items-center rounded-full border transition ${selected ? "keep-white border-[#007f70] bg-[#007f70] text-white" : "border-[#cbdad6] bg-white group-hover:border-[#76b9aa]"}`}>{selected && <CheckCircle2 className="keep-white h-4 w-4" />}</span>}</button>;
             })}</div>}
           </div>
-          {bulkStudentId && <div className="mt-5 border-t border-[#e5efec] pt-5">
-            <div className="flex items-center justify-between"><p className="text-xs font-black text-[#071633]">Games for {ageGroupFilter}</p>{bulkGames.length > 0 && <button onClick={() => setSelectedBulkGames(bulkGames.filter((game) => !game.alreadyAssigned).map((game) => game.id))} className="text-[9px] font-black text-[#007f70]">Select all available</button>}</div>
+          {bulkStudentIds.length > 0 && <div className="mt-5 border-t border-[#e5efec] pt-5">
+            <div className="flex items-center justify-between"><p className="text-xs font-black text-[#071633]">Games for {ageGroupFilter || "the selected student's age group"}</p>{bulkGames.length > 0 && <button onClick={() => setSelectedBulkGames(bulkGames.filter((game) => !game.alreadyAssigned).map((game) => game.id))} className="text-[9px] font-black text-[#007f70]">Select all available</button>}</div>
             {busy === "bulk-options" ? <div className="grid h-28 place-items-center"><Loader2 className="h-5 w-5 animate-spin text-[#007f70]" /></div> : <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">{bulkGames.map((game) => {
               const selected = selectedBulkGames.includes(game.id);
-              return <button key={game.id} disabled={game.alreadyAssigned} onClick={() => setSelectedBulkGames((current) => selected ? current.filter((id) => id !== game.id) : [...current, game.id])} className={`flex w-full items-center justify-between rounded-xl border p-3 text-left ${game.alreadyAssigned ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-70" : selected ? "border-[#008f7d] bg-[#edf9f5]" : "border-[#dce9e6] bg-white"}`}><div><p className="text-[10px] font-black text-[#071633]">{game.name}</p><p className="mt-1 text-[8px] text-[#81919c]">{game.category} · {game.ageGroup}</p></div><span className={`rounded-full px-2.5 py-1 text-[8px] font-black ${game.alreadyAssigned ? "bg-slate-200 text-slate-600" : selected ? "bg-[#007f70] text-white" : "bg-white text-slate-500 ring-1 ring-slate-200"}`}>{game.alreadyAssigned ? "Already Assigned" : selected ? "Selected" : "Not selected"}</span></button>;
+              return <button key={game.id} disabled={game.alreadyAssigned} onClick={() => setSelectedBulkGames((current) => selected ? current.filter((id) => id !== game.id) : [...current, game.id])} className={`flex w-full items-center justify-between rounded-xl border p-3 text-left ${game.alreadyAssigned ? "cursor-not-allowed border-slate-200 bg-slate-50 opacity-70" : selected ? "border-[#008f7d] bg-[#edf9f5]" : "border-[#dce9e6] bg-white"}`}><div><p className="text-[10px] font-black text-[#071633]">{game.name}</p><p className="mt-1 text-[8px] font-medium text-[#667c89]">{game.category} · {game.ageGroup}</p></div><span className={`rounded-full px-2.5 py-1 text-[8px] font-black ${game.alreadyAssigned ? "bg-slate-200 text-slate-600" : selected ? "keep-white bg-[#007f70] text-white" : "bg-white text-slate-500 ring-1 ring-slate-200"}`}>{game.alreadyAssigned ? "Already Assigned" : selected ? "Selected" : "Not selected"}</span></button>;
             })}</div>}
           </div>}
-          {bulkStudentId && bulkGames.length > 0 && <div className="mt-5 rounded-2xl border border-[#dce9e6] bg-[#f7faf9] p-4 text-[10px]">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><Summary label="Selected Age Group" value={ageGroupFilter} /><Summary label="Student" value={bulkStudents.find((student) => student.id === bulkStudentId) ? `${bulkStudents.find((student) => student.id === bulkStudentId)!.studentFirstName} ${bulkStudents.find((student) => student.id === bulkStudentId)!.studentLastName}` : "—"} /><Summary label="Total Games" value={String(bulkGames.length)} /><Summary label="Selected Games" value={String(selectedBulkGames.length)} /></div>
+          {bulkStudentIds.length > 0 && bulkGames.length > 0 && <div className="mt-5 rounded-2xl border border-[#dce9e6] bg-[#f7faf9] p-4 text-[10px]">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><Summary label="Selected Age Group" value={ageGroupFilter || "All Age Groups"} /><Summary label="Students" value={`${bulkStudentIds.length} selected`} /><Summary label="Total Games" value={String(bulkGames.length)} /><Summary label="Selected Games" value={String(selectedBulkGames.length)} /></div>
             <button onClick={() => void bulkAssign()} disabled={!selectedBulkGames.length || busy === "bulk-assign"} className="keep-white mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#007f70] px-5 text-xs font-black text-white disabled:bg-slate-200 disabled:text-slate-500">{busy === "bulk-assign" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Assign All</button>
           </div>}
-          {!bulkStudentId && <div className="mt-5 flex flex-col gap-3 border-t border-[#e5efec] pt-4 sm:flex-row sm:items-center sm:justify-between"><p className="flex items-center gap-2 text-[9px] font-bold text-[#71818d]"><span className="grid h-7 w-7 place-items-center rounded-lg bg-[#f0f4f3] text-[#8b9b97]"><Users className="h-4 w-4" /></span>Select a student to continue</p><button disabled className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#dbe8e5] px-5 text-xs font-black text-[#8ba19b]"><Send className="h-4 w-4" /> Continue to games</button></div>}
+          {!bulkStudentIds.length && <div className="mt-5 flex flex-col gap-3 border-t border-[#e5efec] pt-4 sm:flex-row sm:items-center sm:justify-between"><p className="flex items-center gap-2 text-[9px] font-bold text-[#71818d]"><span className="grid h-7 w-7 place-items-center rounded-lg bg-[#f0f4f3] text-[#8b9b97]"><Users className="h-4 w-4" /></span>Select one or more students to continue</p><button disabled className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#dbe8e5] px-5 text-xs font-black text-[#8ba19b]"><Send className="h-4 w-4" /> Continue to games</button></div>}
         </Modal>
       )}
       {assigning && (

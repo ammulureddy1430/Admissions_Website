@@ -4296,3 +4296,33 @@ body .games-error-alert .games-error-retry {
   background: #ffffff !important;
   color: #991b1b !important;
 }
+
+/* Mock games are untimed, single-round control practice. */
+.mock-game-single-round .ball-stack-progress,
+.mock-game-single-round .ball-stack-timer,
+.mock-game-single-round .ball-stack-goal,
+.mock-game-single-round .color-path-progress,
+.mock-game-single-round .color-path-timer,
+.mock-game-single-round .color-path-level,
+.mock-game-single-round .mp-progress,
+.mock-game-single-round .mp-timer,
+.mock-game-single-round .tt-progress,
+.mock-game-single-round .tt-timer,
+.mock-game-single-round .tt-level,
+.mock-game-single-round .tt-status small,
+.mock-game-single-round .rescue-progress,
+.mock-game-single-round .rescue-timer,
+.mock-game-single-round .parking-level,
+.mock-game-single-round .parking-timer,
+.mock-game-single-round .pipeline-timer,
+.mock-game-single-round .sound-detective-header p,
+.mock-game-single-round .sound-detective-timer-badge,
+.mock-game-single-round .sound-detective-progress-bar,
+.mock-game-single-round .ps-hud-card:first-child,
+.mock-game-single-round .ps-hud-time,
+.mock-game-single-round .follow-progress-card,
+.mock-game-single-round .follow-lights-world > .absolute.right-4,
+.mock-game-single-round .follow-lights-world h1 + p,
+.mock-game-single-round .follow-lights-world h1 + p + div {
+  display: none !important;
+}

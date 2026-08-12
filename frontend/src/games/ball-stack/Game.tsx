@@ -15,7 +15,7 @@ import "./Styles/Game.css";
 type Particle = ReturnType<typeof burstParticles>[number];
 const TOWER_TARGET = 8;
 const TOTAL_ROUNDS = 2;
-export default function BallStackGame({ disabled = false, sound = true, durationSeconds = BALL_STACK_DURATION_SECONDS, onComplete }: { disabled?: boolean; sound?: boolean; durationSeconds?: number; onComplete: (metrics: BallStackScores) => void | Promise<void> }) {
+export default function BallStackGame({ disabled = false, sound = true, durationSeconds = BALL_STACK_DURATION_SECONDS, maxRounds = TOTAL_ROUNDS, onComplete }: { disabled?: boolean; sound?: boolean; durationSeconds?: number; maxRounds?: number; onComplete: (metrics: BallStackScores) => void | Promise<void> }) {
   const world = useRef<HTMLDivElement>(null); const animation = useRef(0); const movingStartedAt = useRef(0);
   const [engine] = useState(() => new BallStackEngine()); const [physics] = useState(() => new BallStackPhysicsEngine());
   const sounds = useRef<BallStackSoundManager | null>(null); const analytics = useRef(new BallStackAnalyticsService(onComplete));
@@ -66,7 +66,7 @@ export default function BallStackGame({ disabled = false, sound = true, duration
     if (nextStable.length >= 3 && averageStability < 25) { setStable([]); stableRef.current = []; void finish("TOWER_COLLAPSED"); return; }
     if (nextStable.length >= TOWER_TARGET) {
       setTransitioning(true);
-      if (round >= TOTAL_ROUNDS) { window.setTimeout(() => void finish("ROUNDS_COMPLETED"), 900); return; }
+      if (round >= maxRounds) { window.setTimeout(() => void finish("ROUNDS_COMPLETED"), 900); return; }
       window.setTimeout(() => { stableRef.current = []; setStable([]); setRound((value) => value + 1); movingStartedAt.current = performance.now(); setMoving({ id: engine.nextId(), x: BALL_RADIUS, y: 100, radius: BALL_RADIUS, color: engine.nextColor(), stable: false, falling: false }); setTransitioning(false); }, 1100);
       return;
     }

@@ -345,6 +345,14 @@ export default function ParentDashboard() {
         method: "POST",
         body: JSON.stringify({ childId: assignment.child.id }),
       });
+      if (session?.alreadyCompleted) {
+        await refreshAssignedGames();
+        setGameError(null);
+        if (document.fullscreenElement) {
+          await document.exitFullscreen().catch(() => undefined);
+        }
+        return;
+      }
       setActiveGameAssignment(assignment);
       setRuntimeTutorial(tutorial);
       setGameRuntime(session);
@@ -844,21 +852,27 @@ export default function ParentDashboard() {
               <div><p className="text-sm font-extrabold text-[#071633]">{selectedGameChild ? `${selectedGameChild.studentFirstName}'s ${selectedGameContentType === "games" ? "games" : "game-based assessments"}` : `Family ${selectedGameContentType === "games" ? "games" : "game-based assessments"}`}</p><p className="mt-0.5 text-[10px] font-medium text-[#71818d]">{selectedGameChild ? `${selectedGameChild.grade} · ${visibleAssignedGames.length} assigned` : `${gameChildren.length} children · ${visibleAssignedGames.length} assigned`}</p></div>
               <div className="flex flex-wrap gap-2 text-[9px] font-extrabold"><span className="rounded-full bg-blue-100 px-2.5 py-1.5 text-blue-700">{visibleGameStats.ready} ready</span><span className="rounded-full bg-amber-100 px-2.5 py-1.5 text-amber-700">{visibleGameStats.pending} awaiting review</span><span className="rounded-full bg-emerald-100 px-2.5 py-1.5 text-emerald-700">{visibleGameStats.completed} completed</span></div>
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              {[...visibleAssignedGames].sort((a, b) => Number(a.sequence?.position || 0) - Number(b.sequence?.position || 0)).map((assignment) => {
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {[...visibleAssignedGames].sort((a, b) => {
+                const childOrder = `${a.child?.studentFirstName || ""} ${a.child?.studentLastName || ""}`.localeCompare(`${b.child?.studentFirstName || ""} ${b.child?.studentLastName || ""}`);
+                return childOrder || Number(a.sequence?.position || 0) - Number(b.sequence?.position || 0);
+              }).map((assignment) => {
                 const completed = assignment.result?.status === "COMPLETED";
                 const requestStatus = assignment.result?.reassessmentRequestStatus;
                 const approvedReplay = completed && requestStatus === "APPROVED" && assignment.availability?.available;
+                const childInitials = `${assignment.child?.studentFirstName?.charAt(0) || ""}${assignment.child?.studentLastName?.charAt(0) || ""}`;
                 return (
-                <article key={`${assignment.generatedGameId}-${assignment.child.id}`} className="rounded-xl border border-[#dceae6] bg-[#fafdfc] p-4">
+                <article key={`${assignment.generatedGameId}-${assignment.child.id}`} className="flex flex-col rounded-xl border border-[#dceae6] bg-[#fafdfc] p-3.5">
                   <div className="flex items-start justify-between gap-3">
-                    <span className="grid h-9 min-w-9 place-items-center rounded-xl bg-[#e6f7f2] px-2 text-[10px] font-black text-[#007f70]">{assignment.sequence?.position || <Gamepad2 className="h-4 w-4" />}</span>
+                    <span className="grid h-8 min-w-8 place-items-center rounded-lg bg-[#e6f7f2] px-2 text-[9px] font-black text-[#007f70]">{assignment.sequence?.position ? selectedGameChild ? assignment.sequence.position : `${childInitials} · ${assignment.sequence.position}` : <Gamepad2 className="h-4 w-4" />}</span>
                     <span className={`rounded-full px-2 py-1 text-[9px] font-extrabold ${completed ? "bg-emerald-100 text-emerald-700" : assignment.availability?.available ? "bg-blue-100 text-blue-700" : assignment.availability?.reason === "Maximum attempts reached." ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"}`}>{completed ? "COMPLETED" : assignment.availability?.available ? assignment.result?.status === "IN_PROGRESS" ? "IN PROGRESS" : "READY TO PLAY" : assignment.availability?.reason === "Maximum attempts reached." ? "ATTEMPTS REACHED" : "LOCKED"}</span>
                   </div>
-                  <h4 className="mt-3 text-sm font-extrabold text-[#071633]">{assignment.generatedGame?.title}</h4>
-                  {assignment.sequence?.total > 1 && <p className="mt-1 text-[9px] font-black uppercase tracking-wider text-[#8a9aa5]">Game {assignment.sequence.position} of {assignment.sequence.total}</p>}
-                  <p className="mt-1 text-[10px] font-semibold text-[#607080]">{selectedGameChild ? assignment.child.grade : `For ${assignment.child.studentFirstName} ${assignment.child.studentLastName} · ${assignment.child.grade}`}</p>
-                  <p className="mt-2 text-[10px] text-[#71818d]">{assignment.generatedGame?.template?.category?.name || "Learning game"} · {assignment.maxAttempts} {assignment.maxAttempts === 1 ? "attempt" : "attempts"} · Pass {assignment.passingScore}%</p>
+                  <h4 className="mt-2.5 text-sm font-extrabold text-[#071633]">{assignment.generatedGame?.title}</h4>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px] font-semibold text-[#71818d]">
+                    {assignment.sequence?.total > 1 && <span className="font-black uppercase tracking-wider text-[#8a9aa5]">{selectedGameChild ? "" : `${assignment.child.studentFirstName}'s `}Game {assignment.sequence.position} of {assignment.sequence.total}</span>}
+                    <span>{selectedGameChild ? assignment.child.grade : `${assignment.child.studentFirstName} ${assignment.child.studentLastName} · ${assignment.child.grade}`}</span>
+                  </div>
+                  <p className="mt-1.5 line-clamp-1 text-[9px] text-[#71818d]">{assignment.generatedGame?.template?.category?.name || "Learning game"} · {assignment.maxAttempts} {assignment.maxAttempts === 1 ? "attempt" : "attempts"} · Pass {assignment.passingScore}%</p>
                   {assignment.result?.status === "COMPLETED" && <div className="mt-3 rounded-xl border border-[#cfe5df] bg-white p-3">
                     {assignment.result.reviewStatus === "REVIEWED" || assignment.result.reviewStatus === "NEEDS_FOLLOW_UP" ? <div className="flex items-center justify-between gap-3"><span className="text-[10px] font-extrabold text-[#607080]">Published game result</span><span className="text-xs font-black text-[#007f70]">{Math.round(Number(assignment.result.percentage) || 0)}%</span></div> : <div><p className="text-[10px] font-extrabold text-[#607080]">School review pending</p><p className="mt-1 text-[9px] leading-4 text-[#71818d]">The score will appear after the school completes its review.</p></div>}
                     {(assignment.result.reviewStatus === "REVIEWED" || assignment.result.reviewStatus === "NEEDS_FOLLOW_UP") && assignment.result.schoolReview && <div className="mt-3 border-t border-[#e2eeeb] pt-3"><p className="text-[9px] font-black uppercase tracking-wider text-[#007f70]">School review</p><p className="mt-1 text-[10px] leading-5 text-[#526474]">{assignment.result.schoolReview}</p><span className={`mt-2 inline-block rounded-full px-2 py-1 text-[8px] font-black uppercase ${assignment.result.reviewStatus === "REVIEWED" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{assignment.result.reviewStatus === "REVIEWED" ? "Reviewed" : "Needs follow-up"}</span></div>}
@@ -866,9 +880,9 @@ export default function ParentDashboard() {
                   {completed && requestStatus === "PENDING" && <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-[10px] font-extrabold text-amber-800">Re-assessment request pending school approval</p>}
                   {completed && requestStatus === "REJECTED" && <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-[10px] font-extrabold text-rose-700">Re-assessment request was not approved</p>}
                   {approvedReplay && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-[10px] font-extrabold text-emerald-700">One additional attempt approved</p>}
-                  {!completed && (assignment.availability?.sequenceLocked ? <p className="mt-3 rounded-lg bg-slate-100 px-3 py-2 text-[10px] font-extrabold text-slate-600">🔒 Complete game {Math.max(1, Number(assignment.sequence?.position || 1) - 1)} first</p> : assignment.availability?.reason === "Maximum attempts reached." ? <p className="mt-3 text-[10px] font-extrabold text-rose-700">Maximum attempts reached</p> : <p className="mt-3 text-[10px] font-extrabold text-[#007f70]">{assignment.result?.status === "IN_PROGRESS" ? "Continue the current game" : "Ready for the student to play"}</p>)}
-                  {!completed && <div className="mt-4 flex gap-2">
-                    <button type="button" disabled={!assignment.availability?.available || gameBusy === assignment.id} onClick={() => void openGameTutorial(assignment)} className="keep-white inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#007f70] px-4 py-2.5 text-xs font-extrabold text-white hover:bg-[#006b5e] disabled:opacity-50">
+                  {!completed && (assignment.availability?.sequenceLocked ? <p className="mt-2.5 rounded-lg bg-slate-100 px-3 py-2 text-[9px] font-extrabold text-slate-600">🔒 Complete {selectedGameChild ? "" : `${assignment.child.studentFirstName}'s `}game {Math.max(1, Number(assignment.sequence?.position || 1) - 1)} first</p> : assignment.availability?.reason === "Maximum attempts reached." ? <p className="mt-2.5 text-[9px] font-extrabold text-rose-700">Maximum attempts reached</p> : <p className="mt-2.5 text-[9px] font-extrabold text-[#007f70]">{assignment.result?.status === "IN_PROGRESS" ? "Continue the current game" : "Ready for the student to play"}</p>)}
+                  {!completed && assignment.availability?.available && <div className="mt-3 flex gap-2">
+                    <button type="button" disabled={gameBusy === assignment.id} onClick={() => void openGameTutorial(assignment)} className="keep-white inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#007f70] px-3 py-2 text-[10px] font-extrabold text-white hover:bg-[#006b5e] disabled:opacity-50">
                       {gameBusy === assignment.id ? <Loader2 className="keep-white h-4 w-4 animate-spin" /> : <Play className="keep-white h-4 w-4" />}
                       {assignment.result?.status === "IN_PROGRESS" ? "Resume game" : "Start game"}
                     </button>

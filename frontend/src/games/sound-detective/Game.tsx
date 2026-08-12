@@ -16,12 +16,14 @@ export default function SoundDetectiveGame({
   disabled = false,
   sound = true,
   practiceOnly = false,
+  maxRounds = MAX_ROUNDS,
   onComplete,
 }: {
   disabled?: boolean;
   sound?: boolean;
   durationSeconds?: number;
   practiceOnly?: boolean;
+  maxRounds?: number;
   onComplete: (metrics: SoundDetectiveScores) => void | Promise<void>;
 }) {
   const engine = useRef(new SoundDetectiveEngine(practiceOnly));
@@ -195,7 +197,7 @@ export default function SoundDetectiveGame({
               responseTimeMs: ROUND_TIME_LIMIT * 1000,
             });
 
-            if (metrics.current.roundsPlayed >= MAX_ROUNDS) {
+            if (metrics.current.roundsPlayed >= maxRounds) {
               void finish("COMPLETED");
             } else {
               beginRound();
@@ -235,7 +237,7 @@ export default function SoundDetectiveGame({
       metrics.current.incorrectResponses += 1;
     }
 
-    if (metrics.current.roundsPlayed >= MAX_ROUNDS) {
+    if (metrics.current.roundsPlayed >= maxRounds) {
       void finish("COMPLETED");
     } else {
       beginRound();

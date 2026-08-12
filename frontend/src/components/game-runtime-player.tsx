@@ -51,6 +51,18 @@ import ParkingEscapeGame from "@/games/parking-escape/Game";
 import WaterPipelineGame from "@/games/water-pipeline/Game";
 
 const MAX_SECURITY_WARNINGS = 3;
+const SELF_CONTAINED_GAME_ENGINES = new Set([
+  "FOLLOW_THE_LIGHTS",
+  "BALL_STACK",
+  "SOUND_DETECTIVE",
+  "COLOR_PATH",
+  "MAGIC_PAINT",
+  "TRAIN_TRACK_BUILDER",
+  "PACKAGE_SORTER",
+  "RESCUE_MISSION",
+  "PARKING_ESCAPE",
+  "WATER_PIPELINE",
+]);
 type GameOption = { id?: string; optionKey?: string; optionText: string };
 type AnswerResult = {
   correct?: boolean;
@@ -65,7 +77,6 @@ export function GameRuntimePlayer({
   secureMode = false,
   tutorial,
   forceRunning = false,
-  sequenceDeadline,
 }: {
   initial: any;
   request: (path: string, init?: RequestInit) => Promise<any>;
@@ -79,6 +90,9 @@ export function GameRuntimePlayer({
   const [state, setState] = useState(() =>
     forceRunning ? { ...initial, status: "RUNNING" } : initial,
   );
+  const [introVisible, setIntroVisible] = useState(
+    () => Boolean(tutorial) && initial.mode !== "PRACTICE",
+  );
   const [sound, setSound] = useState(true);
   const [fishingBoatPosition, setFishingBoatPosition] = useState(50);
   const [fishingCaughtFish, setFishingCaughtFish] = useState<string[]>([]);
@@ -87,6 +101,7 @@ export function GameRuntimePlayer({
   >(null);
   const [fullscreenRequired, setFullscreenRequired] = useState(false);
   const [recordingInterrupted, setRecordingInterrupted] = useState(false);
+  const [assessmentCompleted, setAssessmentCompleted] = useState(false);
   const totalGameSeconds = Number(initial.configuration?.timeLimitMinutes)
     ? Number(initial.configuration.timeLimitMinutes) * 60
     : Number(
@@ -95,9 +110,6 @@ export function GameRuntimePlayer({
             Number(initial.questionCount || 1),
       );
   const [seconds, setSeconds] = useState(totalGameSeconds);
-  const [sequenceSeconds, setSequenceSeconds] = useState(() =>
-    sequenceDeadline ? Math.max(0, Math.ceil((sequenceDeadline - Date.now()) / 1000)) : 0,
-  );
   const timeoutHandled = useRef(false);
   const securityBusyRef = useRef(false);
   const lastViolationRef = useRef(0);
@@ -111,16 +123,14 @@ export function GameRuntimePlayer({
   const gameplayFinishingRef = useRef(false);
   const gameplayUploadRef = useRef<{ uploadUrl: string; contentType: string; objectKey: string } | null>(null);
 
-  useEffect(() => {
-    if (!sequenceDeadline) return;
-    const update = () => setSequenceSeconds(Math.max(0, Math.ceil((sequenceDeadline - Date.now()) / 1000)));
-    update();
-    const timer = window.setInterval(update, 500);
-    return () => window.clearInterval(timer);
-  }, [sequenceDeadline]);
-
   const startGameplayRecording = async () => {
-    if (state.demo || state.mode !== "ASSIGNMENT" || !navigator.mediaDevices?.getDisplayMedia) return true;
+    if (
+      state.demo ||
+      state.mode !== "ASSIGNMENT" ||
+      SELF_CONTAINED_GAME_ENGINES.has(initial.engine?.engineKey) ||
+      !navigator.mediaDevices?.getDisplayMedia
+    ) return true;
+    if (gameplayStreamRef.current?.getVideoTracks().some((track) => track.readyState === "live")) return true;
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: 15, displaySurface: "browser" },
@@ -224,6 +234,10 @@ export function GameRuntimePlayer({
     const element = playerRef.current;
     if (element && !checkFullscreenState()) void enterFullscreen(element);
     return () => {
+      gameplayFinishingRef.current = true;
+      gameplayStreamRef.current?.getTracks().forEach((track) => track.stop());
+      gameplayStreamRef.current = null;
+      gameplayRecorderRef.current = null;
       document.body.style.overflow = previous;
       if (checkFullscreenState()) {
         if (document.exitFullscreen) {
@@ -240,6 +254,10 @@ export function GameRuntimePlayer({
   }, []);
   const closePlayer = () => {
     suppressSecurityRef.current = true;
+    gameplayFinishingRef.current = true;
+    gameplayStreamRef.current?.getTracks().forEach((track) => track.stop());
+    gameplayStreamRef.current = null;
+    gameplayRecorderRef.current = null;
     if (checkFullscreenState()) {
       if (document.exitFullscreen) {
         void document.exitFullscreen().catch(() => undefined);
@@ -275,20 +293,23 @@ export function GameRuntimePlayer({
     }
   };
   const startGame = async () => {
-    if (!(await startGameplayRecording())) return;
     const element = playerRef.current;
     if (!checkFullscreenState()) {
       const entered = await enterFullscreen(element);
       if (!entered) {
-        gameplayStreamRef.current?.getTracks().forEach((track) => track.stop());
-        gameplayStreamRef.current = null;
-        gameplayRecorderRef.current = null;
         setFullscreenRequired(true);
         return;
       }
     }
     setFullscreenRequired(false);
-    await action("START");
+    if (!(await startGameplayRecording())) return;
+    if (!checkFullscreenState()) {
+      setFullscreenRequired(true);
+      return;
+    }
+    if (state.status === "READY") await action("START");
+    else if (state.status === "PAUSED") await action("RESUME");
+    setIntroVisible(false);
     const recorder = gameplayRecorderRef.current;
     if (recorder?.state === "inactive") {
       recorder.start(1000);
@@ -353,7 +374,12 @@ export function GameRuntimePlayer({
     const applyResult = () => {
       setState(next);
       if (actionName === "ANSWER") {
-        if (next.status === "COMPLETED") void finishGameplayRecording().finally(() => onComplete?.(next));
+        if (next.status === "COMPLETED") {
+          setAssessmentCompleted(true);
+          void finishGameplayRecording().finally(() =>
+            window.setTimeout(() => onComplete?.(next), 1800),
+          );
+        }
       } else if (
         (actionName === "COMPLETE" ||
           actionName === "MAZE_COMPLETE" ||
@@ -369,7 +395,10 @@ export function GameRuntimePlayer({
           actionName === "WATER_PIPELINE_COMPLETE") &&
         next.status === "COMPLETED"
       ) {
-        void finishGameplayRecording().finally(() => onComplete?.(next));
+        setAssessmentCompleted(true);
+        void finishGameplayRecording().finally(() =>
+          window.setTimeout(() => onComplete?.(next), 1800),
+        );
       } else if (
         actionName === "SECURITY_VIOLATION" &&
         next.status === "COMPLETED"
@@ -491,7 +520,10 @@ export function GameRuntimePlayer({
   const isRescueMission = state.engine?.engineKey === "RESCUE_MISSION";
   const isParkingEscape = state.engine?.engineKey === "PARKING_ESCAPE";
   const isWaterPipeline = state.engine?.engineKey === "WATER_PIPELINE";
-  const showGameIntro = state.status === "READY";
+  const isPracticeMode =
+    state.mode === "PRACTICE" || state.configuration?.practiceMode === true;
+  const showGameIntro =
+    !isPracticeMode && (introVisible || state.status === "READY");
   const assignedGameName =
     state.generatedGame?.title ||
     tutorial?.game?.name ||
@@ -543,7 +575,6 @@ export function GameRuntimePlayer({
       }}
       className={`game-runtime-player fixed inset-0 z-[9999] flex h-[100dvh] w-screen flex-col bg-gradient-to-br from-[#071633] via-[#123b5a] to-[#007f70] text-white ${isAdventure ? "is-adventure-game" : ""} ${isBoardGame ? "is-board-game" : ""} ${isBuildingGame ? "is-building-game" : ""} ${isDragDropGame ? "is-drag-drop-game" : ""} ${isFishingGame ? "is-fishing-game" : ""} ${isLogicGame ? "is-logic-game" : ""} ${isMazeGame ? "is-maze-game" : ""} ${isMemoryGame ? "is-memory-game" : ""} ${isRacingGame ? "is-racing-game" : ""} ${isSortingGame ? "is-sorting-game" : ""} ${isTreasureHunt ? "is-treasure-hunt" : ""}`}
     >
-      {sequenceDeadline && <div className="pointer-events-none fixed left-1/2 top-3 z-[10020] -translate-x-1/2 rounded-full border-2 border-white bg-[#b42318] px-4 py-2 text-xs font-black !text-white shadow-xl" style={{ color: "#ffffff" }}><Timer className="mr-1.5 inline h-4 w-4" />Game session {Math.floor(sequenceSeconds / 60)}:{String(sequenceSeconds % 60).padStart(2, "0")}</div>}
       {!isFollowTheLights && !isBallStack && !isSoundDetective && !isColorPath && !isPackageSorter && !isMagicPaint && !isTrainTrackBuilder && (
         <>
           <header className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3">
@@ -552,16 +583,20 @@ export function GameRuntimePlayer({
                 {assignedGameName}
               </p>
               <p className="keep-white text-xs font-bold">
-                {showGameIntro
+                {isPracticeMode
+                  ? "Practice round"
+                  : showGameIntro
                   ? `${state.questionCount} challenges await`
                   : `Question ${Math.min(state.currentIndex + 1, state.questionCount)} of ${state.questionCount}`}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Pill>
-                <Timer /> {Math.floor(seconds / 60)}:
-                {String(seconds % 60).padStart(2, "0")}
-              </Pill>
+              {!isPracticeMode && (
+                <Pill>
+                  <Timer /> {Math.floor(seconds / 60)}:
+                  {String(seconds % 60).padStart(2, "0")}
+                </Pill>
+              )}
               <button
                 onClick={forcePlayerFullscreen}
                 aria-label="Enter fullscreen"
@@ -655,7 +690,16 @@ export function GameRuntimePlayer({
           ) : isParkingEscape ? (
             <ParkingEscapeGame disabled={state.status !== "RUNNING"} sound={sound} durationSeconds={120} onComplete={(metrics) => action("PARKING_ESCAPE_COMPLETE", metrics)} />
           ) : isWaterPipeline ? (
-            <WaterPipelineGame disabled={state.status !== "RUNNING"} sound={sound} durationSeconds={120} onComplete={(metrics) => action("WATER_PIPELINE_COMPLETE", metrics)} />
+            <WaterPipelineGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              sound={sound}
+              durationSeconds={120}
+              maxRounds={isPracticeMode ? 1 : 4}
+              practiceOnly={isPracticeMode}
+              onComplete={(metrics) =>
+                action("WATER_PIPELINE_COMPLETE", metrics)
+              }
+            />
           ) : q ? (
             state.engine?.engineKey === "BOARD_GAME" ? (
               <BoardGame
@@ -1003,7 +1047,7 @@ export function GameRuntimePlayer({
           </section>
         </div>
       )}
-      {secureMode && fullscreenRequired && state.status === "READY" && (
+      {secureMode && fullscreenRequired && (state.status === "READY" || introVisible) && (
         <div className="absolute inset-0 z-[60] grid place-items-center bg-slate-950/95 p-4 backdrop-blur-md">
           <section
             role="alertdialog"
@@ -1023,14 +1067,27 @@ export function GameRuntimePlayer({
             </p>
             <button
               type="button"
-              onClick={forcePlayerFullscreen}
+              onClick={() => void startGame()}
               className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#007f70] px-4 py-3 text-sm font-black text-white"
             >
-              <Maximize2 className="h-4 w-4" /> Enter fullscreen
+              <Maximize2 className="h-4 w-4" /> Enter fullscreen and begin
             </button>
             <p className="mt-4 text-[10px] font-bold text-slate-500">
               Switching tabs or exiting fullscreen during the assessment is
               recorded.
+            </p>
+          </section>
+        </div>
+      )}
+      {assessmentCompleted && (
+        <div className="absolute inset-0 z-[100] grid place-items-center bg-[#041728]/90 p-5 backdrop-blur-md">
+          <section className="w-full max-w-md rounded-3xl border border-emerald-300/40 bg-white p-8 text-center shadow-2xl">
+            <CheckCircle2 className="mx-auto h-16 w-16 text-emerald-600" />
+            <h2 className="mt-5 text-2xl font-black text-[#071633]">
+              Assessment completed
+            </h2>
+            <p className="mt-2 text-sm font-semibold text-slate-600">
+              Your answers and game results have been submitted successfully.
             </p>
           </section>
         </div>
@@ -1710,17 +1767,13 @@ function AssessmentTutorialIntro({
 
 function ActualGameTutorialDemo({ preview }: { preview: any }) {
   const engineKey = preview.engine?.engineKey || "QUIZ_CHALLENGE";
-  const sourceQuestion = preview.currentQuestion;
   const [mockRound, setMockRound] = useState(0);
   const [mockAttempt, setMockAttempt] = useState(1);
   const [mockComplete, setMockComplete] = useState(false);
   const advanceMock = () =>
     setMockRound((value) => {
-      if (value >= 2) {
-        setMockComplete(true);
-        return value;
-      }
-      return value + 1;
+      setMockComplete(true);
+      return value;
     });
   const repeatMock = () => {
     setMockAttempt((value) => value + 1);
@@ -1733,26 +1786,23 @@ function ActualGameTutorialDemo({ preview }: { preview: any }) {
       : engineKey === "RACING_GAME"
         ? ["Left lane", "Center lane", "Right lane", "Boost lane"]
         : ["Demo target A", "Demo target B", "Demo target C", "Demo target D"];
-  const question = sourceQuestion
-    ? {
-        ...sourceQuestion,
-        id: `${sourceQuestion.id}-mock-${mockRound}`,
-        questionText: "Practice the controls",
-        options: (sourceQuestion.options || []).map(
-          (option: any, index: number) => ({
-            ...option,
-            optionText:
-              demoLabels[(index + mockRound) % demoLabels.length] ||
-              `Demo target ${index + 1}`,
-          }),
-        ),
-      }
-    : null;
+  const question: any = {
+    id: `controls-only-mock-${mockAttempt}`,
+    questionText: "Practice the controls",
+    questionType: "PRACTICE",
+    options: demoLabels.map((label, index) => ({
+      id: `mock-option-${index}`,
+      optionKey: String.fromCharCode(65 + index),
+      optionText: label,
+    })),
+    correctAnswer: demoLabels[0],
+    presentation: { mechanic: "CONTROL_PRACTICE" },
+  };
   const options = question?.options || [];
   const common = {
     question,
     questionIndex: mockRound,
-    questionCount: 3,
+    questionCount: 1,
     configuration: preview.configuration,
     disabled: false,
     sound: false,
@@ -1798,7 +1848,7 @@ function ActualGameTutorialDemo({ preview }: { preview: any }) {
         key={question.id}
         question={question}
         questionIndex={mockRound}
-        questionCount={3}
+        questionCount={1}
         disabled={false}
         sound={false}
         practiceOnly
@@ -1811,7 +1861,7 @@ function ActualGameTutorialDemo({ preview }: { preview: any }) {
         key={question.id}
         options={options}
         questionIndex={mockRound}
-        questionCount={3}
+        questionCount={1}
         disabled={false}
         sound={false}
         onAnswer={async () => {
@@ -1825,7 +1875,7 @@ function ActualGameTutorialDemo({ preview }: { preview: any }) {
       <FishingSession
         options={options}
         questionIndex={mockRound}
-        questionCount={3}
+        questionCount={1}
         disabled={false}
         sound={false}
         onAnswer={async () => {
@@ -1956,19 +2006,20 @@ function BuiltInGamePractice({ engineKey }: { engineKey: string }) {
   const finish = () => setComplete(true);
   let game: React.ReactNode;
 
-  if (engineKey === "FOLLOW_THE_LIGHTS") game = <FollowTheLightsGame key={attempt} disabled={false} sound durationSeconds={120} onComplete={finish} />;
-  else if (engineKey === "BALL_STACK") game = <BallStackGame key={attempt} disabled={false} sound durationSeconds={90} onComplete={finish} />;
-  else if (engineKey === "SOUND_DETECTIVE") game = <SoundDetectiveGame key={attempt} disabled={false} sound practiceOnly onComplete={finish} />;
-  else if (engineKey === "COLOR_PATH") game = <ColorPathGame key={attempt} disabled={false} sound durationSeconds={60} onComplete={finish} />;
-  else if (engineKey === "MAGIC_PAINT") game = <MagicPaintGame key={attempt} disabled={false} sound durationSeconds={120} onProgress={() => undefined} onComplete={finish} />;
-  else if (engineKey === "TRAIN_TRACK_BUILDER") game = <TrainTrackBuilderGame key={attempt} disabled={false} sound durationSeconds={120} onComplete={finish} />;
-  else if (engineKey === "PACKAGE_SORTER") game = <PackageSorterGame key={attempt} disabled={false} sound durationSeconds={120} onComplete={finish} />;
-  else if (engineKey === "RESCUE_MISSION") game = <RescueMissionGame key={attempt} disabled={false} sound durationSeconds={120} onComplete={finish} />;
-  else if (engineKey === "PARKING_ESCAPE") game = <ParkingEscapeGame key={attempt} disabled={false} sound durationSeconds={120} onComplete={finish} />;
-  else game = <WaterPipelineGame key={attempt} disabled={false} sound durationSeconds={120} onComplete={finish} />;
+  const mockDurationSeconds = 24 * 60 * 60;
+  if (engineKey === "FOLLOW_THE_LIGHTS") game = <FollowTheLightsGame key={attempt} disabled={false} sound durationSeconds={mockDurationSeconds} maxRounds={1} onComplete={finish} />;
+  else if (engineKey === "BALL_STACK") game = <BallStackGame key={attempt} disabled={false} sound durationSeconds={mockDurationSeconds} maxRounds={1} onComplete={finish} />;
+  else if (engineKey === "SOUND_DETECTIVE") game = <SoundDetectiveGame key={attempt} disabled={false} sound practiceOnly maxRounds={1} onComplete={finish} />;
+  else if (engineKey === "COLOR_PATH") game = <ColorPathGame key={attempt} disabled={false} sound durationSeconds={mockDurationSeconds} maxRounds={1} onComplete={finish} />;
+  else if (engineKey === "MAGIC_PAINT") game = <MagicPaintGame key={attempt} disabled={false} sound durationSeconds={mockDurationSeconds} maxRounds={1} onProgress={() => undefined} onComplete={finish} />;
+  else if (engineKey === "TRAIN_TRACK_BUILDER") game = <TrainTrackBuilderGame key={attempt} disabled={false} sound durationSeconds={mockDurationSeconds} maxRounds={1} onComplete={finish} />;
+  else if (engineKey === "PACKAGE_SORTER") game = <PackageSorterGame key={attempt} disabled={false} sound durationSeconds={mockDurationSeconds} maxRounds={1} onComplete={finish} />;
+  else if (engineKey === "RESCUE_MISSION") game = <RescueMissionGame key={attempt} disabled={false} sound durationSeconds={mockDurationSeconds} maxRounds={1} onComplete={finish} />;
+  else if (engineKey === "PARKING_ESCAPE") game = <ParkingEscapeGame key={attempt} disabled={false} sound durationSeconds={mockDurationSeconds} maxRounds={1} onComplete={finish} />;
+  else game = <WaterPipelineGame key={attempt} disabled={false} sound durationSeconds={mockDurationSeconds} maxRounds={1} practiceOnly onComplete={finish} />;
 
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-2xl">
+    <div className="mock-game-single-round relative h-full w-full overflow-hidden rounded-2xl">
       {game}
       {complete && <div className="absolute inset-0 z-50 grid place-items-center bg-[#041728]/90 p-5 backdrop-blur-md">
         <section className="w-full max-w-sm rounded-3xl border border-white/30 bg-[#0b3045] p-7 text-center shadow-2xl">

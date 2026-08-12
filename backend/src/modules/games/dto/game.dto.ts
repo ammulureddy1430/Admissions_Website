@@ -34,7 +34,8 @@ export class AssignRealTimeGameDto {
 
 export class BulkAssignRealTimeGamesDto {
   @IsString() ageGroup!: string;
-  @IsUUID() studentId!: string;
+  @IsOptional() @IsUUID() studentId?: string;
+  @IsOptional() @IsArray() @ArrayMinSize(1) @IsUUID('4', { each: true }) studentIds?: string[];
   @IsArray() @ArrayMinSize(1) @IsUUID('4', { each: true }) gameIds!: string[];
 }
 

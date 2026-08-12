@@ -9,6 +9,11 @@ import { tutorialFor } from './game-tutorial.catalog';
 import { randomUUID } from 'crypto';
 
 const TARGETS = ['STUDENT','SECTION','CLASS','MULTIPLE_CLASSES','ENTIRE_GRADE'];
+const SELF_CONTAINED_PRACTICE_ENGINES = new Set([
+  'FOLLOW_THE_LIGHTS', 'BALL_STACK', 'SOUND_DETECTIVE', 'COLOR_PATH',
+  'MAGIC_PAINT', 'TRAIN_TRACK_BUILDER', 'PACKAGE_SORTER', 'RESCUE_MISSION',
+  'PARKING_ESCAPE', 'WATER_PIPELINE',
+]);
 
 @Injectable()
 export class GamePlayService {
@@ -373,11 +378,14 @@ export class GamePlayService {
     if (!assignment.generatedGame) throw new BadRequestException('The assigned game is unavailable.');
     return this.runtime.start({
       engineKey: assignment.generatedGame.engineKey,
-      questionIds: assignment.generatedGame.questionIds,
+      questionIds: SELF_CONTAINED_PRACTICE_ENGINES.has(assignment.generatedGame.engineKey)
+        ? []
+        : assignment.generatedGame.questionIds.slice(0, 1),
       configuration: {
         ...(assignment.generatedGame.configuration as Record<string, unknown>),
-        timeLimitMinutes: assignment.timeLimitMinutes,
         practiceMode: true,
+        maxRounds: 1,
+        timerEnabled: false,
       },
       mode: 'PRACTICE',
     }, schoolId, studentId);
@@ -409,8 +417,6 @@ export class GamePlayService {
     if (!bypassTutorial && !tutorialProgress?.tutorialViewed && !skipAllowed) {
       throw new BadRequestException('Complete the game tutorial before starting the assessment.');
     }
-    const availability = this.availability(assignment, savedResult);
-    if (!availability.available) throw new BadRequestException(availability.reason);
     if (!assignment.generatedGame) throw new BadRequestException('The assigned game is unavailable.');
     const masterGame = await this.prisma.game.findUnique({ where: { componentName: assignment.generatedGame?.engineKey || '' }, select: { id: true } });
     let result = await this.prisma.gameResult.upsert({
@@ -428,6 +434,27 @@ export class GamePlayService {
       orderBy: { createdAt: 'desc' },
     });
     if (active && !restart) return this.runtime.state(active.id, schoolId, { id: studentId, role: 'STUDENT' as any });
+    if (!restart && savedResult?.status === 'IN_PROGRESS') {
+      const completedSession = await this.prisma.gameRuntimeSession.findFirst({
+        where: {
+          gameResultId: result.id,
+          userId: studentId,
+          status: 'COMPLETED',
+        },
+        orderBy: { updatedAt: 'desc' },
+      });
+      if (completedSession) {
+        const completedResult = await this.submit(
+          assignmentId,
+          completedSession.id,
+          schoolId,
+          studentId,
+        );
+        return { alreadyCompleted: true, result: completedResult };
+      }
+    }
+    const availability = this.availability(assignment, savedResult);
+    if (!availability.available) throw new BadRequestException(availability.reason);
     if (restart && !assignment.allowRestart) throw new ForbiddenException('Restart is not permitted for this assignment.');
     const permittedAttempts = assignment.maxAttempts + (result.reassessmentRequestStatus === 'APPROVED' ? 1 : 0);
     if (attempts >= permittedAttempts) throw new BadRequestException('Maximum attempts reached.');

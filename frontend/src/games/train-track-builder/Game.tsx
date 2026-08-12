@@ -15,7 +15,7 @@ const TOTAL_ROUNDS = 4;
 const ROUTE_NAMES = ["Step-up", "Step-down", "Zigzag", "Switchback"];
 type Feedback = "building" | "ready" | "running" | "success" | "blocked";
 
-export default function TrainTrackBuilderGame({ disabled = false, sound = true, durationSeconds = TRAIN_TRACK_DURATION_SECONDS, onComplete }: { disabled?: boolean; sound?: boolean; durationSeconds?: number; onComplete: (metrics: TrainTrackScores) => void | Promise<void> }) {
+export default function TrainTrackBuilderGame({ disabled = false, sound = true, durationSeconds = TRAIN_TRACK_DURATION_SECONDS, maxRounds = TOTAL_ROUNDS, onComplete }: { disabled?: boolean; sound?: boolean; durationSeconds?: number; maxRounds?: number; onComplete: (metrics: TrainTrackScores) => void | Promise<void> }) {
   const [engine] = useState(() => new TrainTrackEngine());
   const [physics] = useState(() => new TrainPhysicsController());
   const [puzzle, setPuzzle] = useState(() => engine.current());
@@ -85,7 +85,7 @@ export default function TrainTrackBuilderGame({ disabled = false, sound = true, 
         setCompletedRounds(metrics.current.successfulRoutes); setFeedback("success"); setConfetti(true); sounds.current?.play(720, .35);
       } else { setFeedback("blocked"); sounds.current?.play(150, .28); }
       const timeout = window.setTimeout(() => {
-        if (wasConnected && metrics.current.successfulRoutes >= TOTAL_ROUNDS) { void finish(); return; }
+        if (wasConnected && metrics.current.successfulRoutes >= maxRounds) { void finish(); return; }
         if (wasConnected) { const next = engine.next(); setPuzzle(next); setPieces(next.pieces); }
         setTrainIndex(-1); setRunning(false); setConfetti(false); setFeedback(wasConnected ? "building" : connected ? "ready" : "building");
         startedAt.current = performance.now();

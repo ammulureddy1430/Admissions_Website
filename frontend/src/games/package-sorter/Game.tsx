@@ -17,11 +17,13 @@ export default function PackageSorterGame({
   disabled = false,
   sound = true,
   durationSeconds = 120,
+  maxRounds = TOTAL_ROUNDS,
   onComplete,
 }: {
   disabled?: boolean;
   sound?: boolean;
   durationSeconds?: number;
+  maxRounds?: number;
   onComplete: (metrics: PackageSorterScores) => void | Promise<void>;
 }) {
   // Sub-system instances
@@ -240,6 +242,10 @@ export default function PackageSorterGame({
               const nextC = c + 1;
               const { nextRound, resetCounter } = engine.getNextRound(round, nextC);
               if (nextRound !== round) {
+                if (round >= maxRounds) {
+                  void finish();
+                  return nextC;
+                }
                 setRound(nextRound);
                 metrics.current.roundsPlayed = nextRound;
                 metrics.current.highestDifficulty = Math.max(metrics.current.highestDifficulty, nextRound);
