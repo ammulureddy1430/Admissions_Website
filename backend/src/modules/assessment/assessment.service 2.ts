@@ -970,7 +970,7 @@ export class AssessmentService {
       studentIds.length
         ? this.prisma.application.findMany({
           where: { schoolId, id: { in: studentIds } },
-          select: { id: true, studentFirstName: true, studentLastName: true, grade: true, parent: { select: { firstName: true, lastName: true, email: true, phone: true } } },
+          select: { id: true, studentFirstName: true, studentLastName: true, grade: true },
         })
         : Promise.resolve([]),
       gameQuestionIds.length

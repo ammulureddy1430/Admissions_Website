@@ -18,6 +18,9 @@ export async function apiFetch<T>(
   const token =
     typeof window === "undefined" ? null : localStorage.getItem("token");
   if (token) headers.set("Authorization", `Bearer ${token}`);
+  const schoolId =
+    typeof window === "undefined" ? null : localStorage.getItem("schoolId");
+  if (schoolId) headers.set("x-tenant-id", schoolId);
   if (init.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }

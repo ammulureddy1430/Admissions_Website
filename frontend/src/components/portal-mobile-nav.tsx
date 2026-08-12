@@ -24,7 +24,7 @@ export function PortalMobileNav({
   const pathname = usePathname();
 
   return (
-    <div className="sticky top-0 z-[70] border-b border-[#dbe9e5] bg-white/95 backdrop-blur-xl lg:hidden">
+    <div className="portal-mobile-nav sticky top-0 z-[70] border-b border-[#dbe9e5] bg-white/95 backdrop-blur-xl lg:hidden">
       <div className="flex h-16 items-center justify-between px-4">
         <PehchaanBrand compact subtitle={subtitle} />
         <button

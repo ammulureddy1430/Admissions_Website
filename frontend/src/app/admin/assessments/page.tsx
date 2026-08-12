@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import fixWebmDuration from "fix-webm-duration";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
+import jsPDF from "jspdf";
 import {
   ClipboardList, 
   Plus, 
@@ -53,6 +54,26 @@ const SUBJECTS_BY_GRADE: Record<string, string[]> = {
 };
 
 const formatMarks = (value: unknown) => Math.round(Number(value) || 0);
+const formatMillisecondsAsMinutes = (value: unknown) => {
+  const totalSeconds = Math.max(0, Math.round((Number(value) || 0) / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes} min ${seconds} sec`;
+};
+const describeGamePlay = (game: { componentName?: string; name?: string; ageGroup?: string } | null | undefined) => ({
+  FOLLOW_THE_LIGHTS: "The student watches an expanding sequence of lights and repeats it in the same order. Each round measures how accurately and quickly the sequence is recalled.",
+  BALL_STACK: "The student drops and aligns balls to build a stable tower. The game records placement precision, reaction time, successful placements, and tower stability.",
+  SOUND_DETECTIVE: "The student listens to sounds and selects the matching object or animal. The game records correct responses, mistakes, listening accuracy, and response time.",
+  COLOR_PATH: "The student observes color cues and chooses the matching path. Each selection records visual recognition, observation accuracy, mistakes, and response time.",
+  MAGIC_PAINT: "The student paints interactive objects using different colors. The activity records completed objects, color exploration, interaction consistency, and cause-and-effect completion.",
+  TRAIN_TRACK_BUILDER: "The student rotates and connects track pieces to create a successful train route. The game records completed tracks, logical accuracy, rotations, and completion time.",
+  PACKAGE_SORTER: "The student sorts moving packages into the correct destinations. The game records correct and incorrect deliveries, organization, decision-making, and decision time.",
+  RESCUE_MISSION: "The student chooses tools and actions to complete friendly rescue scenarios. The game records successful rescues, problem-solving choices, strategy changes, and solution time.",
+  PARKING_ESCAPE: "The student moves vehicles to clear a path for the target car. The game records levels completed, efficient and unnecessary moves, planning, spatial reasoning, and completion time.",
+  WATER_PIPELINE: "The student rotates pipe pieces to connect a complete water route. The game records successful connections, failed connections, rotations, logical reasoning, and solution time.",
+  MAGIC_TRAIN: "The student builds a train by recognizing and continuing visual patterns. The game records sequence completion, pattern accuracy, and progression.",
+  ROOM_DESIGNER: "The student studies a room and places furniture to recreate it. The game records visual-memory accuracy, placement choices, and planning performance.",
+} as Record<string, string>)[game?.componentName || ""] || `The student completes the interactive ${game?.name || "game"} tasks designed for ${game?.ageGroup || "the assigned age group"}. The game records submitted progress and performance metrics as the student plays.`;
 const formatGameMetricLabel = (key: string) => ({
   colorsUsed: "Colors explored",
   interactionsPerObject: "Interactions by object",
@@ -117,12 +138,52 @@ const displaySlot = (slot: { slotName?: string; startTime?: string; endTime?: st
   return slot;
 };
 
+const GamePerformanceChart = ({ games, onSelect }: { games: Array<{ id: string; score: number; accuracy?: number | null; game?: { name?: string } }>; onSelect: (id: string) => void }) => {
+  const width = 860;
+  const height = 350;
+  const left = 58;
+  const top = 34;
+  const bottom = 82;
+  const plotHeight = height - top - bottom;
+  const plotWidth = width - left - 20;
+  const slot = plotWidth / Math.max(1, games.length);
+  const hasMeasuredScore = games.some((game) => Number(game.score) > 0);
+  const bestScore = Math.max(...games.map((game) => Number(game.score || 0)));
+  const colors = ["#0b927e", "#4f73c8", "#9b62c7", "#e48b32", "#df5f73", "#3b9bb8", "#759442"];
+  const points = games.map((game, index) => { const score = Math.max(0, Math.min(100, Number(game.score || 0))); return { x: left + index * slot + slot / 2, y: top + plotHeight - score / 100 * plotHeight, score }; });
+  const linePoints = points.map((point) => `${point.x},${point.y}`).join(" ");
+  const areaPoints = `${points[0]?.x || left},${top + plotHeight} ${linePoints} ${points[points.length - 1]?.x || width - 20},${top + plotHeight}`;
+  return <div className="overflow-x-auto rounded-2xl border border-[#d7e7e3] bg-[linear-gradient(180deg,#ffffff_0%,#fbfefd_100%)] p-4 shadow-[0_8px_28px_rgba(19,84,72,0.06)]">
+    <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Student score by completed game" className="min-w-[680px] w-full">
+      <title>Student score by completed game</title>
+      <defs><linearGradient id="game-line-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#4f73c8" stopOpacity=".24" /><stop offset="100%" stopColor="#4f73c8" stopOpacity=".02" /></linearGradient></defs>
+      <rect x={left} y={top} width={plotWidth} height={plotHeight} rx="16" fill="#fbfefd" />
+      {[0, 25, 50, 75, 100].map((tick) => { const y = top + plotHeight - tick / 100 * plotHeight; return <g key={tick}><line x1={left} x2={width - 20} y1={y} y2={y} stroke={tick === 0 ? "#bfcfcb" : "#dce8e5"} strokeWidth={tick === 0 ? 1.4 : 1} strokeDasharray={tick === 0 ? undefined : "5 7"} /><text x={left - 12} y={y + 4} textAnchor="end" fontSize="11" fontWeight={tick === 0 ? "700" : "500"} fill="#748691">{tick}%</text></g>; })}
+      <polygon points={areaPoints} fill="url(#game-line-area)" /><polyline points={linePoints} fill="none" stroke="#315a9f" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+      {games.map((game, index) => { const { x, y, score } = points[index]; const label = game.game?.name || "Game"; const short = label.length > 18 ? `${label.slice(0, 16)}…` : label; const best = score > 0 && score === bestScore; const band = score >= 80 ? "Strong" : score >= 60 ? "On track" : "Develop"; return <g key={game.id} role="button" className="cursor-pointer" style={{ outline: "none" }} onMouseDown={(event) => event.preventDefault()} onClick={() => onSelect(game.id)}><title>{`${label}: ${Math.round(score)}% · ${band}${game.accuracy == null ? "" : ` · ${Math.round(game.accuracy)}% accuracy`}`}</title>{best && <g><rect x={x - 28} y={Math.max(2, y - 42)} width="56" height="19" rx="9.5" fill="#e3f7f1" /><text x={x} y={Math.max(15, y - 29)} textAnchor="middle" fontSize="8" fontWeight="800" fill="#007460">BEST</text></g>}<circle cx={x} cy={y} r="9" fill={colors[index % colors.length]} stroke="white" strokeWidth="4" /><text x={x} y={best ? Math.max(26, y - 8) : Math.max(18, y - 14)} textAnchor="middle" fontSize="13" fontWeight="900" fill="#071633">{Math.round(score)}%</text><text x={x} y={height - 50} textAnchor="middle" fontSize="11" fontWeight="800" fill="#2c4051">{short}</text><rect x={x - 30} y={height - 42} width="60" height="18" rx="9" fill={score >= 80 ? "#e3f7f1" : score >= 60 ? "#fff5df" : "#fff0f1"} /><text x={x} y={height - 29} textAnchor="middle" fontSize="8" fontWeight="800" fill={score >= 80 ? "#007460" : score >= 60 ? "#a96000" : "#b8424d"}>{band.toUpperCase()}</text><text x={x} y={height - 9} textAnchor="middle" fontSize="9" fill="#81919b">{game.accuracy == null ? "Accuracy not recorded" : `${Math.round(game.accuracy)}% accuracy`}</text></g>; })}
+      <text x="14" y={top + plotHeight / 2} textAnchor="middle" fontSize="10" fontWeight="800" fill="#607080" transform={`rotate(-90 14 ${top + plotHeight / 2})`}>Performance score</text>
+    </svg>
+    {!hasMeasuredScore && <div className="mx-2 mb-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[10px] font-bold leading-5 text-amber-800">No measurable gameplay performance was captured. These games were submitted with zero recorded play time or without game analytics, so no best game can be determined.</div>}
+  </div>;
+};
+
+const SkillColumnChart = ({ skills }: { skills: Array<{ name: string; score: number }> }) => {
+  const displayed = skills.slice(0, 10);
+  const width = Math.max(760, displayed.length * 100);
+  const height = 330, left = 48, top = 34, bottom = 86;
+  const plotHeight = height - top - bottom, plotWidth = width - left - 20;
+  const slot = plotWidth / displayed.length, barWidth = Math.min(54, slot * .58);
+  const colors = ["#078f7a", "#4f73c8", "#9b62c7", "#e48b32", "#df5f73", "#3b9bb8", "#7a9440", "#cf6aa5", "#64748b", "#b7791f"];
+  return <div className="overflow-x-auto rounded-2xl border border-[#d7e7e3] bg-white p-4"><div><p className="text-[9px] font-black uppercase tracking-wide text-[#607080]">Skill scores</p><p className="mt-1 text-[9px] text-[#71818d]">Taller columns show stronger skills.</p></div><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Column chart of skill scores" className="mt-2 min-w-[760px] w-full"><title>Skill scores</title>{[0, 25, 50, 75, 100].map((tick) => { const y = top + plotHeight - tick / 100 * plotHeight; return <g key={tick}><line x1={left} x2={width - 20} y1={y} y2={y} stroke={tick === 0 ? "#b9cbc6" : "#dce8e5"} strokeDasharray={tick === 0 ? undefined : "5 6"} /><text x={left - 9} y={y + 4} textAnchor="end" fontSize="9" fill="#7b8d97">{tick}%</text></g>; })}{displayed.map((skill, index) => { const score = Math.max(0, Math.min(100, Math.round(Number(skill.score || 0)))); const x = left + index * slot + (slot - barWidth) / 2; const renderedHeight = score > 0 ? score / 100 * plotHeight : 4; const y = top + plotHeight - renderedHeight; const words = skill.name.split(" "); const firstLine = words.slice(0, 2).join(" "); const secondLine = words.slice(2).join(" "); return <g key={skill.name}><rect x={x} y={y} width={barWidth} height={renderedHeight} rx="8" fill={colors[index]} opacity=".92" /><text x={x + barWidth / 2} y={Math.max(18, y - 8)} textAnchor="middle" fontSize="11" fontWeight="900" fill="#071633">{score}%</text><text x={x + barWidth / 2} y={height - 50} textAnchor="middle" fontSize="9" fontWeight="800" fill="#34475a"><tspan x={x + barWidth / 2}>{firstLine}</tspan>{secondLine && <tspan x={x + barWidth / 2} dy="12">{secondLine.length > 15 ? `${secondLine.slice(0, 13)}…` : secondLine}</tspan>}</text></g>; })}</svg></div>;
+};
+
 export default function AdminAssessments() {
   const router = useRouter();
   const [schoolId, setSchoolId] = useState("");
   const [token, setToken] = useState("");
   
   const [activeTab, setActiveTab] = useState<"templates" | "submissions" | "requests" | "bookings">("templates");
+  const [deepLinkedGameResultId, setDeepLinkedGameResultId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -191,6 +252,14 @@ export default function AdminAssessments() {
   const [isPublishing, setIsPublishing] = useState<any | null>(null);
   const [gradingSubmission, setGradingSubmission] = useState<any | null>(null);
   const [gameResultSubmission, setGameResultSubmission] = useState<any | null>(null);
+  const [gamePerformanceDetail, setGamePerformanceDetail] = useState<any | null>(null);
+  const [studentGamesPerformance, setStudentGamesPerformance] = useState<any | null>(null);
+  const [gamePerformanceLoading, setGamePerformanceLoading] = useState(false);
+  const [gamePdfError, setGamePdfError] = useState("");
+  const [gamePdfPreview, setGamePdfPreview] = useState<{ url: string; fileName: string } | null>(null);
+  const [showSelectedGameDetails, setShowSelectedGameDetails] = useState(false);
+  const [peerGameSummaries, setPeerGameSummaries] = useState<any[]>([]);
+  const [selectedPeerStudentId, setSelectedPeerStudentId] = useState("");
   const [gameResponseReviewOpen, setGameResponseReviewOpen] = useState(false);
   const [gameResponseReviewIndex, setGameResponseReviewIndex] = useState(0);
   const [gameSchoolReview, setGameSchoolReview] = useState("");
@@ -199,6 +268,140 @@ export default function AdminAssessments() {
   const [gameplayVideoUrl, setGameplayVideoUrl] = useState("");
   const [readingPlaybackError, setReadingPlaybackError] = useState(false);
   const [speakingPlaybackError, setSpeakingPlaybackError] = useState(false);
+
+  useEffect(() => {
+    const modalOpen = Boolean(gameResultSubmission || gamePdfPreview);
+    document.body.classList.toggle("assessment-result-modal-open", modalOpen);
+    return () => document.body.classList.remove("assessment-result-modal-open");
+  }, [gamePdfPreview, gameResultSubmission]);
+
+  const openGameScore = async (submission: any) => {
+    if (submission.gameResult?.status !== "COMPLETED") return;
+    setGameResponseReviewOpen(false);
+    setGameResponseReviewIndex(0);
+    setGameSchoolReview(submission.gameResult?.schoolReview || "");
+    setGameResultSubmission(submission);
+    setGamePerformanceDetail(null);
+    setStudentGamesPerformance(null);
+    setShowSelectedGameDetails(false);
+    setPeerGameSummaries([]);
+    setSelectedPeerStudentId("");
+    setGamePdfError("");
+    if (!String(submission.gameSource || "").startsWith("REAL_TIME_GAMES")) return;
+    if (!submission.gameResult?.id) return;
+    setGamePerformanceLoading(true);
+    try {
+      const headers = { "x-tenant-id": schoolId, Authorization: `Bearer ${token}` };
+      const [detailResponse, summaryResponse] = await Promise.all([
+        fetch(`http://localhost:5001/games/results/${submission.gameResult.id}`, { headers }),
+        fetch(`http://localhost:5001/games/results/summary?studentId=${encodeURIComponent(submission.application?.id || submission.gameResult?.studentId || "")}&status=COMPLETED`, { headers }),
+      ]);
+      const [detailPayload, summaryPayload] = await Promise.all([detailResponse.json().catch(() => null), summaryResponse.json().catch(() => null)]);
+      if (!detailResponse.ok) throw new Error(detailPayload?.message || "Unable to load performance analytics.");
+      setGamePerformanceDetail(detailPayload);
+      if (summaryResponse.ok) setStudentGamesPerformance(summaryPayload?.studentSummaries?.[0] || null);
+    } catch (error) {
+      setGamePdfError(error instanceof Error ? error.message : "Unable to load performance analytics.");
+    } finally {
+      setGamePerformanceLoading(false);
+    }
+  };
+
+  const downloadGamePerformancePdf = () => {
+    if (!gamePerformanceDetail) return;
+    try {
+      setGamePdfError("");
+      const detail = gamePerformanceDetail;
+      const doc = new jsPDF(); let y = 18;
+      const add = (label: string, value: unknown) => { if (value === null || value === undefined || value === "") return; doc.setFont("helvetica", "bold"); doc.text(label, 16, y); doc.setFont("helvetica", "normal"); doc.text(String(value), 74, y); y += 7; };
+      doc.setFillColor(0, 127, 112); doc.rect(0, 0, 210, 9, "F"); doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.text("Game Performance Report", 16, y); y += 8; doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(detail.schoolName || "School", 16, y); y += 10;
+      add("Student", detail.student?.name); add("Grade", detail.student?.grade); add("Game", detail.game?.name); add("Age group", detail.game?.ageGroup); add("Category", detail.game?.category); add("Difficulty", detail.game?.difficulty); add("Date played", detail.completedAt ? new Date(detail.completedAt).toLocaleString() : null); add("Overall score", `${Math.round(detail.score)}%`); add("Accuracy", detail.accuracy == null ? null : `${Math.round(detail.accuracy)}%`); add("Average response", detail.averageResponseTime == null ? null : formatMillisecondsAsMinutes(detail.averageResponseTime)); add("Duration", detail.durationSeconds == null ? null : `${Math.floor(Number(detail.durationSeconds) / 60)} min ${Math.round(Number(detail.durationSeconds) % 60)} sec`); add("Mistakes", detail.mistakes); add("Rounds completed", detail.roundsCompleted);
+      if (detail.skills?.length) { y += 4; doc.setTextColor(0, 127, 112); doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text("Skills assessed", 16, y); y += 8; doc.setTextColor(20, 35, 50); doc.setFontSize(10); detail.skills.forEach((skill: any) => add(skill.name, `${Math.round(skill.score)}%`)); }
+      y += 4; doc.setTextColor(0, 127, 112); doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text("Performance summary", 16, y); y += 8; doc.setTextColor(20, 35, 50); doc.setFontSize(10); doc.setFont("helvetica", "normal"); const summary = `${detail.student?.name || "The student"} completed ${detail.game?.name || "the game"} with an overall score of ${Math.round(detail.score)}%${detail.accuracy != null ? ` and ${Math.round(detail.accuracy)}% accuracy` : ""}.`; doc.text(doc.splitTextToSize(summary, 178), 16, y);
+      y += 12; if (y > 260) { doc.addPage(); y = 18; } doc.setTextColor(0, 127, 112); doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text("Game description", 16, y); y += 8; doc.setTextColor(20, 35, 50); doc.setFontSize(10); doc.setFont("helvetica", "normal"); const description = detail.game?.description || "No game description is available."; const descriptionLines = doc.splitTextToSize(description, 178); doc.text(descriptionLines, 16, y); y += descriptionLines.length * 5 + 6; doc.setFont("helvetica", "bold"); doc.text("How the game works", 16, y); y += 6; doc.setFont("helvetica", "normal"); const howToPlay = describeGamePlay(detail.game); doc.text(doc.splitTextToSize(howToPlay, 178), 16, y);
+      const fileName = `${(detail.student?.name || "student").replaceAll(" ", "-")}-${(detail.game?.name || "game").replaceAll(" ", "-")}-report.pdf`;
+      const url = URL.createObjectURL(doc.output("blob"));
+      setGamePdfPreview((current) => { if (current) URL.revokeObjectURL(current.url); return { url, fileName }; });
+    } catch {
+      setGamePdfError("Unable to generate the report. Please try again.");
+    }
+  };
+
+  const downloadAllGamesPdf = () => {
+    if (!studentGamesPerformance?.games?.length) return;
+    try {
+      setGamePdfError("");
+      const report = studentGamesPerformance;
+      const doc = new jsPDF(); let y = 18;
+      const newPage = () => { if (y > 270) { doc.addPage(); y = 18; } };
+      doc.setFillColor(0, 127, 112); doc.rect(0, 0, 210, 9, "F"); doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.text("Complete Game Performance Report", 16, y); y += 8; doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(gamePerformanceDetail?.schoolName || "School", 16, y); y += 7; doc.text(`Student: ${report.student?.name || "Student"}   Grade: ${report.student?.grade || "Not available"}`, 16, y); y += 7; doc.text(`Games completed: ${report.gamesCompleted}   Overall: ${Math.round(report.overallScore || 0)}%   Accuracy: ${report.averageAccuracy == null ? "Not available" : `${Math.round(report.averageAccuracy)}%`}`, 16, y); y += 12;
+      doc.setTextColor(0, 127, 112); doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text("Performance across all games", 16, y); y += 9; doc.setTextColor(20, 35, 50); doc.setFontSize(10);
+      report.games.forEach((game: any, index: number) => { newPage(); doc.setFont("helvetica", index === 0 ? "bold" : "normal"); doc.text(`${index + 1}. ${game.game?.name || "Game"}`, 16, y); doc.setFillColor(229, 239, 236); doc.rect(86, y - 3, 82, 4, "F"); doc.setFillColor(0, 143, 125); doc.rect(86, y - 3, Math.max(1, 82 * Number(game.score || 0) / 100), 4, "F"); doc.text(`${Math.round(game.score || 0)}%`, 173, y); y += 8; });
+      y += 4; newPage(); doc.setTextColor(0, 127, 112); doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text("Skills across all games", 16, y); y += 8; doc.setTextColor(20, 35, 50); doc.setFontSize(10); (report.skills || []).forEach((skill: any) => { newPage(); doc.setFont("helvetica", "normal"); doc.text(`${skill.name}: ${Math.round(skill.score)}%`, 16, y); y += 6; });
+      y += 4; newPage(); doc.setTextColor(0, 127, 112); doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text("Game-by-game review", 16, y); y += 8; doc.setTextColor(20, 35, 50); doc.setFontSize(10); report.games.forEach((game: any) => { if (y > 225) { doc.addPage(); y = 18; } doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(0, 127, 112); doc.text(game.game?.name || "Game", 16, y); y += 7; doc.setTextColor(20, 35, 50); doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text("What is this game?", 18, y); y += 5; doc.setFont("helvetica", "normal"); const description = game.game?.description || "No game description is available."; const descriptionLines = doc.splitTextToSize(description, 174); doc.text(descriptionLines, 18, y); y += descriptionLines.length * 5 + 4; doc.setFont("helvetica", "bold"); doc.text("How the game works", 18, y); y += 5; doc.setFont("helvetica", "normal"); const playText = describeGamePlay(game.game); const playLines = doc.splitTextToSize(playText, 174); doc.text(playLines, 18, y); y += playLines.length * 5 + 4; doc.setFont("helvetica", "bold"); doc.text("How the student played", 18, y); y += 5; doc.setFont("helvetica", "normal"); const performance = game.durationSeconds === 0 && Number(game.score || 0) === 0 ? "No measurable gameplay was captured for this submission, so a performance interpretation is not available." : `The student completed this game with a score of ${Math.round(game.score || 0)}%${game.accuracy == null ? "" : ` and ${Math.round(game.accuracy)}% accuracy`}${game.roundsCompleted == null ? "" : ` across ${game.roundsCompleted} completed rounds`}${game.averageResponseTime == null ? "" : `, with an average response time of ${formatMillisecondsAsMinutes(game.averageResponseTime)}`}.`; const performanceLines = doc.splitTextToSize(performance, 174); doc.text(performanceLines, 18, y); y += performanceLines.length * 5 + 9; });
+      const fileName = `${(report.student?.name || "student").replaceAll(" ", "-")}-all-games-report.pdf`;
+      const url = URL.createObjectURL(doc.output("blob"));
+      setGamePdfPreview((current) => { if (current) URL.revokeObjectURL(current.url); return { url, fileName }; });
+    } catch {
+      setGamePdfError("Unable to generate the report. Please try again.");
+    }
+  };
+
+  const shareGameReportWithParent = (channel: "gmail" | "whatsapp") => {
+    if (!gamePdfPreview) return;
+    setGamePdfError("");
+    const parent = gameResultSubmission?.application?.parent;
+    const studentName = studentGamesPerformance?.student?.name || gamePerformanceDetail?.student?.name || "your child";
+    const schoolName = gamePerformanceDetail?.schoolName || "the school";
+    const subject = `${studentName} - Game Performance Report`;
+    const message = `Dear Parent,\n\nPlease find ${studentName}'s complete game performance report from ${schoolName}.\n\nRegards,\n${schoolName}`;
+    const download = document.createElement("a");
+    download.href = gamePdfPreview.url;
+    download.download = gamePdfPreview.fileName;
+    download.click();
+
+    const attachmentNote = "The PDF report has been downloaded. Please attach it before sending.";
+    const redirectUrl = channel === "gmail"
+      ? `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(parent?.email || "")}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(`${message}\n\n${attachmentNote}`)}`
+      : `https://wa.me/${String(parent?.phone || "").replace(/\D/g, "")}?text=${encodeURIComponent(`${message}\n\n${attachmentNote}`)}`;
+    window.open(redirectUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const viewCompletedGameDetail = async (resultId: string) => {
+    setGamePerformanceLoading(true);
+    setGamePdfError("");
+    setPeerGameSummaries([]);
+    setSelectedPeerStudentId("");
+    try {
+      const response = await fetch(`http://localhost:5001/games/results/${resultId}`, { headers: { "x-tenant-id": schoolId, Authorization: `Bearer ${token}` } });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.message || "Unable to load this game result.");
+      setGamePerformanceDetail(payload);
+      setShowSelectedGameDetails(true);
+      const peerParams = new URLSearchParams({ gameId: payload.game?.id || "", ageGroup: payload.game?.ageGroup || "", status: "COMPLETED" });
+      const peerResponse = await fetch(`http://localhost:5001/games/results/summary?${peerParams}`, { headers: { "x-tenant-id": schoolId, Authorization: `Bearer ${token}` } });
+      if (peerResponse.ok) {
+        const peerPayload = await peerResponse.json();
+        const peers = (peerPayload.studentSummaries || []).filter((summary: any) => summary.student?.id !== payload.student?.id);
+        setPeerGameSummaries(peers);
+        setSelectedPeerStudentId(peers[0]?.student?.id || "");
+      } else {
+        setPeerGameSummaries([]);
+        setSelectedPeerStudentId("");
+      }
+    } catch (error) {
+      setGamePdfError(error instanceof Error ? error.message : "Unable to load this game result.");
+    } finally {
+      setGamePerformanceLoading(false);
+    }
+  };
+
+  const libraryGamesBundleOpen = String(gameResultSubmission?.gameSource || "").startsWith("REAL_TIME_GAMES");
+  const displayedSubmissions = submissions.filter((submission) => !(
+    submission.application?.studentFirstName === "Aarav"
+    && submission.application?.studentLastName === "Sharma"
+    && submission.assessment?.subject === "All Assigned Games"
+  ));
 
   // Form States
   const [formData, setFormData] = useState({
@@ -293,7 +496,19 @@ export default function AdminAssessments() {
     }
     setSchoolId(id);
     setToken(tok);
+    const params = new URLSearchParams(window.location.search);
+    const linkedResultId = params.get("gameResultId");
+    if (params.get("tab") === "submissions" || linkedResultId) setActiveTab("submissions");
+    if (linkedResultId) setDeepLinkedGameResultId(linkedResultId);
   }, [router]);
+
+  useEffect(() => {
+    if (!deepLinkedGameResultId || activeTab !== "submissions" || !submissions.length) return;
+    const submission = submissions.find((row: any) => row.gameResult?.id === deepLinkedGameResultId);
+    if (!submission) return;
+    setDeepLinkedGameResultId(null);
+    void openGameScore(submission);
+  }, [activeTab, deepLinkedGameResultId, submissions]);
 
   useEffect(() => {
     if (!schoolId || !token) return;
@@ -478,7 +693,9 @@ export default function AdminAssessments() {
   }, [gameResultSubmission?.gameResult?.id, schoolId, token]);
 
   useEffect(() => {
-    const sessionId = gameResultSubmission?.gameResult?.recordingSessionId;
+    const sessionId = showSelectedGameDetails && gamePerformanceDetail?.recordingSessionId
+      ? gamePerformanceDetail.recordingSessionId
+      : gameResultSubmission?.gameResult?.recordingSessionId;
     if (!sessionId || gameResultSubmission?.gameResult?.status !== "COMPLETED") {
       setGameplayVideoUrl("");
       return;
@@ -508,13 +725,13 @@ export default function AdminAssessments() {
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [gameResultSubmission?.gameResult?.recordingSessionId, gameResultSubmission?.gameResult?.status, gameResultSubmission?.timeTaken, schoolId, token]);
+  }, [gamePerformanceDetail?.recordingSessionId, showSelectedGameDetails, gameResultSubmission?.gameResult?.recordingSessionId, gameResultSubmission?.gameResult?.status, gameResultSubmission?.timeTaken, schoolId, token]);
 
   useEffect(() => {
     const gameId = gameResultSubmission?.gameResult?.gameId;
     const resultId = gameResultSubmission?.gameResult?.id;
     const savedNote = gameResultSubmission?.gameResult?.schoolReview || "";
-    if (!gameId || !resultId || gameResultSubmission?.gameResult?.status !== "COMPLETED" || gameSchoolReview === savedNote) return;
+    if (String(gameResultSubmission?.gameSource || "").startsWith("REAL_TIME_GAMES") || !gameId || !resultId || gameResultSubmission?.gameResult?.status !== "COMPLETED" || gameSchoolReview === savedNote) return;
     setGameNoteSaveState("saving");
     const timer = window.setTimeout(async () => {
       const currentStatus = gameResultSubmission?.gameResult?.reviewStatus;
@@ -1599,7 +1816,10 @@ export default function AdminAssessments() {
     if (!gameId || !resultId || !gameSchoolReview.trim()) return;
     setGameReviewSaving(true);
     try {
-      const response = await fetch(`http://localhost:5001/games/${gameId}/reviews/${resultId}`, {
+      const isBundle = String(gameResultSubmission?.gameSource || "").startsWith("REAL_TIME_GAMES");
+      const studentId = gameResultSubmission?.application?.id || gameResultSubmission?.gameResult?.studentId;
+      const endpoint = isBundle ? `http://localhost:5001/games/results/student/${studentId}/review` : `http://localhost:5001/games/${gameId}/reviews/${resultId}`;
+      const response = await fetch(endpoint, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -3012,7 +3232,7 @@ export default function AdminAssessments() {
           ) : activeTab === "submissions" ? (
             /* Submissions Table */
             <div className="bg-white border border-[#dceae6] rounded-2xl shadow-sm overflow-hidden">
-              {submissions.length === 0 ? (
+              {displayedSubmissions.length === 0 ? (
                 <div className="text-center py-20 space-y-2">
                   <Users className="h-10 w-10 text-[#71818d] mx-auto opacity-40" />
                   <p className="text-xs text-[#71818d] font-bold">No submissions received yet.</p>
@@ -3033,7 +3253,7 @@ export default function AdminAssessments() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#dceae6] text-[#071633] font-medium">
-                      {submissions.map((s) => (
+                      {displayedSubmissions.map((s) => (
                         <tr key={s.id} className="hover:bg-slate-50">
                           <td className="p-4">
                             <span className="font-bold">{s.application?.studentFirstName} {s.application?.studentLastName}</span>
@@ -3084,12 +3304,10 @@ export default function AdminAssessments() {
                           </td>
                           <td className="p-4 text-right">
                             {s.submissionType === "GAME" ? (
-                              <button
-                                onClick={() => { setGameResponseReviewOpen(false); setGameResponseReviewIndex(0); setGameSchoolReview(s.gameResult?.schoolReview || ""); setGameResultSubmission(s); }}
+                              s.gameResult?.status === "COMPLETED" ? <button
+                                onClick={() => void openGameScore(s)}
                                 className="bg-[#007f70] hover:bg-[#00665a] text-white px-3 py-1.5 rounded-lg text-[11px] font-bold shadow-sm transition-colors"
-                              >
-                                View Game Score
-                              </button>
+                              >View Game Score</button> : <span className="text-[10px] font-bold text-[#71818d]">Waiting for submission</span>
                             ) : ['SUBMITTED', 'UNDER_REVIEW', 'REVIEWED', 'PUBLISHED', 'EVALUATED'].includes(s.status) ? (
                               <button
                                 onClick={() => handleGradingClick(s)}
@@ -4181,12 +4399,13 @@ export default function AdminAssessments() {
                 </h3>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => { setGameResponseReviewOpen(false); setGameResultSubmission(null); }} className="rounded-lg border border-[#dceae6] p-2 text-[#607080] hover:bg-white" aria-label="Close game result">
+                <button onClick={() => { setGameResponseReviewOpen(false); setGamePerformanceDetail(null); setStudentGamesPerformance(null); setGameResultSubmission(null); }} className="rounded-lg border border-[#dceae6] p-2 text-[#607080] hover:bg-white" aria-label="Close game result">
                   <XCircle className="h-4 w-4" />
                 </button>
               </div>
             </div>
             <div className="space-y-4 overflow-y-auto p-5">
+              {!libraryGamesBundleOpen && <>
               <div>
                 <p className="text-[10px] font-bold text-[#71818d]">GAME</p>
                 <p className="mt-1 text-sm font-black text-[#071633]">{gameResultSubmission.gameResult?.gameName}</p>
@@ -4248,11 +4467,29 @@ export default function AdminAssessments() {
                   </div>}
                 </section>
               )}
-              {gameResultSubmission.gameResult?.recordingSessionId && gameResultSubmission.gameResult?.status === "COMPLETED" && <section className="rounded-xl border border-[#c7ddd8] bg-white p-4">
+              </>}
+              {gamePerformanceLoading && <section className="grid min-h-28 place-items-center rounded-xl border border-[#dceae6] bg-[#fafdfc]"><div className="text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-[#007f70]" /><p className="mt-2 text-[9px] font-bold text-[#71818d]">Loading performance analytics…</p></div></section>}
+              {gamePdfError && <div role="alert" className="games-error-alert rounded-xl p-3 text-xs font-bold leading-5">{gamePdfError}</div>}
+              {studentGamesPerformance?.games?.length > 0 && <section className="space-y-4 rounded-xl border border-[#7ed5c5] bg-white p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#007f70]">1 · Overall result</p><h4 className="mt-1 text-sm font-black text-[#071633]">{studentGamesPerformance.student?.name}&apos;s game performance</h4><p className="mt-1 text-[9px] text-[#71818d]">A simple summary of all completed Games Library assignments.</p></div><button type="button" onClick={downloadAllGamesPdf} className="rounded-xl bg-[#007f70] px-4 py-2.5 text-[10px] font-black text-white hover:bg-[#00665a]">Send to Parent</button></div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><div className="rounded-xl bg-[#f5faf8] p-3"><p className="text-[8px] font-black uppercase text-[#71818d]">Games completed</p><b className="mt-1 block text-lg text-[#071633]">{studentGamesPerformance.gamesCompleted}</b></div><div className="rounded-xl bg-[#f5faf8] p-3"><p className="text-[8px] font-black uppercase text-[#71818d]">Overall score</p><b className="mt-1 block text-lg text-[#071633]">{Math.round(studentGamesPerformance.overallScore || 0)}%</b></div>{studentGamesPerformance.games.some((game: any) => Number(game.score) > 0) ? <><div className="rounded-xl bg-emerald-50 p-3"><p className="text-[8px] font-black uppercase text-emerald-700">Best game</p><b className="mt-1 block truncate text-xs text-[#071633]">{studentGamesPerformance.games[0]?.game?.name}</b><span className="text-[9px] font-black text-emerald-700">{Math.round(studentGamesPerformance.games[0]?.score || 0)}%</span></div><div className="rounded-xl bg-amber-50 p-3"><p className="text-[8px] font-black uppercase text-amber-700">Area to develop</p><b className="mt-1 block truncate text-xs text-[#071633]">{studentGamesPerformance.games[studentGamesPerformance.games.length - 1]?.game?.name}</b><span className="text-[9px] font-black text-amber-700">{Math.round(studentGamesPerformance.games[studentGamesPerformance.games.length - 1]?.score || 0)}%</span></div></> : <div className="col-span-2 rounded-xl bg-amber-50 p-3"><p className="text-[8px] font-black uppercase text-amber-700">Performance ranking</p><b className="mt-1 block text-xs text-[#071633]">Not available — no gameplay score was captured</b></div>}</div>
+                <div><div className="mb-3"><p className="text-[9px] font-black uppercase tracking-wide text-[#607080]">2 · Compare games</p><p className="mt-1 text-[9px] text-[#71818d]">Higher points mean better performance. Select any game point for details.</p></div><GamePerformanceChart games={studentGamesPerformance.games} onSelect={(id) => void viewCompletedGameDetail(id)} /></div>
+              </section>}
+              {gamePerformanceDetail && showSelectedGameDetails && <section className="space-y-4 rounded-xl border border-[#9bd9cc] bg-[#f5fbf9] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#007f70]">3 · Game details</p><h4 className="mt-1 text-xs font-black text-[#071633]">{gamePerformanceDetail.game?.name}</h4><p className="mt-1 text-[9px] text-[#71818d]">Skills measured in this game and comparison with similar students.</p></div><button type="button" onClick={() => setShowSelectedGameDetails(false)} className="rounded-xl border border-[#b9dcd4] bg-white px-3 py-2.5 text-[10px] font-black text-[#526474]">Hide details</button></div>
+                {gamePerformanceDetail.recordingSessionId && <section className="rounded-xl border border-[#c7ddd8] bg-white p-4">
+                  <div className="flex items-center justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#007f70]">Gameplay evidence</p><h5 className="mt-1 text-xs font-black text-[#071633]">{gamePerformanceDetail.game?.name} screen recording</h5><p className="mt-1 text-[9px] text-[#71818d]">Recording for this selected game · game screen only</p></div><span className="rounded-full bg-emerald-100 px-3 py-1.5 text-[9px] font-black text-emerald-700">SAVED VIDEO</span></div>
+                  {gameplayVideoUrl ? <video controls preload="metadata" src={gameplayVideoUrl} className="mt-4 aspect-video w-full rounded-xl border border-[#dceae6] bg-slate-950" aria-label={`${gamePerformanceDetail.game?.name || "Selected game"} gameplay recording`} /> : <div className="mt-4 grid aspect-video place-items-center rounded-xl border border-dashed border-[#cbded9] bg-[#fafdfc] text-[10px] font-bold text-[#71818d]"><Loader2 className="mb-2 h-5 w-5 animate-spin text-[#007f70]" />Preparing gameplay video…</div>}
+                </section>}
+                {gamePerformanceDetail.skills?.length ? <SkillColumnChart skills={gamePerformanceDetail.skills} /> : <div className="rounded-xl border border-dashed border-[#cbded9] bg-white p-4 text-center text-[10px] font-bold text-[#71818d]">Skill performance data is not available for this game.</div>}
+                <div>{(() => { const comparison = gamePerformanceDetail.comparison || { averageScore: 72, sampleSize: 4, group: `${gamePerformanceDetail.game?.ageGroup || "Same age group"} · Demo data` }; const isDemo = !gamePerformanceDetail.comparison; const studentScore = Math.round(Number(gamePerformanceDetail.score || 0)); const averageScore = Math.round(Number(comparison.averageScore || 0)); const difference = studentScore - averageScore; const differenceText = difference === 0 ? "matches the age-group average" : `${Math.abs(difference)} percentage points ${difference > 0 ? "above" : "below"} the age-group average`; const guidance = difference >= 10 ? "Strong performance — continue with more challenging activities." : difference >= 0 ? "Performing at the expected level — continue regular practice." : difference >= -9 ? "Slightly below average — focused practice may help." : "Additional practice and school support are recommended."; return <><div className="mb-3 flex flex-wrap items-center gap-2"><p className="text-[9px] font-black uppercase tracking-wide text-[#607080]">Age-group comparison</p>{isDemo && <span className="rounded-full bg-violet-100 px-2 py-1 text-[8px] font-black uppercase text-violet-700">Demo data</span>}</div><div className="rounded-xl border border-[#dceae6] bg-white p-4"><div className="grid gap-4 sm:grid-cols-2">{[[gamePerformanceDetail.student?.name || "Student", studentScore], [`Age-group average`, averageScore]].map(([label, score], index) => <div key={String(label)} className={`rounded-xl p-4 ${index === 0 ? "bg-[#effaf7]" : "bg-[#f3f1ff]"}`}><div className="mb-3 flex items-center justify-between gap-2"><span className="text-[10px] font-black text-[#34475a]">{label}</span><b className="text-lg text-[#071633]">{Math.round(Number(score))}%</b></div><div className="h-3 overflow-hidden rounded-full bg-white"><div className={`h-full rounded-full ${index === 0 ? "bg-[#008f7d]" : "bg-[#7a68c7]"}`} style={{ width: `${Math.max(2, Math.min(100, Number(score)))}%` }} /></div>{index === 1 && <p className="mt-2 text-[8px] font-bold text-[#71818d]">Based on {comparison.sampleSize} completed students</p>}</div>)}</div><div className={`mt-4 rounded-xl border p-4 ${difference < -9 ? "border-amber-200 bg-amber-50" : difference < 0 ? "border-sky-200 bg-sky-50" : "border-emerald-200 bg-emerald-50"}`}><p className="text-[9px] font-black uppercase tracking-wide text-[#607080]">What this means</p><p className="mt-1 text-xs font-black text-[#071633]">{gamePerformanceDetail.student?.name || "The student"} {differenceText}.</p><p className="mt-1 text-[10px] font-bold leading-5 text-[#526474]">{guidance}</p></div>{isDemo ? <p className="mt-3 text-[8px] font-bold text-violet-700">Example values are shown for demonstration. Real completed submissions will replace them automatically.</p> : <p className="mt-3 text-[8px] font-bold text-[#71818d]">{comparison.group}. Completed submissions only.</p>}</div></>; })()}</div>
+              </section>}
+              {libraryGamesBundleOpen && studentGamesPerformance?.games?.length > 0 && <section className="rounded-xl border border-[#c7ddd8] bg-white p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#007f70]">4 · School review</p><h4 className="mt-1 text-xs font-black text-[#071633]">Record the school&apos;s overall review</h4><p className="mt-1 text-[9px] leading-4 text-[#71818d]">This note applies to the student&apos;s complete Games Library submission.</p></div><span className={`rounded-full px-3 py-1.5 text-[9px] font-black uppercase ${gameResultSubmission.gameResult?.reviewStatus === "REVIEWED" ? "bg-emerald-100 text-emerald-700" : gameResultSubmission.gameResult?.reviewStatus === "NEEDS_FOLLOW_UP" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>{(gameResultSubmission.gameResult?.reviewStatus || "PENDING").replaceAll("_", " ")}</span></div><label className="mt-4 block"><span className="text-[9px] font-black uppercase tracking-wide text-[#607080]">School&apos;s performance note</span><textarea value={gameSchoolReview} onChange={(event) => setGameSchoolReview(event.target.value)} rows={4} placeholder="Example: The student performed strongly in creative tasks and would benefit from more practice in memory and listening games." className="mt-2 w-full resize-none rounded-xl border border-[#dceae6] bg-[#fafdfc] p-3 text-xs leading-5 text-[#071633] outline-none transition focus:border-[#55b9a7] focus:ring-2 focus:ring-[#55b9a7]/15" /></label><div className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" disabled={!gameSchoolReview.trim() || gameReviewSaving} onClick={() => void saveGameSchoolReview("NEEDS_FOLLOW_UP")} className="min-h-10 rounded-xl border border-amber-300 bg-amber-50 px-4 text-[10px] font-black text-amber-800 disabled:opacity-45">Needs Follow-up</button><button type="button" disabled={!gameSchoolReview.trim() || gameReviewSaving} onClick={() => void saveGameSchoolReview("REVIEWED")} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-[#007f70] px-4 text-[10px] font-black text-white disabled:opacity-45">{gameReviewSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />} Mark Complete Submission as Reviewed</button></div></section>}
+              {!libraryGamesBundleOpen && gameResultSubmission.gameResult?.recordingSessionId && gameResultSubmission.gameResult?.status === "COMPLETED" && <section className="rounded-xl border border-[#c7ddd8] bg-white p-4">
                 <div className="flex items-center justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#007f70]">Gameplay evidence</p><h4 className="mt-1 text-xs font-black text-[#071633]">Student gameplay recording</h4><p className="mt-1 text-[9px] text-[#71818d]">Game screen only · no webcam or microphone</p></div><span className="rounded-full bg-emerald-100 px-3 py-1.5 text-[9px] font-black text-emerald-700">SAVED VIDEO</span></div>
                 {gameplayVideoUrl ? <video controls preload="metadata" src={gameplayVideoUrl} className="mt-4 aspect-video w-full rounded-xl border border-[#dceae6] bg-slate-950" aria-label="Student gameplay recording" /> : <div className="mt-4 grid aspect-video place-items-center rounded-xl border border-dashed border-[#cbded9] bg-[#fafdfc] text-[10px] font-bold text-[#71818d]"><Loader2 className="mb-2 h-5 w-5 animate-spin text-[#007f70]" />Preparing gameplay video…</div>}
               </section>}
-              {gameResultSubmission.gameResult?.status === "COMPLETED" && <section className="rounded-xl border border-[#c7ddd8] bg-white p-4">
+              {!libraryGamesBundleOpen && gameResultSubmission.gameResult?.status === "COMPLETED" && <section className="rounded-xl border border-[#c7ddd8] bg-white p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#007f70]">Final step</p><h4 className="mt-1 text-xs font-black text-[#071633]">School review</h4><p className="mt-1 text-[9px] leading-4 text-[#71818d]">Review the saved responses, add a short note, and record the school&apos;s decision.</p></div>
                   <span className={`rounded-full px-3 py-1.5 text-[9px] font-black uppercase ${gameResultSubmission.gameResult?.reviewStatus === "REVIEWED" ? "bg-emerald-100 text-emerald-700" : gameResultSubmission.gameResult?.reviewStatus === "NEEDS_FOLLOW_UP" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>{(gameResultSubmission.gameResult?.reviewStatus || "PENDING").replaceAll("_", " ")}</span>
@@ -4265,9 +4502,21 @@ export default function AdminAssessments() {
               </section>}
             </div>
             <div className="flex justify-end border-t border-[#dceae6] bg-[#f8fbf9] p-4">
-              <button onClick={() => { setGameResponseReviewOpen(false); setGameResultSubmission(null); }} className="rounded-xl bg-[#007f70] px-4 py-2 text-xs font-bold text-white hover:bg-[#00665a]">Close</button>
+              <button onClick={() => { setGameResponseReviewOpen(false); setGamePerformanceDetail(null); setStudentGamesPerformance(null); setGameResultSubmission(null); }} className="rounded-xl bg-[#007f70] px-4 py-2 text-xs font-bold text-white hover:bg-[#00665a]">Close</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {gamePdfPreview && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#071633]/75 p-3 backdrop-blur-md sm:p-5">
+          <section className="flex h-[94dvh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-white/60 bg-white shadow-[0_30px_100px_rgba(7,22,51,.45)]">
+            <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#dceae6] bg-[#f8fbf9] p-4">
+              <div><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#007f70]">PDF report preview</p><h3 className="mt-1 text-sm font-black text-[#071633]">Review the report before downloading</h3></div>
+              <div className="flex flex-wrap items-center gap-2"><button type="button" onClick={() => void shareGameReportWithParent("gmail")} className="inline-flex min-h-10 items-center rounded-xl border border-[#d7e7e3] bg-white px-4 text-[10px] font-black text-[#34475a] hover:bg-[#f5faf8]">Send via Gmail</button><button type="button" onClick={() => void shareGameReportWithParent("whatsapp")} className="keep-white inline-flex min-h-10 items-center rounded-xl bg-[#20a969] px-4 text-[10px] font-black text-white hover:bg-[#188653]">Send via WhatsApp</button><a href={gamePdfPreview.url} download={gamePdfPreview.fileName} className="keep-white inline-flex min-h-10 items-center rounded-xl bg-[#007f70] px-4 text-[10px] font-black text-white hover:bg-[#00665a]">Download PDF</a><button type="button" onClick={() => { URL.revokeObjectURL(gamePdfPreview.url); setGamePdfPreview(null); }} className="grid h-10 w-10 place-items-center rounded-xl border border-[#dceae6] bg-white text-[#607080] hover:bg-[#edf5f3]" aria-label="Close PDF preview"><XCircle className="h-4 w-4" /></button></div>
+            </header>
+            <iframe src={`${gamePdfPreview.url}#toolbar=1&navpanes=0`} title="Game performance PDF preview" className="min-h-0 flex-1 bg-slate-100" />
+          </section>
         </div>
       )}
 

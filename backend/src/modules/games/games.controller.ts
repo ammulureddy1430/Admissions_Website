@@ -17,6 +17,9 @@ export class GamesController {
   @Post('bulk-assign') bulkAssign(@Body() dto: BulkAssignRealTimeGamesDto, @SchoolId() schoolId: string, @Req() req: any) { return this.service.bulkAssign(dto, schoolId, req.user.id); }
   @Get('bulk-eligible-students') bulkEligibleStudents(@Query('ageGroup') ageGroup: string, @SchoolId() schoolId: string) { return this.service.bulkEligibleStudents(ageGroup, schoolId); }
   @Get('bulk-assignment-options') bulkAssignmentOptions(@Query('ageGroup') ageGroup: string, @Query('studentId') studentId: string, @SchoolId() schoolId: string) { return this.service.bulkAssignmentOptions(ageGroup, studentId, schoolId); }
+  @Get('results/summary') resultSummary(@SchoolId() schoolId: string, @Query() query: Record<string, string>) { return this.service.resultSummary(schoolId, query); }
+  @Patch('results/student/:studentId/review') reviewStudentResults(@Param('studentId') studentId: string, @Body() dto: ReviewGameResultDto, @SchoolId() schoolId: string, @Req() req: any) { return this.service.reviewStudentResults(studentId, dto, schoolId, req.user.id); }
+  @Get('results/:resultId') resultDetail(@Param('resultId') resultId: string, @SchoolId() schoolId: string) { return this.service.resultDetail(resultId, schoolId); }
   @Get(':id') one(@Param('id') id: string, @SchoolId() schoolId: string) { return this.service.one(id, schoolId); }
   @Get(':id/analytics') analytics(@Param('id') id: string, @SchoolId() schoolId: string) { return this.service.analytics(id, schoolId); }
   @Get(':id/reports') reports(@Param('id') id: string, @SchoolId() schoolId: string) { return this.service.reports(id, schoolId); }

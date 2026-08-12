@@ -33,7 +33,6 @@ export class GamesService implements OnModuleInit {
     const responseTime = numeric(['averageResponseTime', 'averageReactionTime', 'averageDecisionTime', 'averageSolutionTime', 'averageCompletionTime', 'averageLevelCompletionTime']);
     const rounds = numeric(['roundsPlayed', 'levelsCompleted', 'missionsCompleted', 'tracksCompleted', 'objectsCompleted', 'completedPipelines']);
     const sessions = result.runtimeSessions || [];
-    const recordingSession = sessions.find((session: any) => typeof session.runtimeState?.recordingObjectKey === 'string');
     const events = includeEvents ? sessions.flatMap((session: any) => session.events || []).sort((a: any, b: any) => a.sequence - b.sequence) : undefined;
     const durationSeconds = result.startedAt && result.completedAt ? Math.max(0, Math.round((new Date(result.completedAt).getTime() - new Date(result.startedAt).getTime()) / 1000)) : (sessions[0]?.elapsedSeconds ?? null);
     return {
@@ -41,14 +40,13 @@ export class GamesService implements OnModuleInit {
       game: result.game, status: result.status, reviewStatus: result.reviewStatus, schoolReview: result.schoolReview, recommendation: result.recommendation,
       score: result.percentage, totalScore: result.totalScore, passed: result.passed, startedAt: result.startedAt, completedAt: result.completedAt,
       durationSeconds, accuracy, averageResponseTime: responseTime, attempts, mistakes, roundsCompleted: rounds, metrics, skills, events,
-      recordingSessionId: recordingSession?.id || null,
     };
   }
 
   private resultInclude(includeEvents = false) {
     return {
       game: true, attempts: { include: { scores: true }, orderBy: { attemptNumber: 'desc' as const } },
-      runtimeSessions: includeEvents ? { include: { events: { orderBy: { sequence: 'asc' as const } } }, orderBy: { createdAt: 'desc' as const } } : { select: { id: true, elapsedSeconds: true, startedAt: true, completedAt: true, runtimeState: true } },
+      runtimeSessions: includeEvents ? { include: { events: { orderBy: { sequence: 'asc' as const } } }, orderBy: { createdAt: 'desc' as const } } : { select: { elapsedSeconds: true, startedAt: true, completedAt: true } },
       followLightsAnalytics: true, ballStackAnalytics: true, soundDetectiveAnalytics: true, colorPathAnalytics: true,
       magicPaintAnalytics: true, trainTrackAnalytics: true, packageSorterAnalytics: true, rescueMissionAnalytics: true,
       parkingEscapeAnalytics: true, waterPipelineAnalytics: true,
@@ -93,16 +91,6 @@ export class GamesService implements OnModuleInit {
     }
     const school = await this.prisma.school.findUnique({ where: { id: schoolId }, select: { name: true } });
     return { ...detail, comparison, schoolName: school?.name || 'School' };
-  }
-
-  async reviewStudentResults(studentId: string, dto: ReviewGameResultDto, schoolId: string, userId: string) {
-    const student = await this.prisma.application.findFirst({ where: { id: studentId, schoolId }, select: { id: true } });
-    if (!student) throw new NotFoundException('Student not found.');
-    const results = await this.prisma.gameResult.findMany({ where: { studentId, status: 'COMPLETED', assessment: { schoolId, settings: { path: ['source'], string_starts_with: 'REAL_TIME_GAMES' } } }, select: { id: true } });
-    if (!results.length) throw new NotFoundException('No completed Games Library results are available for review.');
-    const isFinal = dto.reviewStatus !== 'PENDING';
-    await this.prisma.gameResult.updateMany({ where: { id: { in: results.map((result) => result.id) } }, data: { reviewStatus: dto.reviewStatus, schoolReview: dto.schoolReview.trim(), recommendation: dto.recommendation?.trim() || null, reviewedById: isFinal ? userId : null, reviewedAt: isFinal ? new Date() : null } });
-    return { updated: results.length, reviewStatus: dto.reviewStatus, schoolReview: dto.schoolReview.trim(), reviewedAt: isFinal ? new Date() : null };
   }
 
   async onModuleInit() {

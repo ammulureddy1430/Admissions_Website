@@ -153,7 +153,12 @@ export class GamePlayService {
         targetIds: { hasSome: childIds },
         status: 'ASSIGNED',
       },
-      include: { generatedGame: { include: { template: { include: { category: true } } } }, gameAssessment: true, results: { include: { attempts: true } } },
+      include: { generatedGame: { include: { template: { include: { category: true } } } }, gameAssessment: true, results: { include: {
+        attempts: true,
+        followLightsAnalytics: true, ballStackAnalytics: true, soundDetectiveAnalytics: true, colorPathAnalytics: true,
+        magicPaintAnalytics: true, trainTrackAnalytics: true, packageSorterAnalytics: true, rescueMissionAnalytics: true,
+        parkingEscapeAnalytics: true, waterPipelineAnalytics: true,
+      } } },
       orderBy: { createdAt: 'desc' },
     });
     const seen = new Set<string>();
@@ -168,6 +173,20 @@ export class GamePlayService {
         const result = assignment.results.find((row) => row.studentId === studentId) || null;
         const { results: _results, ...safeAssignment } = assignment;
         const reviewIsFinal = result?.reviewStatus === 'REVIEWED' || result?.reviewStatus === 'NEEDS_FOLLOW_UP';
+        const analytics = result && (result.followLightsAnalytics || result.ballStackAnalytics || result.soundDetectiveAnalytics
+          || result.colorPathAnalytics || result.magicPaintAnalytics || result.trainTrackAnalytics
+          || result.packageSorterAnalytics || result.rescueMissionAnalytics || result.parkingEscapeAnalytics
+          || result.waterPipelineAnalytics);
+        const ignoredMetrics = new Set(['id', 'studentId', 'assessmentId', 'gameId', 'gameResultId', 'createdAt', 'updatedAt', 'completionStatus']);
+        const performanceMetrics = analytics ? Object.fromEntries(Object.entries(analytics).filter(([metric, value]) =>
+          !ignoredMetrics.has(metric) && (typeof value === 'number' || typeof value === 'string'),
+        )) : {};
+        const skills = Object.entries(performanceMetrics)
+          .filter(([metric, value]) => metric.toLowerCase().endsWith('score') && metric !== 'overallScore' && typeof value === 'number')
+          .map(([metric, value]) => ({
+            name: metric.replace(/Score$/, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (letter) => letter.toUpperCase()),
+            score: Number(value),
+          }));
         const parentResult = result ? {
           ...result,
           totalScore: reviewIsFinal ? result.totalScore : null,
@@ -176,6 +195,8 @@ export class GamePlayService {
           reviewStatus: reviewIsFinal ? result.reviewStatus : 'PENDING',
           schoolReview: reviewIsFinal ? result.schoolReview : null,
           recommendation: reviewIsFinal ? result.recommendation : null,
+          performanceMetrics,
+          skills,
         } : null;
         return { ...safeAssignment, child, result: parentResult, availability: this.availability(assignment, result) };
       })

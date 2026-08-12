@@ -116,6 +116,8 @@ export default function ParentDashboard() {
   const [gameBusy, setGameBusy] = useState<string | null>(null);
   const [gameError, setGameError] = useState<string | null>(null);
   const [runtimeTutorial, setRuntimeTutorial] = useState<any | null>(null);
+  const [selectedGamesChild, setSelectedGamesChild] = useState<any | null>(null);
+  const [selectedGameReview, setSelectedGameReview] = useState<any | null>(null);
   const [gameSequenceDeadline, setGameSequenceDeadline] = useState<number | null>(null);
   const sequenceDeadlineRef = useRef<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -129,9 +131,13 @@ export default function ParentDashboard() {
   const [demoPaymentMethod, setDemoPaymentMethod] = useState<"upi" | "card">("upi");
   const [selectedUpiApp, setSelectedUpiApp] = useState<"gpay" | "phonepe" | "paytm">("gpay");
   const applicationsList = applications.length > 0 ? applications : mockParentApplications;
+  const displayedAssignedGames = useMemo(() => assignedGames.filter((assignment) => !(
+    assignment.child?.studentFirstName === "Aarav"
+    && assignment.child?.studentLastName === "Sharma"
+  )), [assignedGames]);
   const gameChildren = useMemo(() => {
     const children = new Map<string, any>();
-    assignedGames.forEach((assignment) => {
+    displayedAssignedGames.forEach((assignment) => {
       if (assignment.child?.id && !children.has(assignment.child.id)) {
         children.set(assignment.child.id, assignment.child);
       }
@@ -139,12 +145,12 @@ export default function ParentDashboard() {
     return Array.from(children.values()).sort((a, b) =>
       `${a.studentFirstName} ${a.studentLastName}`.localeCompare(`${b.studentFirstName} ${b.studentLastName}`),
     );
-  }, [assignedGames]);
+  }, [displayedAssignedGames]);
   const childAssignedGames = useMemo(
     () => selectedGameChildId === "all"
-      ? assignedGames
-      : assignedGames.filter((assignment) => assignment.child?.id === selectedGameChildId),
-    [assignedGames, selectedGameChildId],
+      ? displayedAssignedGames
+      : displayedAssignedGames.filter((assignment) => assignment.child?.id === selectedGameChildId),
+    [displayedAssignedGames, selectedGameChildId],
   );
   const isRegularGame = (assignment: any) =>
     String(assignment.gameAssessment?.settings?.source || "").startsWith("REAL_TIME_GAMES");
@@ -154,11 +160,6 @@ export default function ParentDashboard() {
   const regularGameCount = childAssignedGames.filter(isRegularGame).length;
   const gameAssessmentCount = childAssignedGames.length - regularGameCount;
   const selectedGameChild = gameChildren.find((child) => child.id === selectedGameChildId);
-  const visibleGameStats = {
-    ready: visibleAssignedGames.filter((assignment) => assignment.result?.status !== "COMPLETED" && assignment.availability?.available).length,
-    completed: visibleAssignedGames.filter((assignment) => assignment.result?.status === "COMPLETED").length,
-    pending: visibleAssignedGames.filter((assignment) => assignment.result?.status === "COMPLETED" && !["REVIEWED", "NEEDS_FOLLOW_UP"].includes(assignment.result?.reviewStatus)).length,
-  };
 
   useEffect(() => {
     document.body.classList.toggle("payment-modal-open", Boolean(demoPayment));
@@ -752,6 +753,26 @@ export default function ParentDashboard() {
     }
   };
 
+  const renderGamesTabCard = (assignment: any) => {
+    const completed = assignment.result?.status === "COMPLETED";
+    const reviewComplete = ["REVIEWED", "NEEDS_FOLLOW_UP"].includes(assignment.result?.reviewStatus);
+    const requestStatus = assignment.result?.reassessmentRequestStatus;
+    const approvedReplay = completed && requestStatus === "APPROVED" && assignment.availability?.available;
+    const scoreAvailable = assignment.result?.percentage !== null && assignment.result?.percentage !== undefined && assignment.result?.percentage !== "";
+    const initials = `${assignment.child?.studentFirstName?.charAt(0) || ""}${assignment.child?.studentLastName?.charAt(0) || ""}`;
+    return <article key={`${assignment.generatedGameId}-${assignment.child.id}`} className="flex flex-col rounded-xl border border-[#dceae6] bg-[#fafdfc] p-4">
+      <div className="flex items-start justify-between gap-3"><span className="grid h-8 min-w-8 place-items-center rounded-lg bg-[#e6f7f2] px-2 text-[9px] font-black text-[#007f70]">{assignment.sequence?.position ? `${initials} · ${assignment.sequence.position}` : <Gamepad2 className="h-4 w-4" />}</span><span className={`rounded-full px-2 py-1 text-[9px] font-extrabold ${completed ? "bg-emerald-100 text-emerald-700" : assignment.availability?.available ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"}`}>{completed ? "COMPLETED" : assignment.availability?.available ? assignment.result?.status === "IN_PROGRESS" ? "IN PROGRESS" : "READY TO PLAY" : "LOCKED"}</span></div>
+      <h4 className="mt-2.5 text-sm font-extrabold text-[#071633]">{assignment.generatedGame?.title}</h4>
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px] font-semibold text-[#71818d]">{assignment.sequence?.total > 1 && <span className="font-black uppercase tracking-wider text-[#8a9aa5]">{assignment.child.studentFirstName}&apos;s Game {assignment.sequence.position} of {assignment.sequence.total}</span>}<span>{assignment.child.studentFirstName} {assignment.child.studentLastName} · {assignment.child.grade}</span></div>
+      <p className="mt-1.5 line-clamp-1 text-[9px] text-[#71818d]">{assignment.generatedGame?.template?.category?.name || "Learning game"} · {assignment.maxAttempts} {assignment.maxAttempts === 1 ? "attempt" : "attempts"} · Pass {assignment.passingScore}%</p>
+      {completed && <div className="mt-3 border-t border-[#dceae6] pt-3">{reviewComplete ? <><div className="flex flex-wrap items-center gap-3"><span className="text-xl font-black text-[#071633]">{scoreAvailable ? `${Math.round(Number(assignment.result.percentage))}%` : "Score pending"}</span><span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-[#08775f]"><CheckCircle className="h-3.5 w-3.5" />{assignment.result.reviewStatus === "NEEDS_FOLLOW_UP" ? "Needs follow-up" : "Reviewed"}</span></div><p className="mt-2 text-[10px] text-[#526474]"><b>School review:</b> {assignment.result.schoolReview || "No additional comments."}</p><button type="button" onClick={() => setSelectedGameReview(assignment)} className="mt-2 inline-flex items-center gap-1 text-[10px] font-extrabold text-[#007f70]">View review <ArrowRight className="h-3 w-3" /></button></> : <><div className="flex flex-wrap items-center gap-3"><span className="text-sm font-black text-[#607080]">Score pending</span><span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-[#71818d]"><Clock3 className="h-3.5 w-3.5" />Review pending</span></div><button type="button" onClick={() => setSelectedGameReview(assignment)} className="mt-2 inline-flex items-center gap-1 text-[10px] font-extrabold text-[#007f70]">Review game <ArrowRight className="h-3 w-3" /></button></>}</div>}
+      {!completed && assignment.availability?.available && <button type="button" disabled={gameBusy === assignment.id} onClick={() => void openGameTutorial(assignment)} className="keep-white mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#007f70] px-3 py-2 text-[10px] font-extrabold text-white"><Play className="keep-white h-3.5 w-3.5" />{assignment.result?.status === "IN_PROGRESS" ? "Resume game" : "Start game"}</button>}
+      {completed && requestStatus === "PENDING" && <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-[10px] font-extrabold text-amber-800">Re-assessment request pending school approval</p>}
+      {approvedReplay && <button type="button" disabled={gameBusy === assignment.id} onClick={() => void openGameTutorial(assignment)} className="keep-white mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#007f70] px-3 py-2 text-[10px] font-extrabold text-white"><Play className="keep-white h-3.5 w-3.5" />Start re-assessment</button>}
+      {completed && reviewComplete && !requestStatus && <button type="button" disabled={gameBusy === assignment.id} onClick={() => void requestGameReassessment(assignment)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#9ed4c8] bg-[#f4fbf9] px-3 py-2 text-[10px] font-extrabold text-[#007f70]"><RotateCcw className="h-3.5 w-3.5" />Request re-assessment</button>}
+    </article>;
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -813,17 +834,17 @@ export default function ParentDashboard() {
               <h3 className="text-lg font-extrabold text-[#071633]">Assigned to your children</h3>
               <p className="mt-1 text-[11px] font-medium text-[#71818d]">Choose a child, then switch between learning games and formal game-based assessments.</p>
             </div>
-            <span className="rounded-full bg-[#e6f7f2] px-3 py-1 text-[10px] font-extrabold text-[#007f70]">{assignedGames.length} {assignedGames.length === 1 ? "game" : "games"}</span>
+            <span className="rounded-full bg-[#e6f7f2] px-3 py-1 text-[10px] font-extrabold text-[#007f70]">{displayedAssignedGames.length} {displayedAssignedGames.length === 1 ? "game" : "games"}</span>
           </div>
 
           {gameChildren.length > 0 && <div className="border-b border-[#e4efec] bg-[#f8fbfa] px-5 pt-4">
             <div className="flex gap-2 overflow-x-auto pb-4" role="tablist" aria-label="Choose a child">
               <button type="button" role="tab" aria-selected={selectedGameChildId === "all"} onClick={() => setSelectedGameChildId("all")} className={`min-w-fit rounded-xl border px-4 py-3 text-left transition-all ${selectedGameChildId === "all" ? "border-[#007f70] bg-[#007f70] text-white shadow-sm" : "border-[#d8e7e3] bg-white text-[#526474] hover:border-[#8fc9bd]"}`}>
                 <span className="block text-xs font-extrabold">All children</span>
-                <span className={`mt-0.5 block text-[9px] font-bold ${selectedGameChildId === "all" ? "text-[#bff3e7]" : "text-[#8a9aa5]"}`}>{assignedGames.length} games</span>
+                <span className={`mt-0.5 block text-[9px] font-bold ${selectedGameChildId === "all" ? "text-[#bff3e7]" : "text-[#8a9aa5]"}`}>{displayedAssignedGames.length} games</span>
               </button>
               {gameChildren.map((child) => {
-                const childGames = assignedGames.filter((assignment) => assignment.child?.id === child.id);
+                const childGames = displayedAssignedGames.filter((assignment) => assignment.child?.id === child.id);
                 const childReady = childGames.filter((assignment) => assignment.result?.status !== "COMPLETED" && assignment.availability?.available).length;
                 const selected = selectedGameChildId === child.id;
                 return <button key={child.id} type="button" role="tab" aria-selected={selected} onClick={() => setSelectedGameChildId(child.id)} className={`flex min-w-[180px] items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all ${selected ? "border-[#007f70] bg-[#007f70] text-white shadow-sm" : "border-[#d8e7e3] bg-white text-[#526474] hover:border-[#8fc9bd]"}`}>
@@ -836,7 +857,7 @@ export default function ParentDashboard() {
 
           <div className="space-y-4 p-5">
           {gameError && <div role="alert" className="game-assessment-alert--error rounded-xl border p-3 text-xs font-bold">{gameError}</div>}
-          {assignedGames.length ? (
+          {displayedAssignedGames.length ? (
             <>
             <div className="grid gap-3 sm:grid-cols-2" role="tablist" aria-label="Assignment type">
               <button type="button" role="tab" aria-selected={selectedGameContentType === "games"} onClick={() => setSelectedGameContentType("games")} className={`flex items-center justify-between rounded-xl border p-4 text-left transition-all ${selectedGameContentType === "games" ? "border-[#007f70] bg-[#edf9f6] ring-1 ring-[#007f70]" : "border-[#dceae6] bg-white hover:border-[#8fc9bd]"}`}>
@@ -848,10 +869,15 @@ export default function ParentDashboard() {
                 <span className="ml-4 inline-flex min-w-[88px] shrink-0 items-center justify-center rounded-full border border-[#c5baf5] bg-[#eee9ff] px-3.5 py-2 text-xs font-black text-[#362a78] shadow-sm">{gameAssessmentCount} assigned</span>
               </button>
             </div>
-            <div className="flex flex-col gap-3 rounded-xl border border-[#dceae6] bg-[#f8fbfa] p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div><p className="text-sm font-extrabold text-[#071633]">{selectedGameChild ? `${selectedGameChild.studentFirstName}'s ${selectedGameContentType === "games" ? "games" : "game-based assessments"}` : `Family ${selectedGameContentType === "games" ? "games" : "game-based assessments"}`}</p><p className="mt-0.5 text-[10px] font-medium text-[#71818d]">{selectedGameChild ? `${selectedGameChild.grade} · ${visibleAssignedGames.length} assigned` : `${gameChildren.length} children · ${visibleAssignedGames.length} assigned`}</p></div>
-              <div className="flex flex-wrap gap-2 text-[9px] font-extrabold"><span className="rounded-full bg-blue-100 px-2.5 py-1.5 text-blue-700">{visibleGameStats.ready} ready</span><span className="rounded-full bg-amber-100 px-2.5 py-1.5 text-amber-700">{visibleGameStats.pending} awaiting review</span><span className="rounded-full bg-emerald-100 px-2.5 py-1.5 text-emerald-700">{visibleGameStats.completed} completed</span></div>
-            </div>
+            {selectedGameContentType === "games" ? <>{regularGameCount > 0 ? <div className="grid gap-3 sm:grid-cols-2">{gameChildren.map((child) => {
+              if (selectedGameChildId !== "all" && selectedGameChildId !== child.id) return null;
+              const childGames = displayedAssignedGames.filter((assignment) => assignment.child?.id === child.id && isRegularGame(assignment));
+              if (!childGames.length) return null;
+              const completed = childGames.filter((assignment) => assignment.result?.status === "COMPLETED").length;
+              const reviewed = childGames.filter((assignment) => ["REVIEWED", "NEEDS_FOLLOW_UP"].includes(assignment.result?.reviewStatus)).length;
+              const awaiting = childGames.filter((assignment) => assignment.result?.status === "COMPLETED" && !["REVIEWED", "NEEDS_FOLLOW_UP"].includes(assignment.result?.reviewStatus)).length;
+              return <button key={child.id} type="button" onClick={() => setSelectedGamesChild(child)} className="group rounded-2xl border border-[#dceae6] bg-[#fafdfc] p-4 text-left transition hover:-translate-y-0.5 hover:border-[#8fc9bd] hover:shadow-[0_12px_30px_rgba(28,65,56,.08)]"><div className="flex items-start gap-3"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#e6f7f2] text-xs font-black text-[#007f70]">{child.studentFirstName?.charAt(0)}{child.studentLastName?.charAt(0)}</span><span className="min-w-0 flex-1"><span className="block text-sm font-extrabold text-[#071633]">{child.studentFirstName} {child.studentLastName}</span><span className="mt-0.5 block text-[10px] font-semibold text-[#71818d]">{child.grade}</span></span><ArrowRight className="mt-1 h-4 w-4 text-[#8aa19b] group-hover:text-[#007f70]" /></div><p className="mt-3 text-[10px] font-semibold leading-5 text-[#526474]">{childGames.length} games assigned · {completed} completed · {awaiting ? `${awaiting} awaiting review` : `${reviewed} reviewed`}</p><span className="mt-3 inline-flex items-center gap-1 text-[10px] font-extrabold text-[#007f70]">View games <ArrowRight className="h-3 w-3" /></span></button>;
+            })}</div> : <div className="rounded-xl border border-dashed border-[#cfe1dd] bg-[#fafdfc] p-7 text-center"><Gamepad2 className="mx-auto h-6 w-6 text-[#8aa19b]" /><p className="mt-2 text-xs font-bold text-[#526474]">No games assigned for this selection.</p><p className="mt-1 text-[10px] text-[#8a9aa5]">Choose another child or check the Game-based assessments tab.</p></div>}</> : <>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {[...visibleAssignedGames].sort((a, b) => {
                 const childOrder = `${a.child?.studentFirstName || ""} ${a.child?.studentLastName || ""}`.localeCompare(`${b.child?.studentFirstName || ""} ${b.child?.studentLastName || ""}`);
@@ -861,6 +887,7 @@ export default function ParentDashboard() {
                 const requestStatus = assignment.result?.reassessmentRequestStatus;
                 const approvedReplay = completed && requestStatus === "APPROVED" && assignment.availability?.available;
                 const childInitials = `${assignment.child?.studentFirstName?.charAt(0) || ""}${assignment.child?.studentLastName?.charAt(0) || ""}`;
+                const reviewComplete = assignment.result?.reviewStatus === "REVIEWED" || assignment.result?.reviewStatus === "NEEDS_FOLLOW_UP";
                 return (
                 <article key={`${assignment.generatedGameId}-${assignment.child.id}`} className="flex flex-col rounded-xl border border-[#dceae6] bg-[#fafdfc] p-3.5">
                   <div className="flex items-start justify-between gap-3">
@@ -873,9 +900,8 @@ export default function ParentDashboard() {
                     <span>{selectedGameChild ? assignment.child.grade : `${assignment.child.studentFirstName} ${assignment.child.studentLastName} · ${assignment.child.grade}`}</span>
                   </div>
                   <p className="mt-1.5 line-clamp-1 text-[9px] text-[#71818d]">{assignment.generatedGame?.template?.category?.name || "Learning game"} · {assignment.maxAttempts} {assignment.maxAttempts === 1 ? "attempt" : "attempts"} · Pass {assignment.passingScore}%</p>
-                  {assignment.result?.status === "COMPLETED" && <div className="mt-3 rounded-xl border border-[#cfe5df] bg-white p-3">
-                    {assignment.result.reviewStatus === "REVIEWED" || assignment.result.reviewStatus === "NEEDS_FOLLOW_UP" ? <div className="flex items-center justify-between gap-3"><span className="text-[10px] font-extrabold text-[#607080]">Published game result</span><span className="text-xs font-black text-[#007f70]">{Math.round(Number(assignment.result.percentage) || 0)}%</span></div> : <div><p className="text-[10px] font-extrabold text-[#607080]">School review pending</p><p className="mt-1 text-[9px] leading-4 text-[#71818d]">The score will appear after the school completes its review.</p></div>}
-                    {(assignment.result.reviewStatus === "REVIEWED" || assignment.result.reviewStatus === "NEEDS_FOLLOW_UP") && assignment.result.schoolReview && <div className="mt-3 border-t border-[#e2eeeb] pt-3"><p className="text-[9px] font-black uppercase tracking-wider text-[#007f70]">School review</p><p className="mt-1 text-[10px] leading-5 text-[#526474]">{assignment.result.schoolReview}</p><span className={`mt-2 inline-block rounded-full px-2 py-1 text-[8px] font-black uppercase ${assignment.result.reviewStatus === "REVIEWED" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{assignment.result.reviewStatus === "REVIEWED" ? "Reviewed" : "Needs follow-up"}</span></div>}
+                  {completed && <div className="mt-3 border-t border-[#dceae6] pt-3">
+                    {reviewComplete ? <button type="button" onClick={() => setSelectedGameReview(assignment)} className="inline-flex items-center gap-1 text-[10px] font-extrabold text-[#007f70] hover:text-[#005f54]">View review <ArrowRight className="h-3 w-3" /></button> : <button type="button" onClick={() => setSelectedGameReview(assignment)} className="inline-flex items-center gap-1 text-[10px] font-extrabold text-[#007f70] hover:text-[#005f54]">Review game <ArrowRight className="h-3 w-3" /></button>}
                   </div>}
                   {completed && requestStatus === "PENDING" && <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-[10px] font-extrabold text-amber-800">Re-assessment request pending school approval</p>}
                   {completed && requestStatus === "REJECTED" && <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-[10px] font-extrabold text-rose-700">Re-assessment request was not approved</p>}
@@ -888,11 +914,12 @@ export default function ParentDashboard() {
                     </button>
                   </div>}
                   {approvedReplay && <button type="button" disabled={gameBusy === assignment.id} onClick={() => void openGameTutorial(assignment)} className="keep-white mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#007f70] px-4 py-2.5 text-xs font-extrabold text-white hover:bg-[#006b5e] disabled:opacity-50"><Play className="keep-white h-4 w-4" />Start re-assessment</button>}
-                  {completed && (assignment.result.reviewStatus === "REVIEWED" || assignment.result.reviewStatus === "NEEDS_FOLLOW_UP") && !requestStatus && <button type="button" disabled={gameBusy === assignment.id} onClick={() => void requestGameReassessment(assignment)} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#007f70] bg-white px-4 py-2.5 text-xs font-extrabold text-[#007f70] hover:bg-[#edf9f6] disabled:opacity-50"><RotateCcw className="h-4 w-4" />Request re-assessment (one time)</button>}
+                  {completed && reviewComplete && !requestStatus && <button type="button" disabled={gameBusy === assignment.id} onClick={() => void requestGameReassessment(assignment)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#9ed4c8] bg-[#f4fbf9] px-3 py-2 text-[10px] font-extrabold text-[#007f70] transition hover:border-[#007f70] hover:bg-[#e8f7f3] disabled:opacity-50"><RotateCcw className="h-3.5 w-3.5" />Request re-assessment</button>}
                 </article>
               )})}
             </div>
             {visibleAssignedGames.length === 0 && <div className="rounded-xl border border-dashed border-[#cfe1dd] bg-[#fafdfc] p-7 text-center"><Gamepad2 className="mx-auto h-6 w-6 text-[#8aa19b]" /><p className="mt-2 text-xs font-bold text-[#526474]">No {selectedGameContentType === "games" ? "games" : "game-based assessments"} are assigned for this selection.</p><p className="mt-1 text-[10px] text-[#8a9aa5]">Try another child or switch the assignment type above.</p></div>}
+            </>}
             </>
           ) : (
             <div className="rounded-xl border border-dashed border-[#cfe1dd] bg-[#fafdfc] p-5 text-center">
@@ -902,6 +929,44 @@ export default function ParentDashboard() {
           )}
           </div>
         </section>
+
+        {selectedGamesChild && createPortal((() => {
+          const childGames = displayedAssignedGames.filter((assignment) => assignment.child?.id === selectedGamesChild.id && isRegularGame(assignment)).sort((a, b) => Number(a.sequence?.position || 0) - Number(b.sequence?.position || 0));
+          const completed = childGames.filter((assignment) => assignment.result?.status === "COMPLETED").length;
+          const reviewed = childGames.filter((assignment) => ["REVIEWED", "NEEDS_FOLLOW_UP"].includes(assignment.result?.reviewStatus)).length;
+          const awaiting = childGames.filter((assignment) => assignment.result?.status === "COMPLETED" && !["REVIEWED", "NEEDS_FOLLOW_UP"].includes(assignment.result?.reviewStatus)).length;
+          return <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#071633]/65 p-3 backdrop-blur-sm sm:p-5" role="dialog" aria-modal="true" aria-labelledby="student-games-title"><section className="flex max-h-[88vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-[#dceae6] bg-white shadow-[0_28px_90px_rgba(7,22,51,.3)] lg:w-[78vw]"><header className="flex items-start justify-between gap-4 border-b border-[#dceae6] bg-[#f8fbf9] p-5 sm:p-6"><div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#007f70]">Student games</p><h2 id="student-games-title" className="mt-1 text-lg font-extrabold text-[#071633]">{selectedGamesChild.studentFirstName} {selectedGamesChild.studentLastName}</h2><p className="mt-1 text-[10px] font-semibold text-[#71818d]">{selectedGamesChild.grade} · {childGames.length} {childGames.length === 1 ? "Game" : "Games"}</p><div className="mt-3 flex flex-wrap gap-2 text-[9px] font-extrabold"><span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-700">{completed} completed</span>{awaiting > 0 && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-700">{awaiting} awaiting review</span>}<span className="rounded-full bg-[#e6f7f2] px-2.5 py-1 text-[#007f70]">{reviewed} reviewed</span></div></div><button type="button" onClick={() => setSelectedGamesChild(null)} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#dceae6] bg-white text-[#607080] hover:bg-[#edf5f3]" aria-label="Close student games"><X className="h-4 w-4" /></button></header><div className="min-h-0 overflow-y-auto p-4 sm:p-6"><div className="grid gap-4 md:grid-cols-2">{childGames.map(renderGamesTabCard)}</div></div></section></div>;
+        })(), document.body)}
+
+        {selectedGameReview && createPortal((() => {
+          const assignment = selectedGameReview;
+          const result = assignment.result;
+          const scoreAvailable = result.percentage !== null && result.percentage !== undefined && result.percentage !== "";
+          const score = scoreAvailable ? Math.round(Number(result.percentage)) : null;
+          const skills = Array.isArray(result.skills) ? result.skills : [];
+          const metricEntries = Object.entries(result.performanceMetrics || {}).filter(([key]) => !key.toLowerCase().endsWith("score")).slice(0, 6);
+          const studentName = `${assignment.child?.studentFirstName || ""} ${assignment.child?.studentLastName || ""}`.trim();
+          const reviewComplete = ["REVIEWED", "NEEDS_FOLLOW_UP"].includes(result.reviewStatus);
+          const performanceSummary = score === null
+            ? `${studentName}'s completed gameplay is awaiting a published score.`
+            : `${studentName} completed ${assignment.generatedGame?.title || "this game"} with a final score of ${score}%${result.passed === true ? ", meeting the required target." : result.passed === false ? ", below the current target." : "."}`;
+          return <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#071633]/65 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="game-review-title">
+            <section className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[#dceae6] bg-white shadow-[0_24px_80px_rgba(7,22,51,.28)]">
+              <header className="flex items-start justify-between gap-4 border-b border-[#dceae6] bg-[#f8fbf9] p-5">
+                <div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#007f70]">Game review</p><h2 id="game-review-title" className="mt-1 text-base font-extrabold text-[#071633]">{assignment.generatedGame?.title}</h2><p className="mt-1 text-[10px] text-[#71818d]">{studentName} · {assignment.child?.grade}</p></div>
+                <button type="button" onClick={() => setSelectedGameReview(null)} className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-[#dceae6] bg-white text-[#607080] hover:bg-[#edf5f3]" aria-label="Close review"><X className="h-4 w-4" /></button>
+              </header>
+              <div className="min-h-0 space-y-5 overflow-y-auto p-5">
+                <div className="flex flex-wrap items-center gap-3"><strong className="text-3xl font-black tracking-tight text-[#071633]">{score === null ? "Pending" : `${score}%`}</strong><span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[9px] font-black text-emerald-700"><CheckCircle className="h-3 w-3" />{String(result.status || "COMPLETED").replaceAll("_", " ")}</span><span className={`inline-flex items-center gap-1 text-[10px] font-extrabold ${reviewComplete ? "text-[#08775f]" : "text-amber-700"}`}>{reviewComplete ? <CheckCircle className="h-3.5 w-3.5" /> : <Clock3 className="h-3.5 w-3.5" />}{reviewComplete ? (result.reviewStatus === "NEEDS_FOLLOW_UP" ? "Needs follow-up" : "Reviewed") : "Review pending"}</span></div>
+                <section><h3 className="text-[10px] font-black uppercase tracking-wider text-[#607080]">School review</h3><p className="mt-2 text-xs leading-5 text-[#34475a]">{reviewComplete ? (result.schoolReview || "No additional comments.") : "The school has not published its review or comments yet."}</p></section>
+                <section><h3 className="text-[10px] font-black uppercase tracking-wider text-[#607080]">Performance summary</h3><p className="mt-2 text-xs leading-5 text-[#34475a]">{performanceSummary}</p></section>
+                <section><h3 className="text-[10px] font-black uppercase tracking-wider text-[#607080]">Skills assessed</h3>{skills.length ? <div className="mt-3 space-y-3">{skills.map((skill: any) => <div key={skill.name}><div className="mb-1.5 flex items-center justify-between gap-3 text-[10px] font-extrabold text-[#34475a]"><span>{skill.name}</span><span>{Math.round(Number(skill.score) || 0)}%</span></div><div className="h-2 overflow-hidden rounded-full bg-[#e6efec]"><div className="h-full rounded-full bg-[#008f7d]" style={{ width: `${Math.max(0, Math.min(100, Number(skill.score) || 0))}%` }} /></div></div>)}</div> : <p className="mt-2 text-[10px] text-[#71818d]">No skill-wise results were recorded for this game.</p>}</section>
+                {metricEntries.length > 0 && <section><h3 className="text-[10px] font-black uppercase tracking-wider text-[#607080]">Recorded performance</h3><div className="mt-3 grid gap-2 sm:grid-cols-2">{metricEntries.map(([key, value]) => <div key={key} className="rounded-xl bg-[#f5faf8] px-3 py-2.5"><span className="block text-[8px] font-black uppercase tracking-wide text-[#71818d]">{key.replace(/([a-z0-9])([A-Z])/g, "$1 $2")}</span><strong className="mt-1 block text-xs text-[#071633]">{String(value).replaceAll("_", " ")}</strong></div>)}</div></section>}
+                <section className="grid gap-3 border-t border-[#dceae6] pt-4 sm:grid-cols-2"><div><h3 className="text-[9px] font-black uppercase tracking-wider text-[#607080]">Important observations</h3><p className="mt-1 text-[10px] leading-4 text-[#526474]">{reviewComplete ? (result.recommendation || result.schoolReview || "No additional observations were entered.") : "School observations will appear after the review is published."}</p></div><div><h3 className="text-[9px] font-black uppercase tracking-wider text-[#607080]">{reviewComplete ? "Reviewed on" : "Completed on"}</h3><p className="mt-1 text-[10px] font-bold text-[#34475a]">{(reviewComplete ? result.reviewedAt : result.completedAt) ? new Date(reviewComplete ? result.reviewedAt : result.completedAt).toLocaleString() : "Date not available"}</p></div></section>
+              </div>
+            </section>
+          </div>;
+        })(), document.body)}
 
         {/* Active applications list */}
         <div className="space-y-6">

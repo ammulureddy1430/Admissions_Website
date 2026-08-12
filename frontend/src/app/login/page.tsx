@@ -75,8 +75,11 @@ function LoginContent() {
           router.push(nextParam || "/study-abroad");
         }
       } else {
+        const safeNext = nextParam?.startsWith("/") && !nextParam.startsWith("//") ? nextParam : null;
         router.push(
-          data.user.role === "SUPER_ADMIN"
+          safeNext && (data.user.role === "SCHOOL_ADMIN" || data.user.role === "ADMISSIONS_STAFF")
+            ? safeNext
+            : data.user.role === "SUPER_ADMIN"
             ? "/super-admin/dashboard"
             : data.user.role === "SCHOOL_ADMIN" || data.user.role === "ADMISSIONS_STAFF"
             ? "/admin/dashboard"

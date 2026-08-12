@@ -4326,3 +4326,13 @@ body .games-error-alert .games-error-retry {
 .mock-game-single-round .follow-lights-world h1 + p + div {
   display: none !important;
 }
+body.assessment-result-modal-open .admin-sidebar,
+body.assessment-result-modal-open .portal-mobile-nav {
+  display: none !important;
+}
+
+@media (min-width: 1024px) {
+  body.assessment-result-modal-open main {
+    margin-left: 0 !important;
+  }
+}

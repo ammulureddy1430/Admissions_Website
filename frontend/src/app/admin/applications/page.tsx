@@ -859,7 +859,7 @@ export default function AdminApplications() {
                 <button
                   type="button"
                   onClick={handleWhatsAppRedirect}
-                  className="px-5 py-2.5 bg-[#25D366] hover:bg-[#1fb958] text-white rounded-xl text-xs font-bold flex items-center gap-2 transition shadow-sm active:scale-95"
+                  className="keep-white px-5 py-2.5 bg-[#25D366] hover:bg-[#1fb958] text-white rounded-xl text-xs font-bold flex items-center gap-2 transition shadow-sm active:scale-95"
                 >
                   <MessageCircle className="h-4 w-4 text-white shrink-0" />
                   <span>Send via WhatsApp</span>

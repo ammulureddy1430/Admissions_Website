@@ -127,7 +127,6 @@ export function GameRuntimePlayer({
     if (
       state.demo ||
       state.mode !== "ASSIGNMENT" ||
-      SELF_CONTAINED_GAME_ENGINES.has(initial.engine?.engineKey) ||
       !navigator.mediaDevices?.getDisplayMedia
     ) return true;
     if (gameplayStreamRef.current?.getVideoTracks().some((track) => track.readyState === "live")) return true;
@@ -156,7 +155,8 @@ export function GameRuntimePlayer({
       gameplayStreamRef.current?.getTracks().forEach((track) => track.stop());
       gameplayStreamRef.current = null;
       gameplayRecorderRef.current = null;
-      alert("Gameplay screen recording is required. Please choose this game tab in the sharing dialog.");
+      const sharingTarget = SELF_CONTAINED_GAME_ENGINES.has(initial.engine?.engineKey) ? "this game tab" : "the assessment tab";
+      alert(`Gameplay screen recording is required. Please choose ${sharingTarget} in the sharing dialog.`);
       return false;
     }
   };
