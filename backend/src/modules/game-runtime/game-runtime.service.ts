@@ -180,6 +180,10 @@ export class GameRuntimeService {
   async action(id: string, dto: RuntimeActionDto, schoolId: string, user: { id: string; role: Role }) {
     const session = await this.owned(id, schoolId, user);
     const action = dto.action.toUpperCase();
+    if (action === 'END') {
+      if (session.status === 'COMPLETED') return { state: await this.state(id, schoolId, user) };
+      return this.transition(id, 'COMPLETED', { completedAt: new Date() }, 'ENDED_EARLY', dto.payload, schoolId, user);
+    }
     if (session.engine.engineKey === 'COLOR_PATH' && ['PAUSE', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)) {
       throw new BadRequestException('Color Path does not allow pause, hints, retries, skips, or question answers.');
     }

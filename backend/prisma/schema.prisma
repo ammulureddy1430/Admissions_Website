@@ -271,6 +271,7 @@ model GameAssignment {
   startDate          DateTime?
   endDate            DateTime?
   maxAttempts        Int                @default(1)
+  allowedReassessments Int              @default(0)
   timeLimitMinutes   Int?
   passingScore       Float              @default(60)
   allowRestart       Boolean            @default(false)
@@ -300,6 +301,8 @@ model GameResult {
   passed                    Boolean?
   startedAt                 DateTime?
   completedAt               DateTime?
+  finalSubmittedAt          DateTime?
+  submissionCount           Int                      @default(0)
   reviewStatus              String                   @default("PENDING")
   schoolReview              String?                  @db.Text
   recommendation            String?                  @db.Text
@@ -332,6 +335,7 @@ model GameResult {
   @@index([gameId, studentId])
   @@index([assessmentId, studentId])
   @@index([reviewStatus])
+  @@index([finalSubmittedAt])
   @@index([reassessmentRequestStatus])
 }
 

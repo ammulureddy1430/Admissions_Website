@@ -65,7 +65,11 @@ export class GamePlayService {
     if (existing) {
       const updated = await this.prisma.gameAssignment.update({
         where: { id: existing.id },
-        data: { assignmentSettings: { ...((existing.assignmentSettings as Record<string, unknown>) || {}), ...(dto.settings || {}), deliveryMode } as Prisma.InputJsonValue },
+        data: {
+          allowedReassessments: dto.allowedReassessments,
+          maxAttempts: 1 + dto.allowedReassessments,
+          assignmentSettings: { ...((existing.assignmentSettings as Record<string, unknown>) || {}), ...(dto.settings || {}), deliveryMode } as Prisma.InputJsonValue,
+        },
         include: { generatedGame: true, gameAssessment: true },
       });
       return { ...updated, alreadyAssigned: true, deliveryModeUpdated: true };
@@ -74,7 +78,8 @@ export class GamePlayService {
       gameAssessmentId: dto.gameAssessmentId, generatedGameId: game.id, assignedById: userId,
       targetType: dto.targetType, targetIds: dto.targetIds, startDate: dto.startDate ? new Date(dto.startDate) : null,
       endDate: dto.endDate ? new Date(dto.endDate) : null, scheduledAt: dto.startDate ? new Date(dto.startDate) : null,
-      dueDate: dto.endDate ? new Date(dto.endDate) : null, maxAttempts: dto.maxAttempts,
+      dueDate: dto.endDate ? new Date(dto.endDate) : null, maxAttempts: 1 + dto.allowedReassessments,
+      allowedReassessments: dto.allowedReassessments,
       timeLimitMinutes: dto.timeLimitMinutes, passingScore: dto.passingScore, allowRestart: dto.allowRestart || false,
       assignmentSettings: { ...(dto.settings || {}), deliveryMode } as Prisma.InputJsonValue, status: 'ASSIGNED',
     }, include: { generatedGame: true, gameAssessment: true } });
@@ -104,6 +109,64 @@ export class GamePlayService {
   }
   assignments(schoolId: string, q: any) {
     return this.prisma.gameAssignment.findMany({ where: { gameAssessment: { schoolId }, ...(q.status && { status: q.status }) }, include: { generatedGame: true, gameAssessment: true, _count: { select: { results: true } } }, orderBy: { createdAt: 'desc' } });
+  }
+  async updateAssignment(id: string, allowedReassessments: number, schoolId: string) {
+    const assignment = await this.prisma.gameAssignment.findFirst({ where: { id, gameAssessment: { schoolId } } });
+    if (!assignment) throw new NotFoundException('Game assignment not found.');
+    return this.prisma.gameAssignment.update({
+      where: { id },
+      data: { allowedReassessments, maxAttempts: 1 + allowedReassessments },
+      include: { generatedGame: true, gameAssessment: true },
+    });
+  }
+
+  async attemptHistory(assignmentId: string, studentId: string, schoolId: string) {
+    const assignment = await this.prisma.gameAssignment.findFirst({
+      where: { id: assignmentId, gameAssessment: { schoolId } },
+      include: {
+        generatedGame: true,
+        gameAssessment: true,
+        results: { where: { studentId }, include: { attempts: { include: { scores: true }, orderBy: { attemptNumber: 'asc' } } } },
+      },
+    });
+    if (!assignment) throw new NotFoundException('Game assignment not found.');
+    const result = assignment.results[0];
+    const attempts = (result?.attempts || []).map((attempt) => {
+      const score = attempt.scores[0];
+      const details = (score?.details || {}) as Record<string, any>;
+      return {
+        id: attempt.id,
+        attemptNumber: attempt.attemptNumber,
+        status: attempt.submittedAt ? 'COMPLETED' : 'IN_PROGRESS',
+        startedAt: attempt.startedAt,
+        completedAt: attempt.submittedAt,
+        score: score?.score ?? null,
+        percentage: score ? Number(details.percentage ?? (score.maxScore > 0 ? Math.min(100, (score.score / score.maxScore) * 100) : 0)) : null,
+        timeTaken: score?.timeTaken ?? null,
+        accuracy: details.accuracy ?? details.observationAccuracy ?? null,
+        interactions: details.totalBallsDropped ?? details.roundsPlayed ?? details.totalSequences ?? details.objectsCompleted ?? details.levelsStarted ?? details.answers?.length ?? null,
+        mistakes: details.mistakes ?? details.wrongTaps ?? details.incorrectResponses ?? details.incorrectSelections ?? details.failedPlacements ?? details.unsuccessfulActions ?? details.unnecessaryMoves ?? details.failedConnections ?? details.incorrect ?? null,
+        analytics: details,
+        state: attempt.state,
+      };
+    });
+    const completed = attempts.filter((attempt) => attempt.status === 'COMPLETED' && attempt.percentage !== null);
+    const first = completed[0]?.percentage ?? null;
+    const latest = completed.at(-1)?.percentage ?? null;
+    const allowedReassessments = Number(assignment.allowedReassessments || 0);
+    const attemptsUsed = attempts.length;
+    return {
+      assignment: { id: assignment.id, gameName: assignment.generatedGame?.title || assignment.gameAssessment.name, allowedReassessments },
+      attempts,
+      progression: {
+        firstAttemptScore: first,
+        latestAttemptScore: latest,
+        bestScore: completed.length ? Math.max(...completed.map((attempt) => Number(attempt.percentage))) : null,
+        improvement: first !== null && latest !== null ? latest - first : null,
+        attemptsUsed,
+        remainingReassessments: Math.max(0, 1 + allowedReassessments - attemptsUsed),
+      },
+    };
   }
   async assignmentVenue(schoolId: string, ageGroup: string) {
     if (!ageGroup) throw new BadRequestException('Age group is required to find the school venue.');
@@ -154,7 +217,7 @@ export class GamePlayService {
         status: 'ASSIGNED',
       },
       include: { generatedGame: { include: { template: { include: { category: true } } } }, gameAssessment: true, results: { include: {
-        attempts: true,
+        attempts: { include: { scores: true }, orderBy: { attemptNumber: 'asc' } },
         followLightsAnalytics: true, ballStackAnalytics: true, soundDetectiveAnalytics: true, colorPathAnalytics: true,
         magicPaintAnalytics: true, trainTrackAnalytics: true, packageSorterAnalytics: true, rescueMissionAnalytics: true,
         parkingEscapeAnalytics: true, waterPipelineAnalytics: true,
@@ -198,7 +261,7 @@ export class GamePlayService {
           performanceMetrics,
           skills,
         } : null;
-        return { ...safeAssignment, child, result: parentResult, availability: this.availability(assignment, result) };
+        return { ...safeAssignment, child, result: parentResult, ...this.attemptSummary(assignment, result), availability: this.availability(assignment, result) };
       })
       .filter(Boolean));
     return this.withSequentialAvailability(rows).sort((a: any, b: any) =>
@@ -268,6 +331,47 @@ export class GamePlayService {
     if (!assignment) throw new ForbiddenException('This game is not assigned to your child.');
     return this.submit(assignmentId, sessionId, schoolId, childId);
   }
+  async parentFinalize(assignmentId: string, childId: string, schoolId: string, parentId: string) {
+    await this.parentChild(childId, schoolId, parentId);
+    const result = await this.prisma.gameResult.findFirst({
+      where: { gameAssignmentId: assignmentId, studentId: childId, gameAssignment: { gameAssessment: { schoolId } } },
+    });
+    if (!result || result.status !== 'COMPLETED') throw new BadRequestException('Complete an assessment attempt before submitting.');
+    if (result.finalSubmittedAt) return result;
+    return this.prisma.gameResult.update({
+      where: { id: result.id },
+      data: { finalSubmittedAt: new Date(), submissionCount: { increment: 1 }, reviewStatus: 'PENDING' },
+    });
+  }
+  async parentFinalizeGames(childId: string, schoolId: string, parentId: string) {
+    await this.parentChild(childId, schoolId, parentId);
+    const assignments = await this.prisma.gameAssignment.findMany({
+      where: {
+        status: 'ASSIGNED',
+        targetType: 'STUDENT',
+        targetIds: { has: childId },
+        gameAssessment: { schoolId },
+      },
+      include: {
+        gameAssessment: true,
+        results: { where: { studentId: childId } },
+      },
+    });
+    const games = assignments.filter((assignment) =>
+      String((assignment.gameAssessment.settings as any)?.source || '').startsWith('REAL_TIME_GAMES'),
+    );
+    if (!games.length) throw new NotFoundException('No assigned games were found for this student.');
+    if (games.some((assignment) => assignment.results[0]?.status !== 'COMPLETED')) {
+      throw new BadRequestException('Complete all assigned games before submitting them for review.');
+    }
+    const resultIds = games.map((assignment) => assignment.results[0].id);
+    const submittedAt = new Date();
+    await this.prisma.$transaction(resultIds.map((id) => this.prisma.gameResult.update({
+      where: { id },
+      data: { finalSubmittedAt: submittedAt, submissionCount: { increment: 1 }, reviewStatus: 'PENDING' },
+    })));
+    return { submitted: resultIds.length, submittedAt };
+  }
   async parentTutorial(assignmentId: string, childId: string, schoolId: string, parentId: string) {
     await this.parentChild(childId, schoolId, parentId);
     return this.tutorial(assignmentId, schoolId, childId);
@@ -287,12 +391,12 @@ export class GamePlayService {
   async studentGames(schoolId: string, studentId: string) {
     const direct = await this.prisma.gameAssignment.findMany({
       where: { gameAssessment: { schoolId }, OR: [{ targetType: 'STUDENT', targetIds: { has: studentId } }, { results: { some: { studentId } } }] },
-      include: { generatedGame: { include: { template: true } }, gameAssessment: true, results: { where: { studentId }, include: { attempts: true } } },
+      include: { generatedGame: { include: { template: true } }, gameAssessment: true, results: { where: { studentId }, include: { attempts: { include: { scores: true }, orderBy: { attemptNumber: 'asc' } } } } },
       orderBy: { createdAt: 'desc' },
     });
     const rows = direct.map((assignment) => {
       const result = assignment.results[0] || null;
-      return { ...assignment, availability: this.availability(assignment, result), result };
+      return { ...assignment, ...this.attemptSummary(assignment, result), availability: this.availability(assignment, result), result };
     });
     return this.withSequentialAvailability(rows, studentId).sort((a: any, b: any) =>
       new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
@@ -477,7 +581,7 @@ export class GamePlayService {
     const availability = this.availability(assignment, savedResult);
     if (!availability.available) throw new BadRequestException(availability.reason);
     if (restart && !assignment.allowRestart) throw new ForbiddenException('Restart is not permitted for this assignment.');
-    const permittedAttempts = assignment.maxAttempts + (result.reassessmentRequestStatus === 'APPROVED' ? 1 : 0);
+    const permittedAttempts = 1 + Number(assignment.allowedReassessments || 0);
     if (attempts >= permittedAttempts) throw new BadRequestException('Maximum attempts reached.');
     const session = await this.runtime.start({
       engineKey: assignment.generatedGame.engineKey,
@@ -488,7 +592,19 @@ export class GamePlayService {
     const attempt = await this.prisma.gameAttempt.create({ data: { gameResultId: result.id, attemptNumber: attempts + 1, state: { status: 'STARTED' } } });
     await this.prisma.$transaction([
       this.prisma.gameRuntimeSession.update({ where: { id: session.id }, data: { generatedGameId: assignment.generatedGame.id, gameResultId: result.id } }),
-      this.prisma.gameResult.update({ where: { id: result.id }, data: { status: 'IN_PROGRESS', startedAt: result.startedAt || new Date() } }),
+      this.prisma.gameResult.update({
+        where: { id: result.id },
+        data: {
+          status: 'IN_PROGRESS',
+          startedAt: result.startedAt || new Date(),
+          finalSubmittedAt: null,
+          reviewStatus: 'PENDING',
+          schoolReview: null,
+          recommendation: null,
+          reviewedById: null,
+          reviewedAt: null,
+        },
+      }),
     ]);
     return { ...(await this.runtime.state(session.id, schoolId, { id: studentId, role: 'STUDENT' as any })), attemptId: attempt.id, attemptNumber: attempt.attemptNumber };
   }
@@ -634,7 +750,14 @@ export class GamePlayService {
       }
       if (attempt) {
         await tx.gameAttempt.update({ where: { id: attempt.id }, data: { submittedAt: new Date(), state: session.runtimeState as Prisma.InputJsonValue } });
-        await tx.gameScore.create({ data: { gameAttemptId: attempt.id, gameKey: assignment.generatedGame?.engineKey || 'GAME', score: session.score, maxScore: cognitive ? 100 : total * 10, timeTaken: session.elapsedSeconds, details: cognitive || { answered, correct: runtime?.correct || 0, incorrect: runtime?.incorrect || 0 } } });
+        await tx.gameScore.create({ data: {
+          gameAttemptId: attempt.id,
+          gameKey: assignment.generatedGame?.engineKey || 'GAME',
+          score: session.score,
+          maxScore: cognitive ? 100 : total * 10,
+          timeTaken: session.elapsedSeconds,
+          details: { ...(cognitive || { answered, correct: runtime?.correct || 0, incorrect: runtime?.incorrect || 0 }), percentage, passed } as Prisma.InputJsonValue,
+        } });
       }
     });
     const rewards = await this.insights.processResult(result.id, schoolId);
@@ -704,10 +827,34 @@ export class GamePlayService {
     if (assignment.startDate && now < assignment.startDate) return { available: false, reason: 'Assignment has not started.' };
     if (assignment.endDate && now > assignment.endDate) return { available: false, reason: 'Assignment has ended.' };
     const attemptsUsed = Number(result?.attempts?.length || 0);
-    const permittedAttempts = Number(assignment.maxAttempts || 1) + (result?.reassessmentRequestStatus === 'APPROVED' ? 1 : 0);
-    if (result?.status !== 'IN_PROGRESS' && attemptsUsed >= permittedAttempts) {
-      return { available: false, reason: 'Maximum attempts reached.', attemptsUsed };
+    const permittedAttempts = 1 + Number(assignment.allowedReassessments || 0);
+    if (result?.finalSubmittedAt && result.reviewStatus === 'REVIEWED') {
+      return { available: false, reason: 'The school review has been published.', attemptsUsed, remainingReassessments: 0 };
     }
-    return { available: true, reason: null, attemptsUsed };
+    if (result?.status !== 'IN_PROGRESS' && attemptsUsed >= permittedAttempts) {
+      return { available: false, reason: 'No reassessments remaining.', attemptsUsed, remainingReassessments: 0 };
+    }
+    return { available: true, reason: null, attemptsUsed, remainingReassessments: Math.max(0, permittedAttempts - attemptsUsed) };
+  }
+
+  private attemptSummary(assignment: any, result?: any) {
+    const attempts = result?.attempts || [];
+    const percentages = attempts.map((attempt: any) => {
+      const score = attempt.scores?.[0];
+      const details = (score?.details || {}) as Record<string, any>;
+      return score ? Number(details.percentage ?? (Number(score.maxScore) > 0 ? Math.min(100, Number(score.score) / Number(score.maxScore) * 100) : 0)) : null;
+    }).filter((value: number | null): value is number => value !== null);
+    const attemptsUsed = attempts.length;
+    const totalPossibleAttempts = 1 + Number(assignment.allowedReassessments || 0);
+    return {
+      attemptsUsed,
+      remainingReassessments: Math.max(0, totalPossibleAttempts - attemptsUsed),
+      totalPossibleAttempts,
+      attemptSummary: {
+        firstScore: percentages[0] ?? null,
+        latestScore: percentages.at(-1) ?? null,
+        bestScore: percentages.length ? Math.max(...percentages) : null,
+      },
+    };
   }
 }

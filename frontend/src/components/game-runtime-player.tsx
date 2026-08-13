@@ -80,7 +80,7 @@ export function GameRuntimePlayer({
 }: {
   initial: any;
   request: (path: string, init?: RequestInit) => Promise<any>;
-  onClose: () => void;
+  onClose: (session: any) => void;
   onComplete?: (session: any) => void;
   secureMode?: boolean;
   tutorial?: any;
@@ -112,6 +112,7 @@ export function GameRuntimePlayer({
   const [seconds, setSeconds] = useState(totalGameSeconds);
   const timeoutHandled = useRef(false);
   const securityBusyRef = useRef(false);
+  const completionSubmittedRef = useRef(false);
   const lastViolationRef = useRef(0);
   const suppressSecurityRef = useRef(false);
   const playerRef = useRef<HTMLDivElement>(null);
@@ -213,7 +214,11 @@ export function GameRuntimePlayer({
     if (!element) return false;
     try {
       if (element.requestFullscreen) {
-        await element.requestFullscreen({ navigationUI: "hide" });
+        try {
+          await element.requestFullscreen({ navigationUI: "hide" });
+        } catch {
+          await element.requestFullscreen();
+        }
       } else if ((element as any).webkitRequestFullscreen) {
         await (element as any).webkitRequestFullscreen();
       } else if ((element as any).mozRequestFullScreen) {
@@ -252,12 +257,25 @@ export function GameRuntimePlayer({
       }
     };
   }, []);
-  const closePlayer = () => {
+  const closePlayer = async () => {
     suppressSecurityRef.current = true;
     gameplayFinishingRef.current = true;
     gameplayStreamRef.current?.getTracks().forEach((track) => track.stop());
     gameplayStreamRef.current = null;
     gameplayRecorderRef.current = null;
+    let completedState = state;
+    if (!state.demo && state.status !== "COMPLETED") {
+      try {
+        const result = await request(
+          `game-assessments/engine/sessions/${state.id}/action`,
+          { method: "POST", body: JSON.stringify({ action: "END" }) },
+        );
+        completedState = result.state || result;
+        setState(completedState);
+      } catch (error) {
+        console.error("Unable to end the game session while closing.", error);
+      }
+    }
     if (checkFullscreenState()) {
       if (document.exitFullscreen) {
         void document.exitFullscreen().catch(() => undefined);
@@ -269,7 +287,7 @@ export function GameRuntimePlayer({
         void (document as any).msExitFullscreen().catch(() => undefined);
       }
     }
-    onClose();
+    onClose(completedState);
   };
   const forcePlayerFullscreen = async () => {
     const element = playerRef.current;
@@ -303,7 +321,8 @@ export function GameRuntimePlayer({
     }
     setFullscreenRequired(false);
     if (!(await startGameplayRecording())) return;
-    if (!checkFullscreenState()) {
+    const fullscreenRestored = checkFullscreenState() || await enterFullscreen(element);
+    if (!fullscreenRestored) {
       setFullscreenRequired(true);
       return;
     }
@@ -403,7 +422,13 @@ export function GameRuntimePlayer({
         actionName === "SECURITY_VIOLATION" &&
         next.status === "COMPLETED"
       ) {
+        if (completionSubmittedRef.current) return;
+        completionSubmittedRef.current = true;
         suppressSecurityRef.current = true;
+        setSecurityWarning(null);
+        setFullscreenRequired(false);
+        setRecordingInterrupted(false);
+        setAssessmentCompleted(true);
         void finishGameplayRecording().finally(() => onComplete?.(next));
       } else if (actionName === "RECORDING_STOPPED" && next.status === "PAUSED") {
         setRecordingInterrupted(true);

@@ -34,7 +34,10 @@ import {
   Camera,
   ChevronDown,
   ChevronUp,
-  Sliders
+  Sliders,
+  Mail,
+  MessageCircle,
+  Download
 } from "lucide-react";
 
 const SUBJECTS_BY_GRADE: Record<string, string[]> = {
@@ -231,7 +234,6 @@ export default function AdminAssessments() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [reassignmentRequests, setReassignmentRequests] = useState<any[]>([]);
-  const [gameReassessmentRequests, setGameReassessmentRequests] = useState<any[]>([]);
   const [requestFilter, setRequestFilter] = useState("PENDING");
   const [approvingRequest, setApprovingRequest] = useState<any | null>(null);
   const [reassignmentQuestionPreview, setReassignmentQuestionPreview] = useState<any[]>([]);
@@ -332,14 +334,119 @@ export default function AdminAssessments() {
     try {
       setGamePdfError("");
       const report = studentGamesPerformance;
-      const doc = new jsPDF(); let y = 18;
-      const newPage = () => { if (y > 270) { doc.addPage(); y = 18; } };
-      doc.setFillColor(0, 127, 112); doc.rect(0, 0, 210, 9, "F"); doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.text("Complete Game Performance Report", 16, y); y += 8; doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(gamePerformanceDetail?.schoolName || "School", 16, y); y += 7; doc.text(`Student: ${report.student?.name || "Student"}   Grade: ${report.student?.grade || "Not available"}`, 16, y); y += 7; doc.text(`Games completed: ${report.gamesCompleted}   Overall: ${Math.round(report.overallScore || 0)}%   Accuracy: ${report.averageAccuracy == null ? "Not available" : `${Math.round(report.averageAccuracy)}%`}`, 16, y); y += 12;
-      doc.setTextColor(0, 127, 112); doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text("Performance across all games", 16, y); y += 9; doc.setTextColor(20, 35, 50); doc.setFontSize(10);
-      report.games.forEach((game: any, index: number) => { newPage(); doc.setFont("helvetica", index === 0 ? "bold" : "normal"); doc.text(`${index + 1}. ${game.game?.name || "Game"}`, 16, y); doc.setFillColor(229, 239, 236); doc.rect(86, y - 3, 82, 4, "F"); doc.setFillColor(0, 143, 125); doc.rect(86, y - 3, Math.max(1, 82 * Number(game.score || 0) / 100), 4, "F"); doc.text(`${Math.round(game.score || 0)}%`, 173, y); y += 8; });
-      y += 4; newPage(); doc.setTextColor(0, 127, 112); doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text("Skills across all games", 16, y); y += 8; doc.setTextColor(20, 35, 50); doc.setFontSize(10); (report.skills || []).forEach((skill: any) => { newPage(); doc.setFont("helvetica", "normal"); doc.text(`${skill.name}: ${Math.round(skill.score)}%`, 16, y); y += 6; });
-      y += 4; newPage(); doc.setTextColor(0, 127, 112); doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text("Game-by-game review", 16, y); y += 8; doc.setTextColor(20, 35, 50); doc.setFontSize(10); report.games.forEach((game: any) => { if (y > 225) { doc.addPage(); y = 18; } doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(0, 127, 112); doc.text(game.game?.name || "Game", 16, y); y += 7; doc.setTextColor(20, 35, 50); doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text("What is this game?", 18, y); y += 5; doc.setFont("helvetica", "normal"); const description = game.game?.description || "No game description is available."; const descriptionLines = doc.splitTextToSize(description, 174); doc.text(descriptionLines, 18, y); y += descriptionLines.length * 5 + 4; doc.setFont("helvetica", "bold"); doc.text("How the game works", 18, y); y += 5; doc.setFont("helvetica", "normal"); const playText = describeGamePlay(game.game); const playLines = doc.splitTextToSize(playText, 174); doc.text(playLines, 18, y); y += playLines.length * 5 + 4; doc.setFont("helvetica", "bold"); doc.text("How the student played", 18, y); y += 5; doc.setFont("helvetica", "normal"); const performance = game.durationSeconds === 0 && Number(game.score || 0) === 0 ? "No measurable gameplay was captured for this submission, so a performance interpretation is not available." : `The student completed this game with a score of ${Math.round(game.score || 0)}%${game.accuracy == null ? "" : ` and ${Math.round(game.accuracy)}% accuracy`}${game.roundsCompleted == null ? "" : ` across ${game.roundsCompleted} completed rounds`}${game.averageResponseTime == null ? "" : `, with an average response time of ${formatMillisecondsAsMinutes(game.averageResponseTime)}`}.`; const performanceLines = doc.splitTextToSize(performance, 174); doc.text(performanceLines, 18, y); y += performanceLines.length * 5 + 9; });
-      const fileName = `${(report.student?.name || "student").replaceAll(" ", "-")}-all-games-report.pdf`;
+      const highestPerformance = Math.max(...report.games.map((game: any) => Number(game.score || 0)));
+      const doc = new jsPDF();
+      const schoolName = gamePerformanceDetail?.schoolName || "School";
+      const teal = [0, 127, 112] as const;
+      const navy = [7, 22, 51] as const;
+      const muted = [102, 122, 136] as const;
+      let y = 22;
+      const addPageHeader = () => {
+        const initials = schoolName.split(/\s+/).filter(Boolean).map((word: string) => word[0]).slice(0, 2).join("").toUpperCase() || "SC";
+        doc.setFillColor(...navy); doc.rect(0, 0, 210, 15, "F");
+        doc.setFillColor(...teal); doc.rect(0, 15, 210, 1.5, "F");
+        doc.roundedRect(16, 3.5, 8, 8, 2, 2, "F");
+        doc.setFont("helvetica", "bold"); doc.setFontSize(6.5); doc.setTextColor(255, 255, 255); doc.text(initials, 20, 8.7, { align: "center", baseline: "middle" });
+        doc.setFontSize(8); doc.text(schoolName.toUpperCase(), 28, 8.5, { baseline: "middle" });
+        doc.setFont("helvetica", "normal"); doc.setFontSize(6.5); doc.setTextColor(196, 217, 215); doc.text("STUDENT ASSESSMENT REPORT", 194, 8.5, { align: "right", baseline: "middle" });
+        y = 23;
+      };
+      const ensureSpace = (height: number) => { if (y + height > 278) { doc.addPage(); addPageHeader(); } };
+      const sectionTitle = (eyebrow: string, title: string) => {
+        ensureSpace(18); doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(...teal); doc.text(eyebrow.toUpperCase(), 16, y);
+        doc.setFontSize(15); doc.setTextColor(...navy); doc.text(title, 16, y + 7); y += 15;
+      };
+      const scoreColor = (score: number): [number, number, number] => score >= 70 ? [0, 127, 112] : score >= 40 ? [221, 145, 28] : [205, 79, 74];
+
+      addPageHeader();
+      doc.setFont("helvetica", "bold"); doc.setFontSize(19); doc.setTextColor(...navy); doc.text("Complete Assessment Report", 16, y); y += 7;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...muted); doc.text("A consolidated view of performance, skills, and learning observations", 16, y); y += 7;
+      const studentName = report.student?.name || "Student";
+      const studentInitials = studentName.split(/\s+/).filter(Boolean).map((word: string) => word[0]).slice(0, 2).join("").toUpperCase() || "ST";
+      doc.setFillColor(244, 249, 248); doc.roundedRect(16, y, 178, 18, 3, 3, "F");
+      doc.setFillColor(...teal); doc.circle(27, y + 9, 6, "F");
+      doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(255, 255, 255); doc.text(studentInitials, 27, y + 9, { align: "center", baseline: "middle" });
+      doc.setFontSize(10.5); doc.setTextColor(...navy); doc.text(studentName, 37, y + 7);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(...muted); doc.text(`Grade ${report.student?.grade || "Not available"}`, 37, y + 13);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(6); doc.setTextColor(...teal); doc.text("REPORT DATE", 188, y + 6, { align: "right" });
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(...muted); doc.text(new Date().toLocaleDateString(), 188, y + 13, { align: "right" }); y += 24;
+
+      const kpis = [
+        ["ASSESSMENTS", String(report.gamesCompleted)],
+        ["HIGHEST PERFORMANCE", `${Math.round(highestPerformance)}%`],
+        ["AVG. ACCURACY", report.averageAccuracy == null ? "N/A" : `${Math.round(report.averageAccuracy)}%`],
+      ];
+      kpis.forEach(([label, value], index) => {
+        const x = 16 + index * 61; const accent = index === 0 ? [71, 102, 128] as const : index === 1 ? teal : [36, 86, 116] as const;
+        doc.setFillColor(index === 1 ? 232 : 247, index === 1 ? 247 : 250, index === 1 ? 243 : 249); doc.roundedRect(x, y, 56, 18, 3, 3, "F");
+        doc.setFillColor(accent[0], accent[1], accent[2]); doc.roundedRect(x, y, 56, 1.5, 1, 1, "F");
+        doc.setFont("helvetica", "bold"); doc.setFontSize(6.5); doc.setTextColor(...muted); doc.text(label, x + 5, y + 7);
+        doc.setFontSize(13);
+        if (index === 1) doc.setTextColor(...teal); else doc.setTextColor(...navy);
+        doc.text(value, x + 51, y + 14, { align: "right" });
+      }); y += 24;
+
+      sectionTitle("01 / PERFORMANCE", "Assessment performance");
+      report.games.forEach((assessment: any, index: number) => {
+        ensureSpace(13); const score = Math.max(0, Math.min(100, Number(assessment.score || 0))); const color = scoreColor(score);
+        doc.setFont("helvetica", index === 0 ? "bold" : "normal"); doc.setFontSize(9); doc.setTextColor(...navy); doc.text(`${index + 1}. ${assessment.game?.name || "Assessment"}`, 16, y + 3);
+        doc.setFillColor(231, 239, 237); doc.roundedRect(91, y, 78, 5, 2, 2, "F"); doc.setFillColor(...color); if (score > 0) doc.roundedRect(91, y, 78 * score / 100, 5, 2, 2, "F");
+        doc.setFont("helvetica", "bold"); doc.setTextColor(...color); doc.text(`${Math.round(score)}%`, 188, y + 4, { align: "right" }); y += 11;
+      });
+
+      y += 4; sectionTitle("02 / CAPABILITIES", "Skills demonstrated");
+      (report.skills || []).forEach((skill: any, index: number) => {
+        const column = index % 2; const rowY = y + Math.floor(index / 2) * 13; const x = 16 + column * 91; const score = Math.max(0, Math.min(100, Number(skill.score || 0))); const color = scoreColor(score);
+        doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(...navy); doc.text(String(skill.name), x, rowY);
+        doc.setFontSize(8); doc.setTextColor(...color); doc.text(`${Math.round(score)}%`, x + 84, rowY, { align: "right" });
+        doc.setFillColor(231, 239, 237); doc.roundedRect(x, rowY + 3, 84, 3, 1.5, 1.5, "F"); doc.setFillColor(...color); if (score > 0) doc.roundedRect(x, rowY + 3, 84 * score / 100, 3, 1.5, 1.5, "F");
+      });
+      y += Math.ceil((report.skills || []).length / 2) * 13 + 7;
+
+      doc.addPage(); addPageHeader(); sectionTitle("03 / DETAILED REVIEW", "Assessment observations");
+      report.games.forEach((assessment: any, index: number) => {
+        const description = assessment.game?.description || "No assessment description is available.";
+        const playText = describeGamePlay(assessment.game).replaceAll("game", "assessment").replaceAll("Game", "Assessment");
+        const performance = assessment.durationSeconds === 0 && Number(assessment.score || 0) === 0
+          ? "No measurable activity was captured for this submission, so a performance interpretation is not available."
+          : `The student completed this assessment with a score of ${Math.round(assessment.score || 0)}%${assessment.accuracy == null ? "" : ` and ${Math.round(assessment.accuracy)}% accuracy`}${assessment.roundsCompleted == null ? "" : ` across ${assessment.roundsCompleted} completed rounds`}${assessment.averageResponseTime == null ? "" : `, with an average response time of ${formatMillisecondsAsMinutes(assessment.averageResponseTime)}`}.`;
+        doc.setFont("helvetica", "normal"); doc.setFontSize(7.5);
+        const descriptionLines = doc.splitTextToSize(description, 76); const playLines = doc.splitTextToSize(playText, 76); const performanceLines = doc.splitTextToSize(performance, 164);
+        const contentLineHeight = 3.7;
+        const overviewHeight = 6 + Math.max(descriptionLines.length, playLines.length) * contentLineHeight;
+        const performanceHeight = 6 + performanceLines.length * contentLineHeight;
+        const cardHeight = 37 + overviewHeight + performanceHeight;
+        ensureSpace(cardHeight + 4); const score = Number(assessment.score || 0); const color = scoreColor(score);
+        doc.setDrawColor(221, 234, 231); doc.setFillColor(250, 252, 252); doc.roundedRect(16, y, 178, cardHeight, 3, 3, "FD");
+        doc.setFillColor(244, 249, 248); doc.roundedRect(16, y, 178, 23, 3, 3, "F"); doc.rect(16, y + 19, 178, 4, "F");
+        doc.setFillColor(...teal); doc.circle(23, y + 7.5, 3.2, "F");
+        doc.setFont("helvetica", "bold"); doc.setFontSize(6); doc.setTextColor(255, 255, 255); doc.text(String(index + 1), 23, y + 7.5, { align: "center", baseline: "middle" });
+        doc.setFontSize(7); doc.setTextColor(...muted); doc.text("GAME PERFORMANCE", 29, y + 8);
+        doc.setFontSize(12); doc.setTextColor(...navy); doc.text(assessment.game?.name || "Assessment", 22, y + 16);
+        const badgeX = 165; const badgeY = y + 5; const badgeWidth = 23; const badgeHeight = 13;
+        doc.setFillColor(...color); doc.roundedRect(badgeX, badgeY, badgeWidth, badgeHeight, 3, 3, "F");
+        doc.setFont("helvetica", "bold"); doc.setFontSize(5); doc.setTextColor(220, 246, 241); doc.text("OVERALL SCORE", badgeX + badgeWidth / 2, badgeY + 4, { align: "center" });
+        doc.setFontSize(8); doc.setTextColor(255, 255, 255); doc.text(`${Math.round(score)}%`, badgeX + badgeWidth / 2, badgeY + 9.5, { align: "center", baseline: "middle" });
+        const overviewY = y + 31;
+        [["PURPOSE", descriptionLines, 22], ["HOW IT WORKS", playLines, 108]].forEach(([label, lines, x]) => {
+          doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(...teal); doc.text(label as string, x as number, overviewY);
+          doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(49, 68, 82); doc.text(lines as string[], x as number, overviewY + 4.5);
+        });
+        const dividerY = overviewY + overviewHeight + 1;
+        doc.setDrawColor(225, 235, 232); doc.line(105, overviewY - 3, 105, dividerY - 4);
+        doc.setFillColor(245, 250, 249); doc.roundedRect(21, dividerY + 2, 168, cardHeight - (dividerY - y) - 7, 2, 2, "F");
+        const performanceY = dividerY + 6;
+        doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(...teal); doc.text("PERFORMANCE", 22, performanceY);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(49, 68, 82); doc.text(performanceLines, 22, performanceY + 4.5);
+        y += cardHeight + 4;
+      });
+
+      const totalPages = doc.getNumberOfPages();
+      for (let page = 1; page <= totalPages; page += 1) {
+        doc.setPage(page); doc.setDrawColor(225, 234, 232); doc.line(16, 286, 194, 286);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(...muted); doc.text("CONFIDENTIAL STUDENT ASSESSMENT REPORT", 16, 291); doc.text(`Page ${page} of ${totalPages}`, 194, 291, { align: "right" });
+      }
+      const fileName = `${(report.student?.name || "student").replaceAll(" ", "-")}-assessment-report.pdf`;
       const url = URL.createObjectURL(doc.output("blob"));
       setGamePdfPreview((current) => { if (current) URL.revokeObjectURL(current.url); return { url, fileName }; });
     } catch {
@@ -353,8 +460,8 @@ export default function AdminAssessments() {
     const parent = gameResultSubmission?.application?.parent;
     const studentName = studentGamesPerformance?.student?.name || gamePerformanceDetail?.student?.name || "your child";
     const schoolName = gamePerformanceDetail?.schoolName || "the school";
-    const subject = `${studentName} - Game Performance Report`;
-    const message = `Dear Parent,\n\nPlease find ${studentName}'s complete game performance report from ${schoolName}.\n\nRegards,\n${schoolName}`;
+    const subject = `${studentName} - Assessment Performance Report`;
+    const message = `Dear Parent,\n\nPlease find ${studentName}'s complete assessment performance report from ${schoolName}.\n\nRegards,\n${schoolName}`;
     const download = document.createElement("a");
     download.href = gamePdfPreview.url;
     download.download = gamePdfPreview.fileName;
@@ -397,11 +504,7 @@ export default function AdminAssessments() {
   };
 
   const libraryGamesBundleOpen = String(gameResultSubmission?.gameSource || "").startsWith("REAL_TIME_GAMES");
-  const displayedSubmissions = submissions.filter((submission) => !(
-    submission.application?.studentFirstName === "Aarav"
-    && submission.application?.studentLastName === "Sharma"
-    && submission.assessment?.subject === "All Assigned Games"
-  ));
+  const displayedSubmissions = submissions;
 
   // Form States
   const [formData, setFormData] = useState({
@@ -650,19 +753,17 @@ export default function AdminAssessments() {
         "Authorization": `Bearer ${token}`
       };
       
-      const [templatesRes, submissionsRes, appsRes, requestsRes, gameRequestsRes] = await Promise.all([
+      const [templatesRes, submissionsRes, appsRes, requestsRes] = await Promise.all([
         fetch("http://localhost:5001/assessments", { headers }),
         fetch("http://localhost:5001/assessments/submissions/list", { headers }),
         fetch("http://localhost:5001/application", { headers }),
-        fetch(`http://localhost:5001/assessments/reassignment-requests/list?status=${requestFilter}`, { headers }),
-        fetch(`http://localhost:5001/game-assessments/game-reassessment-requests?status=${requestFilter}`, { headers })
+        fetch(`http://localhost:5001/assessments/reassignment-requests/list?status=${requestFilter}`, { headers })
       ]);
 
       if (templatesRes.ok) setTemplates(await templatesRes.json());
       if (submissionsRes.ok) setSubmissions(await submissionsRes.json());
       if (appsRes.ok) setApplications(await appsRes.json());
       if (requestsRes.ok) setReassignmentRequests(await requestsRes.json());
-      if (gameRequestsRes.ok) setGameReassessmentRequests(await gameRequestsRes.json());
     } catch (err) {
       console.error(err);
     } finally {
@@ -3079,7 +3180,7 @@ export default function AdminAssessments() {
               onClick={() => setActiveTab("requests")}
               className={`pb-3 px-6 text-xs font-bold transition-all relative ${activeTab === "requests" ? "text-[#007f70]" : "text-[#607080] hover:text-[#007f70]"}`}
             >
-              Assessment Re-Requests ({reassignmentRequests.length + gameReassessmentRequests.length})
+              Assessment Re-Requests ({reassignmentRequests.length})
               {activeTab === "requests" && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#007f70] rounded-t-full" />}
             </button>
             <button
@@ -3266,21 +3367,21 @@ export default function AdminAssessments() {
                               s.status === 'REVIEWED' ? 'bg-sky-100 text-sky-800' :
                               s.status === 'INTERRUPTED' ? 'bg-amber-100 text-amber-800' :
                               s.status === 'UNDER_REVIEW' ? 'bg-amber-100 text-amber-800' :
-                              s.status === 'SUBMITTED' ? 'bg-indigo-100 text-indigo-800' :
+                              s.status === 'SUBMITTED' || s.status === 'RESUBMITTED' ? 'bg-indigo-100 text-indigo-800' :
                               'bg-slate-100 text-slate-800'
                             }`}>
                               {s.status === 'PUBLISHED' || s.status === 'EVALUATED' ? <CheckCircle2 className="h-3 w-3" /> :
                                s.status === 'REVIEWED' ? <CheckCircle2 className="h-3 w-3 text-sky-500" /> :
                                s.status === 'INTERRUPTED' ? <AlertTriangle className="h-3 w-3 text-amber-600" /> :
                                s.status === 'UNDER_REVIEW' ? <Clock className="h-3 w-3 text-amber-500" /> :
-                               s.status === 'SUBMITTED' ? <Clock className="h-3 w-3" /> :
+                               s.status === 'SUBMITTED' || s.status === 'RESUBMITTED' ? <Clock className="h-3 w-3" /> :
                                null}
-                              {s.status === "INTERRUPTED" ? "Recording interrupted" : String(s.status).replaceAll("_", " ")}
+                              {s.status === "INTERRUPTED" ? "Recording interrupted" : s.status === "RESUBMITTED" ? "Reassessment submitted" : String(s.status).replaceAll("_", " ")}
                             </span>
                           </td>
                           <td className="p-4">
                             {s.status === "INTERRUPTED" && <div className="flex flex-col gap-0.5"><span className="text-[10px] font-bold text-amber-700">Recording stopped</span><span className="text-[9px] text-[#71818d]">Student must resume the assessment</span></div>}
-                            {['IN_PROGRESS', 'SUBMITTED', 'UNDER_REVIEW', 'REVIEWED', 'PUBLISHED', 'EVALUATED'].includes(s.status) && (
+                            {['IN_PROGRESS', 'SUBMITTED', 'RESUBMITTED', 'UNDER_REVIEW', 'REVIEWED', 'PUBLISHED', 'EVALUATED'].includes(s.status) && (
                               <div className="flex flex-col gap-0.5">
                                 {s.status === "IN_PROGRESS" && <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wide text-blue-700"><i className="h-2 w-2 animate-pulse rounded-full bg-blue-500" /> Monitoring live</span>}
                                 <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${
@@ -3308,12 +3409,12 @@ export default function AdminAssessments() {
                                 onClick={() => void openGameScore(s)}
                                 className="bg-[#007f70] hover:bg-[#00665a] text-white px-3 py-1.5 rounded-lg text-[11px] font-bold shadow-sm transition-colors"
                               >View Game Score</button> : <span className="text-[10px] font-bold text-[#71818d]">Waiting for submission</span>
-                            ) : ['SUBMITTED', 'UNDER_REVIEW', 'REVIEWED', 'PUBLISHED', 'EVALUATED'].includes(s.status) ? (
+                            ) : ['SUBMITTED', 'RESUBMITTED', 'UNDER_REVIEW', 'REVIEWED', 'PUBLISHED', 'EVALUATED'].includes(s.status) ? (
                               <button
                                 onClick={() => handleGradingClick(s)}
                                 className="bg-[#007f70] hover:bg-[#00665a] text-white px-3 py-1.5 rounded-lg text-[11px] font-bold shadow-sm transition-colors"
                               >
-                                {s.status === "PUBLISHED" || s.status === "EVALUATED" ? "View Grades" : 
+                                {s.status === "PUBLISHED" || s.status === "EVALUATED" ? "View Grades" : s.status === "RESUBMITTED" ? "Review reassessment" :
                                  s.status === "REVIEWED" ? "Edit / Publish" : "Grade Submission"}
                               </button>
                             ) : (
@@ -3336,10 +3437,6 @@ export default function AdminAssessments() {
                   </button>
                 ))}
               </div>
-              {gameReassessmentRequests.length > 0 && <div className="bg-white border border-[#dceae6] rounded-2xl shadow-sm overflow-hidden">
-                <div className="border-b border-[#dceae6] px-4 py-3"><h3 className="text-xs font-extrabold text-[#071633]">Game re-assessment requests</h3><p className="mt-1 text-[10px] text-[#71818d]">Each game permits only one parent request. Approval unlocks one additional attempt.</p></div>
-                <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-left text-xs"><thead><tr className="bg-[#f8fbf9] text-[#607080]"><th className="p-3">Student</th><th className="p-3">Parent</th><th className="p-3">Class</th><th className="p-3">Game</th><th className="p-3">Previous Result</th><th className="p-3">Requested</th><th className="p-3">Status</th><th className="p-3 text-right">Actions</th></tr></thead><tbody className="divide-y divide-[#dceae6]">{gameReassessmentRequests.map(request => <tr key={request.id}><td className="p-3 font-bold">{request.student?.studentFirstName} {request.student?.studentLastName}</td><td className="p-3">{request.student?.parent?.firstName} {request.student?.parent?.lastName}</td><td className="p-3">{request.student?.grade}</td><td className="p-3">{request.gameAssignment?.generatedGame?.title}</td><td className="p-3 font-bold">{Math.round(Number(request.percentage) || 0)}%</td><td className="p-3">{request.reassessmentRequestedAt ? new Date(request.reassessmentRequestedAt).toLocaleDateString() : "—"}</td><td className="p-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${request.reassessmentRequestStatus === "PENDING" ? "bg-amber-100 text-amber-800" : request.reassessmentRequestStatus === "APPROVED" ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>{request.reassessmentRequestStatus}</span></td><td className="p-3"><div className="flex justify-end gap-2">{request.reassessmentRequestStatus === "PENDING" && <><button disabled={actionLoading} onClick={() => void decideGameReassessment(request, "APPROVED")} className="rounded-lg bg-[#007f70] px-3 py-1.5 text-[10px] font-bold text-white disabled:opacity-50">Approve</button><button disabled={actionLoading} onClick={() => void decideGameReassessment(request, "REJECTED")} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-[10px] font-bold text-red-700 disabled:opacity-50">Reject</button></>}</div></td></tr>)}</tbody></table></div>
-              </div>}
               {reassignmentRequests.length > 0 && <div className="bg-white border border-[#dceae6] rounded-2xl shadow-sm overflow-hidden">
                 {reassignmentRequests.length === 0 ? (
                   <div className="text-center py-20">
@@ -3379,7 +3476,7 @@ export default function AdminAssessments() {
                   </div>
                 )}
               </div>}
-              {reassignmentRequests.length === 0 && gameReassessmentRequests.length === 0 && <div className="rounded-2xl border border-[#dceae6] bg-white py-20 text-center shadow-sm"><RotateCcw className="mx-auto h-10 w-10 text-[#71818d] opacity-40" /><p className="mt-2 text-xs font-bold text-[#71818d]">No {requestFilter.toLowerCase()} re-assessment requests.</p></div>}
+              {reassignmentRequests.length === 0 && <div className="rounded-2xl border border-[#dceae6] bg-white py-20 text-center shadow-sm"><RotateCcw className="mx-auto h-10 w-10 text-[#71818d] opacity-40" /><p className="mt-2 text-xs font-bold text-[#71818d]">No {requestFilter.toLowerCase()} re-assessment requests.</p></div>}
             </div>
           ) : (
              <div className="space-y-6">
@@ -4397,6 +4494,7 @@ export default function AdminAssessments() {
                 <h3 className="mt-1 text-sm font-bold text-[#071633]">
                   {gameResultSubmission.application?.studentFirstName} {gameResultSubmission.application?.studentLastName}
                 </h3>
+                {libraryGamesBundleOpen && <div className="mt-2 flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-[9px] font-black uppercase ${Number(gameResultSubmission.gameResult?.submissionCount || 0) > 1 ? "bg-indigo-100 text-indigo-700" : "bg-[#e6f7f2] text-[#007f70]"}`}>{Number(gameResultSubmission.gameResult?.submissionCount || 0) > 1 ? "Reassessment submission" : "Initial submission"}</span><span className="text-[9px] font-bold text-[#71818d]">Submission cycle {Math.max(1, Number(gameResultSubmission.gameResult?.submissionCount || 0))}</span></div>}
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => { setGameResponseReviewOpen(false); setGamePerformanceDetail(null); setStudentGamesPerformance(null); setGameResultSubmission(null); }} className="rounded-lg border border-[#dceae6] p-2 text-[#607080] hover:bg-white" aria-label="Close game result">
@@ -4471,9 +4569,10 @@ export default function AdminAssessments() {
               {gamePerformanceLoading && <section className="grid min-h-28 place-items-center rounded-xl border border-[#dceae6] bg-[#fafdfc]"><div className="text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-[#007f70]" /><p className="mt-2 text-[9px] font-bold text-[#71818d]">Loading performance analytics…</p></div></section>}
               {gamePdfError && <div role="alert" className="games-error-alert rounded-xl p-3 text-xs font-bold leading-5">{gamePdfError}</div>}
               {studentGamesPerformance?.games?.length > 0 && <section className="space-y-4 rounded-xl border border-[#7ed5c5] bg-white p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#007f70]">1 · Overall result</p><h4 className="mt-1 text-sm font-black text-[#071633]">{studentGamesPerformance.student?.name}&apos;s game performance</h4><p className="mt-1 text-[9px] text-[#71818d]">A simple summary of all completed Games Library assignments.</p></div><button type="button" onClick={downloadAllGamesPdf} className="rounded-xl bg-[#007f70] px-4 py-2.5 text-[10px] font-black text-white hover:bg-[#00665a]">Send to Parent</button></div>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><div className="rounded-xl bg-[#f5faf8] p-3"><p className="text-[8px] font-black uppercase text-[#71818d]">Games completed</p><b className="mt-1 block text-lg text-[#071633]">{studentGamesPerformance.gamesCompleted}</b></div><div className="rounded-xl bg-[#f5faf8] p-3"><p className="text-[8px] font-black uppercase text-[#71818d]">Overall score</p><b className="mt-1 block text-lg text-[#071633]">{Math.round(studentGamesPerformance.overallScore || 0)}%</b></div>{studentGamesPerformance.games.some((game: any) => Number(game.score) > 0) ? <><div className="rounded-xl bg-emerald-50 p-3"><p className="text-[8px] font-black uppercase text-emerald-700">Best game</p><b className="mt-1 block truncate text-xs text-[#071633]">{studentGamesPerformance.games[0]?.game?.name}</b><span className="text-[9px] font-black text-emerald-700">{Math.round(studentGamesPerformance.games[0]?.score || 0)}%</span></div><div className="rounded-xl bg-amber-50 p-3"><p className="text-[8px] font-black uppercase text-amber-700">Area to develop</p><b className="mt-1 block truncate text-xs text-[#071633]">{studentGamesPerformance.games[studentGamesPerformance.games.length - 1]?.game?.name}</b><span className="text-[9px] font-black text-amber-700">{Math.round(studentGamesPerformance.games[studentGamesPerformance.games.length - 1]?.score || 0)}%</span></div></> : <div className="col-span-2 rounded-xl bg-amber-50 p-3"><p className="text-[8px] font-black uppercase text-amber-700">Performance ranking</p><b className="mt-1 block text-xs text-[#071633]">Not available — no gameplay score was captured</b></div>}</div>
-                <div><div className="mb-3"><p className="text-[9px] font-black uppercase tracking-wide text-[#607080]">2 · Compare games</p><p className="mt-1 text-[9px] text-[#71818d]">Higher points mean better performance. Select any game point for details.</p></div><GamePerformanceChart games={studentGamesPerformance.games} onSelect={(id) => void viewCompletedGameDetail(id)} /></div>
+                <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#007f70]">1 · Overall result</p><h4 className="mt-1 text-sm font-black text-[#071633]">{studentGamesPerformance.student?.name}&apos;s assessment performance</h4><p className="mt-1 text-[9px] text-[#71818d]">A consolidated summary of all completed interactive assessments.</p></div><button type="button" onClick={downloadAllGamesPdf} className="rounded-xl bg-[#007f70] px-4 py-2.5 text-[10px] font-black text-white hover:bg-[#00665a]">Send to Parent</button></div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><div className="rounded-xl bg-[#f5faf8] p-3"><p className="text-[8px] font-black uppercase text-[#71818d]">Assessments completed</p><b className="mt-1 block text-lg text-[#071633]">{studentGamesPerformance.gamesCompleted}</b></div><div className="rounded-xl bg-[#f5faf8] p-3"><p className="text-[8px] font-black uppercase text-[#71818d]">Highest performance</p><b className="mt-1 block text-lg text-[#071633]">{Math.round(Math.max(...studentGamesPerformance.games.map((game: any) => Number(game.score || 0))))}%</b></div>{studentGamesPerformance.games.some((game: any) => Number(game.score) > 0) ? <><div className="rounded-xl bg-emerald-50 p-3"><p className="text-[8px] font-black uppercase text-emerald-700">Best assessment</p><b className="mt-1 block truncate text-xs text-[#071633]">{studentGamesPerformance.games[0]?.game?.name}</b><span className="text-[9px] font-black text-emerald-700">{Math.round(studentGamesPerformance.games[0]?.score || 0)}%</span></div><div className="rounded-xl bg-amber-50 p-3"><p className="text-[8px] font-black uppercase text-amber-700">Area to develop</p><b className="mt-1 block truncate text-xs text-[#071633]">{studentGamesPerformance.games[studentGamesPerformance.games.length - 1]?.game?.name}</b><span className="text-[9px] font-black text-amber-700">{Math.round(studentGamesPerformance.games[studentGamesPerformance.games.length - 1]?.score || 0)}%</span></div></> : <div className="col-span-2 rounded-xl bg-amber-50 p-3"><p className="text-[8px] font-black uppercase text-amber-700">Performance ranking</p><b className="mt-1 block text-xs text-[#071633]">Not available - no assessment score was captured</b></div>}</div>
+                <div><div className="mb-3"><p className="text-[9px] font-black uppercase tracking-wide text-[#607080]">2 · Compare assessments</p><p className="mt-1 text-[9px] text-[#71818d]">Higher points indicate stronger performance. Select any assessment point for details.</p></div><GamePerformanceChart games={studentGamesPerformance.games} onSelect={(id) => void viewCompletedGameDetail(id)} /></div>
+                <div><div className="mb-3"><p className="text-[9px] font-black uppercase tracking-wide text-[#607080]">3 · Assessment and reassessment performance</p><p className="mt-1 text-[9px] text-[#71818d]">Every completed attempt is shown below. The strongest attempt is used as the game&apos;s highest performance.</p></div><div className="grid gap-3 md:grid-cols-2">{studentGamesPerformance.games.map((game: any) => { const attempts = (game.attemptHistory || []).filter((attempt: any) => attempt.status === "COMPLETED" && attempt.percentage !== null); const highest = attempts.length ? Math.max(...attempts.map((attempt: any) => Number(attempt.percentage || 0))) : Number(game.score || 0); return <article key={game.id} className="rounded-xl border border-[#dceae6] bg-[#fafdfc] p-4"><div className="flex items-start justify-between gap-3"><div><h5 className="text-xs font-black text-[#071633]">{game.game?.name || "Assessment"}</h5><p className="mt-1 text-[9px] font-semibold text-[#71818d]">{attempts.length} completed attempt{attempts.length === 1 ? "" : "s"}</p></div><span className="rounded-lg bg-emerald-100 px-2.5 py-1.5 text-[9px] font-black text-emerald-700">Highest {Math.round(highest)}%</span></div><div className="mt-3 grid gap-2">{attempts.length ? attempts.map((attempt: any) => <div key={attempt.id} className="flex items-center gap-3 rounded-lg border border-[#e0ece9] bg-white px-3 py-2.5"><span className="min-w-16 text-[9px] font-black text-[#526474]">Attempt {attempt.attemptNumber}</span><div className="h-2 flex-1 overflow-hidden rounded-full bg-[#e7efed]"><div className={`h-full rounded-full ${Number(attempt.percentage) === highest ? "bg-[#008f7d]" : "bg-[#e49a18]"}`} style={{ width: `${Math.max(2, Math.min(100, Number(attempt.percentage || 0)))}%` }} /></div><strong className="w-10 text-right text-[10px] text-[#071633]">{Math.round(Number(attempt.percentage || 0))}%</strong></div>) : <p className="rounded-lg bg-white p-3 text-[9px] font-semibold text-[#71818d]">No completed attempt scores are available.</p>}</div></article>; })}</div></div>
               </section>}
               {gamePerformanceDetail && showSelectedGameDetails && <section className="space-y-4 rounded-xl border border-[#9bd9cc] bg-[#f5fbf9] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#007f70]">3 · Game details</p><h4 className="mt-1 text-xs font-black text-[#071633]">{gamePerformanceDetail.game?.name}</h4><p className="mt-1 text-[9px] text-[#71818d]">Skills measured in this game and comparison with similar students.</p></div><button type="button" onClick={() => setShowSelectedGameDetails(false)} className="rounded-xl border border-[#b9dcd4] bg-white px-3 py-2.5 text-[10px] font-black text-[#526474]">Hide details</button></div>
@@ -4484,7 +4583,7 @@ export default function AdminAssessments() {
                 {gamePerformanceDetail.skills?.length ? <SkillColumnChart skills={gamePerformanceDetail.skills} /> : <div className="rounded-xl border border-dashed border-[#cbded9] bg-white p-4 text-center text-[10px] font-bold text-[#71818d]">Skill performance data is not available for this game.</div>}
                 <div>{(() => { const comparison = gamePerformanceDetail.comparison || { averageScore: 72, sampleSize: 4, group: `${gamePerformanceDetail.game?.ageGroup || "Same age group"} · Demo data` }; const isDemo = !gamePerformanceDetail.comparison; const studentScore = Math.round(Number(gamePerformanceDetail.score || 0)); const averageScore = Math.round(Number(comparison.averageScore || 0)); const difference = studentScore - averageScore; const differenceText = difference === 0 ? "matches the age-group average" : `${Math.abs(difference)} percentage points ${difference > 0 ? "above" : "below"} the age-group average`; const guidance = difference >= 10 ? "Strong performance — continue with more challenging activities." : difference >= 0 ? "Performing at the expected level — continue regular practice." : difference >= -9 ? "Slightly below average — focused practice may help." : "Additional practice and school support are recommended."; return <><div className="mb-3 flex flex-wrap items-center gap-2"><p className="text-[9px] font-black uppercase tracking-wide text-[#607080]">Age-group comparison</p>{isDemo && <span className="rounded-full bg-violet-100 px-2 py-1 text-[8px] font-black uppercase text-violet-700">Demo data</span>}</div><div className="rounded-xl border border-[#dceae6] bg-white p-4"><div className="grid gap-4 sm:grid-cols-2">{[[gamePerformanceDetail.student?.name || "Student", studentScore], [`Age-group average`, averageScore]].map(([label, score], index) => <div key={String(label)} className={`rounded-xl p-4 ${index === 0 ? "bg-[#effaf7]" : "bg-[#f3f1ff]"}`}><div className="mb-3 flex items-center justify-between gap-2"><span className="text-[10px] font-black text-[#34475a]">{label}</span><b className="text-lg text-[#071633]">{Math.round(Number(score))}%</b></div><div className="h-3 overflow-hidden rounded-full bg-white"><div className={`h-full rounded-full ${index === 0 ? "bg-[#008f7d]" : "bg-[#7a68c7]"}`} style={{ width: `${Math.max(2, Math.min(100, Number(score)))}%` }} /></div>{index === 1 && <p className="mt-2 text-[8px] font-bold text-[#71818d]">Based on {comparison.sampleSize} completed students</p>}</div>)}</div><div className={`mt-4 rounded-xl border p-4 ${difference < -9 ? "border-amber-200 bg-amber-50" : difference < 0 ? "border-sky-200 bg-sky-50" : "border-emerald-200 bg-emerald-50"}`}><p className="text-[9px] font-black uppercase tracking-wide text-[#607080]">What this means</p><p className="mt-1 text-xs font-black text-[#071633]">{gamePerformanceDetail.student?.name || "The student"} {differenceText}.</p><p className="mt-1 text-[10px] font-bold leading-5 text-[#526474]">{guidance}</p></div>{isDemo ? <p className="mt-3 text-[8px] font-bold text-violet-700">Example values are shown for demonstration. Real completed submissions will replace them automatically.</p> : <p className="mt-3 text-[8px] font-bold text-[#71818d]">{comparison.group}. Completed submissions only.</p>}</div></>; })()}</div>
               </section>}
-              {libraryGamesBundleOpen && studentGamesPerformance?.games?.length > 0 && <section className="rounded-xl border border-[#c7ddd8] bg-white p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#007f70]">4 · School review</p><h4 className="mt-1 text-xs font-black text-[#071633]">Record the school&apos;s overall review</h4><p className="mt-1 text-[9px] leading-4 text-[#71818d]">This note applies to the student&apos;s complete Games Library submission.</p></div><span className={`rounded-full px-3 py-1.5 text-[9px] font-black uppercase ${gameResultSubmission.gameResult?.reviewStatus === "REVIEWED" ? "bg-emerald-100 text-emerald-700" : gameResultSubmission.gameResult?.reviewStatus === "NEEDS_FOLLOW_UP" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>{(gameResultSubmission.gameResult?.reviewStatus || "PENDING").replaceAll("_", " ")}</span></div><label className="mt-4 block"><span className="text-[9px] font-black uppercase tracking-wide text-[#607080]">School&apos;s performance note</span><textarea value={gameSchoolReview} onChange={(event) => setGameSchoolReview(event.target.value)} rows={4} placeholder="Example: The student performed strongly in creative tasks and would benefit from more practice in memory and listening games." className="mt-2 w-full resize-none rounded-xl border border-[#dceae6] bg-[#fafdfc] p-3 text-xs leading-5 text-[#071633] outline-none transition focus:border-[#55b9a7] focus:ring-2 focus:ring-[#55b9a7]/15" /></label><div className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" disabled={!gameSchoolReview.trim() || gameReviewSaving} onClick={() => void saveGameSchoolReview("NEEDS_FOLLOW_UP")} className="min-h-10 rounded-xl border border-amber-300 bg-amber-50 px-4 text-[10px] font-black text-amber-800 disabled:opacity-45">Needs Follow-up</button><button type="button" disabled={!gameSchoolReview.trim() || gameReviewSaving} onClick={() => void saveGameSchoolReview("REVIEWED")} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-[#007f70] px-4 text-[10px] font-black text-white disabled:opacity-45">{gameReviewSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />} Mark Complete Submission as Reviewed</button></div></section>}
+              {libraryGamesBundleOpen && studentGamesPerformance?.games?.length > 0 && <section className="rounded-xl border border-[#c7ddd8] bg-white p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#007f70]">4 · School review</p><h4 className="mt-1 text-xs font-black text-[#071633]">Record the school&apos;s overall review</h4><p className="mt-1 text-[9px] leading-4 text-[#71818d]">This note applies to the student&apos;s complete Games Library submission.</p></div><span className={`rounded-full px-3 py-1.5 text-[9px] font-black uppercase ${gameResultSubmission.gameResult?.reviewStatus === "REVIEWED" ? "bg-emerald-100 text-emerald-700" : gameResultSubmission.gameResult?.reviewStatus === "NEEDS_FOLLOW_UP" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>{(gameResultSubmission.gameResult?.reviewStatus || "PENDING").replaceAll("_", " ")}</span></div><label className="mt-4 block"><span className="text-[9px] font-black uppercase tracking-wide text-[#607080]">School&apos;s performance note</span><textarea value={gameSchoolReview} onChange={(event) => setGameSchoolReview(event.target.value)} rows={4} placeholder="Example: The student performed strongly in creative tasks and would benefit from more practice in memory and listening games." className="mt-2 w-full resize-none rounded-xl border border-[#dceae6] bg-[#fafdfc] p-3 text-xs leading-5 text-[#071633] outline-none transition focus:border-[#55b9a7] focus:ring-2 focus:ring-[#55b9a7]/15" /></label><div className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" disabled={!gameSchoolReview.trim() || gameReviewSaving} onClick={() => void saveGameSchoolReview("REVIEWED")} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-[#007f70] px-4 text-[10px] font-black text-white disabled:opacity-45">{gameReviewSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />} Mark Complete Submission as Reviewed</button></div></section>}
               {!libraryGamesBundleOpen && gameResultSubmission.gameResult?.recordingSessionId && gameResultSubmission.gameResult?.status === "COMPLETED" && <section className="rounded-xl border border-[#c7ddd8] bg-white p-4">
                 <div className="flex items-center justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#007f70]">Gameplay evidence</p><h4 className="mt-1 text-xs font-black text-[#071633]">Student gameplay recording</h4><p className="mt-1 text-[9px] text-[#71818d]">Game screen only · no webcam or microphone</p></div><span className="rounded-full bg-emerald-100 px-3 py-1.5 text-[9px] font-black text-emerald-700">SAVED VIDEO</span></div>
                 {gameplayVideoUrl ? <video controls preload="metadata" src={gameplayVideoUrl} className="mt-4 aspect-video w-full rounded-xl border border-[#dceae6] bg-slate-950" aria-label="Student gameplay recording" /> : <div className="mt-4 grid aspect-video place-items-center rounded-xl border border-dashed border-[#cbded9] bg-[#fafdfc] text-[10px] font-bold text-[#71818d]"><Loader2 className="mb-2 h-5 w-5 animate-spin text-[#007f70]" />Preparing gameplay video…</div>}
@@ -4512,10 +4611,10 @@ export default function AdminAssessments() {
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#071633]/75 p-3 backdrop-blur-md sm:p-5">
           <section className="flex h-[94dvh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-white/60 bg-white shadow-[0_30px_100px_rgba(7,22,51,.45)]">
             <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#dceae6] bg-[#f8fbf9] p-4">
-              <div><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#007f70]">PDF report preview</p><h3 className="mt-1 text-sm font-black text-[#071633]">Review the report before downloading</h3></div>
-              <div className="flex flex-wrap items-center gap-2"><button type="button" onClick={() => void shareGameReportWithParent("gmail")} className="inline-flex min-h-10 items-center rounded-xl border border-[#d7e7e3] bg-white px-4 text-[10px] font-black text-[#34475a] hover:bg-[#f5faf8]">Send via Gmail</button><button type="button" onClick={() => void shareGameReportWithParent("whatsapp")} className="keep-white inline-flex min-h-10 items-center rounded-xl bg-[#20a969] px-4 text-[10px] font-black text-white hover:bg-[#188653]">Send via WhatsApp</button><a href={gamePdfPreview.url} download={gamePdfPreview.fileName} className="keep-white inline-flex min-h-10 items-center rounded-xl bg-[#007f70] px-4 text-[10px] font-black text-white hover:bg-[#00665a]">Download PDF</a><button type="button" onClick={() => { URL.revokeObjectURL(gamePdfPreview.url); setGamePdfPreview(null); }} className="grid h-10 w-10 place-items-center rounded-xl border border-[#dceae6] bg-white text-[#607080] hover:bg-[#edf5f3]" aria-label="Close PDF preview"><XCircle className="h-4 w-4" /></button></div>
+              <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-[#e7f5f1] text-[#007f70]"><FileText className="h-5 w-5" /></span><div><p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#007f70]">Assessment report</p><h3 className="mt-1 text-sm font-black text-[#071633]">Preview and share</h3></div></div>
+              <div className="flex flex-wrap items-center gap-2"><button type="button" onClick={() => void shareGameReportWithParent("gmail")} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#d7e7e3] bg-white px-4 text-[10px] font-black text-[#34475a] hover:bg-[#f5faf8]"><Mail className="h-3.5 w-3.5" /> Gmail</button><button type="button" onClick={() => void shareGameReportWithParent("whatsapp")} className="keep-white inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#20a969] px-4 text-[10px] font-black text-white hover:bg-[#188653]"><MessageCircle className="keep-white h-3.5 w-3.5" /> WhatsApp</button><a href={gamePdfPreview.url} download={gamePdfPreview.fileName} className="keep-white inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#007f70] px-4 text-[10px] font-black text-white hover:bg-[#00665a]"><Download className="keep-white h-3.5 w-3.5" /> Download</a><button type="button" onClick={() => { URL.revokeObjectURL(gamePdfPreview.url); setGamePdfPreview(null); }} className="grid h-10 w-10 place-items-center rounded-xl border border-[#dceae6] bg-white text-[#607080] hover:bg-[#edf5f3]" aria-label="Close PDF preview"><XCircle className="h-4 w-4" /></button></div>
             </header>
-            <iframe src={`${gamePdfPreview.url}#toolbar=1&navpanes=0`} title="Game performance PDF preview" className="min-h-0 flex-1 bg-slate-100" />
+            <iframe src={`${gamePdfPreview.url}#toolbar=1&navpanes=0`} title="Assessment performance PDF preview" className="min-h-0 flex-1 bg-[#e8efed]" />
           </section>
         </div>
       )}

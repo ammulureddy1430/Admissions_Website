@@ -76,7 +76,7 @@ export default function TeacherGameStudio() {
       gameAssessmentId: "",
       targetIds: "",
       targetType: "STUDENT",
-      maxAttempts: 2,
+      allowedReassessments: 0,
       timeLimitMinutes: 20,
       passingScore: 60,
       allowRestart: true,
@@ -751,23 +751,9 @@ export default function TeacherGameStudio() {
           {success && <div role="status" className="mt-3 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-extrabold text-emerald-800"><CheckCircle2 className="h-4 w-4" /> {success}</div>}
           {error && <div role="alert" className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-extrabold text-rose-700">{error}</div>}
           <button type="button" onClick={() => setShowAssignmentSettings(!showAssignmentSettings)} className="mt-3 text-[10px] font-extrabold text-[#007f70] underline">
-            {showAssignmentSettings ? "Hide optional settings" : "Change attempts or passing score (optional)"}
+          {showAssignmentSettings ? "Hide optional settings" : "Change passing score (optional)"}
           </button>
-          {showAssignmentSettings && <div className="mt-3 grid gap-3 rounded-xl border border-[#dceae6] bg-[#fafdfc] p-3 sm:grid-cols-2">
-            <Field label="Attempts">
-              <input
-                className="input"
-                type="number"
-                min={1}
-                value={assignment.maxAttempts}
-                onChange={(e) =>
-                  setAssignment({
-                    ...assignment,
-                    maxAttempts: Number(e.target.value),
-                  })
-                }
-              />
-            </Field>
+          {showAssignmentSettings && <div className="mt-3 grid gap-3 rounded-xl border border-[#dceae6] bg-[#fafdfc] p-3">
             <Field label="Passing score">
               <input
                 className="input"

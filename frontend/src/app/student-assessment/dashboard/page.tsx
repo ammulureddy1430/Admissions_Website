@@ -835,6 +835,7 @@ export default function StudentDashboard() {
                       <span>{game.generatedGame?.engineKey?.replaceAll("_", " ") || "Interactive game"}</span>
                     </div>
                   </div>
+                  {game.result?.status === "COMPLETED" && <p className={`mt-3 text-center text-[10px] font-extrabold ${Number(game.remainingReassessments || 0) > 0 ? "text-[#008f80]" : "text-slate-500"}`}>{Number(game.remainingReassessments || 0) > 0 ? `${game.remainingReassessments} reassessment${game.remainingReassessments === 1 ? "" : "s"} remaining` : "No reassessments remaining."}</p>}
                   <button
                     type="button"
                     disabled={!game.availability?.available}
@@ -842,7 +843,7 @@ export default function StudentDashboard() {
                     className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#008f80] px-4 py-3 text-xs font-extrabold !text-white shadow-[0_10px_22px_rgba(0,143,128,0.18)] transition hover:bg-[#007d70] disabled:cursor-not-allowed disabled:bg-[#91c2bb] disabled:shadow-none"
                   >
                     {gameBusy === game.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                    View tutorial
+                    {game.result?.status === "COMPLETED" ? "Retake Assessment" : game.result?.status === "IN_PROGRESS" ? "Resume Assessment" : "View tutorial"}
                   </button>
                 </div>
               ))}

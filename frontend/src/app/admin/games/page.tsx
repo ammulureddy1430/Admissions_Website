@@ -58,11 +58,21 @@ type Student = {
   status: string;
   allGamesAssigned?: boolean;
 };
+type GameAttempt = {
+  id: string;
+  attemptNumber: number;
+  status: string;
+  percentage?: number | null;
+  completedAt?: string | null;
+  timeTaken?: number | null;
+  analytics?: Record<string, number | string>;
+};
 type GameReview = {
   id: string; status: string; percentage: number; totalScore: number; passed: boolean | null;
   reviewStatus: string; schoolReview?: string; recommendation?: string; completedAt?: string;
-  student?: { studentFirstName: string; studentLastName: string; grade: string };
+  student?: { id?: string; studentFirstName: string; studentLastName: string; grade: string };
   gameName?: string; componentName?: string; performanceMetrics?: Record<string, number | string>;
+  allowedReassessments?: number; attemptHistory?: GameAttempt[];
 };
 type BulkGame = Pick<Game, "id" | "name" | "category" | "ageGroup" | "durationSeconds" | "componentName"> & { alreadyAssigned: boolean };
 
@@ -91,17 +101,15 @@ export default function GamesPage() {
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [studentLoading, setStudentLoading] = useState(false);
   const [previewing, setPreviewing] = useState<Game | null>(null);
-  const [reviewing, setReviewing] = useState<Game | null>(null);
   const [reviews, setReviews] = useState<GameReview[]>([]);
-  const [reviewResult, setReviewResult] = useState<GameReview | null>(null);
-  const [reviewText, setReviewText] = useState("");
-  const [recommendation, setRecommendation] = useState("");
   const [success, setSuccess] = useState("");
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkStudents, setBulkStudents] = useState<Student[]>([]);
   const [bulkStudentIds, setBulkStudentIds] = useState<string[]>([]);
   const [bulkGames, setBulkGames] = useState<BulkGame[]>([]);
   const [selectedBulkGames, setSelectedBulkGames] = useState<string[]>([]);
+  const [allowedReassessments, setAllowedReassessments] = useState(0);
+  const [allResultsOpen, setAllResultsOpen] = useState(false);
 
   const request = async (path: string, init?: RequestInit) => {
     const response = await fetch(`${API}/${path}`, {
@@ -156,6 +164,19 @@ export default function GamesPage() {
         )
       : matchingAgeGroup;
   }, [ageGroupFilter, games, query]);
+
+  const resultGroups = useMemo(() => {
+    const groups = new Map<string, { key: string; name: string; grade: string; results: Array<GameReview & { gameId?: string }> }>();
+    for (const result of reviews as Array<GameReview & { gameId?: string }>) {
+      if (!["REVIEWED", "NEEDS_FOLLOW_UP"].includes(result.reviewStatus)) continue;
+      const name = result.student ? `${result.student.studentFirstName} ${result.student.studentLastName}`.trim() : "Student";
+      const key = result.student?.id || `${name}:${result.student?.grade || ""}`;
+      const group = groups.get(key) || { key, name, grade: result.student?.grade || "", results: [] };
+      group.results.push(result);
+      groups.set(key, group);
+    }
+    return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [reviews]);
 
   const save = async () => {
     if (
@@ -226,6 +247,7 @@ export default function GamesPage() {
   const openAssignment = async (game: Game) => {
     setAssigning(game);
     setSelectedStudents([]);
+    setAllowedReassessments(0);
     setStudentLoading(true);
     setError("");
     try {
@@ -254,6 +276,7 @@ export default function GamesPage() {
         body: JSON.stringify({
           ageGroup: assigning.ageGroup,
           studentIds: selectedStudents,
+          allowedReassessments,
         }),
       });
       setAssigning(null);
@@ -267,14 +290,22 @@ export default function GamesPage() {
     }
   };
 
-  const saveReview = async (status: "REVIEWED" | "NEEDS_FOLLOW_UP") => {
-    if (!reviewing || !reviewResult || !reviewText.trim()) return;
-    setBusy("review-save");
+  const openAllResults = async () => {
+    setAllResultsOpen(true);
+    setBusy("reviews");
+    setError("");
     try {
-      await request(`games/${reviewing.id}/reviews/${reviewResult.id}`, { method: "PATCH", body: JSON.stringify({ reviewStatus: status, schoolReview: reviewText, recommendation }) });
-      setReviews(await request(`games/${reviewing.id}/reviews`)); setReviewResult(null); setReviewText(""); setRecommendation("");
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to save the school review."); }
-    finally { setBusy(""); }
+      const rows = await Promise.all(games.map(async (game) => {
+        const gameReviews = await request(`games/${game.id}/reviews`) as GameReview[];
+        return gameReviews.map((result) => ({ ...result, gameId: game.id, gameName: result.gameName || game.name }));
+      }));
+      setReviews(rows.flat().sort((a, b) => new Date(b.completedAt || 0).getTime() - new Date(a.completedAt || 0).getTime()));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to load game results.");
+      setReviews([]);
+    } finally {
+      setBusy("");
+    }
   };
 
   const openBulkAssign = async () => {
@@ -319,7 +350,7 @@ export default function GamesPage() {
     if (!bulkStudentIds.length || !selectedBulkGames.length) return;
     setBusy("bulk-assign"); setError("");
     try {
-      const result = await request("games/bulk-assign", { method: "POST", body: JSON.stringify({ ageGroup: ageGroupFilter || "ALL", studentIds: bulkStudentIds, gameIds: selectedBulkGames }) });
+      const result = await request("games/bulk-assign", { method: "POST", body: JSON.stringify({ ageGroup: ageGroupFilter || "ALL", studentIds: bulkStudentIds, gameIds: selectedBulkGames, allowedReassessments }) });
       setSuccess(result.message); setBulkOpen(false); await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to assign the selected games."); }
     finally { setBusy(""); }
@@ -405,6 +436,9 @@ export default function GamesPage() {
             </select>
             <button type="button" onClick={() => void openBulkAssign()} className="keep-white inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#007f70] px-4 py-2.5 text-[10px] font-black text-white shadow-sm transition hover:bg-[#006b5e]">
               <ListChecks className="keep-white h-4 w-4" /> Assign All Games
+            </button>
+            <button type="button" onClick={() => void openAllResults()} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-[#8fcfc1] bg-[#f0faf7] px-4 py-2.5 text-[10px] font-black text-[#007f70] shadow-sm transition hover:bg-[#e5f6f1]">
+              <ListChecks className="h-4 w-4" /> Results
             </button>
             <label className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#82939e]" />
@@ -527,7 +561,7 @@ export default function GamesPage() {
                   <button
                     disabled={!game.isActive}
                     onClick={() => setPreviewing(game)}
-                    className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#b9dcd4] bg-white px-4 py-2.5 text-[10px] font-black text-[#007f70] transition hover:border-[#008f7d] hover:bg-[#f0f8f5] disabled:opacity-40"
+                    className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-[#b9dcd4] bg-white px-4 py-2.5 text-[10px] font-black text-[#007f70] transition hover:border-[#008f7d] hover:bg-[#f0f8f5] disabled:opacity-40"
                   >
                     <Eye className="h-3.5 w-3.5" /> Preview
                   </button>
@@ -648,6 +682,7 @@ export default function GamesPage() {
           </div>}
           {bulkStudentIds.length > 0 && bulkGames.length > 0 && <div className="mt-5 rounded-2xl border border-[#dce9e6] bg-[#f7faf9] p-4 text-[10px]">
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><Summary label="Selected Age Group" value={ageGroupFilter || "All Age Groups"} /><Summary label="Students" value={`${bulkStudentIds.length} selected`} /><Summary label="Total Games" value={String(bulkGames.length)} /><Summary label="Selected Games" value={String(selectedBulkGames.length)} /></div>
+            <label className="mt-4 block"><span className="text-[9px] font-black uppercase tracking-wide text-[#607080]">Reassessments Allowed</span><select value={allowedReassessments} onChange={(event) => setAllowedReassessments(Number(event.target.value))} className="mt-2 w-full rounded-xl border border-[#d5e7e2] bg-white px-3 py-2.5 text-xs font-bold text-[#071633]">{[0, 1, 2, 3, 5].map((count) => <option key={count} value={count}>{count}</option>)}</select><span className="mt-2 block text-[9px] leading-4 text-[#71818d]">Students can retake each selected game up to {allowedReassessments} additional {allowedReassessments === 1 ? "time" : "times"}. No approval is required. Total possible attempts: {1 + allowedReassessments}.</span></label>
             <button onClick={() => void bulkAssign()} disabled={!selectedBulkGames.length || busy === "bulk-assign"} className="keep-white mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#007f70] px-5 text-xs font-black text-white disabled:bg-slate-200 disabled:text-slate-500">{busy === "bulk-assign" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Assign All</button>
           </div>}
           {!bulkStudentIds.length && <div className="mt-5 flex flex-col gap-3 border-t border-[#e5efec] pt-4 sm:flex-row sm:items-center sm:justify-between"><p className="flex items-center gap-2 text-[9px] font-bold text-[#71818d]"><span className="grid h-7 w-7 place-items-center rounded-lg bg-[#f0f4f3] text-[#8b9b97]"><Users className="h-4 w-4" /></span>Select one or more students to continue</p><button disabled className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#dbe8e5] px-5 text-xs font-black text-[#8ba19b]"><Send className="h-4 w-4" /> Continue to games</button></div>}
@@ -679,6 +714,7 @@ export default function GamesPage() {
               </div>
             </div>
           </div>
+          <label className="mt-4 block rounded-xl border border-[#dce9e6] bg-[#f7faf9] p-4"><span className="text-[9px] font-black uppercase tracking-wide text-[#607080]">Reassessments Allowed</span><select value={allowedReassessments} onChange={(event) => setAllowedReassessments(Number(event.target.value))} className="mt-2 w-full rounded-xl border border-[#d5e7e2] bg-white px-3 py-2.5 text-xs font-bold text-[#071633]">{[0, 1, 2, 3, 5].map((count) => <option key={count} value={count}>{count}</option>)}</select><span className="mt-2 block text-[9px] leading-4 text-[#71818d]">After the first attempt, the student can retake this game up to {allowedReassessments} additional {allowedReassessments === 1 ? "time" : "times"}. No approval request is required.</span><b className="mt-1 block text-[10px] text-[#007f70]">Total possible attempts: {1 + allowedReassessments}</b></label>
           <div className="mt-5 flex items-end justify-between">
             <div>
               <p className="text-xs font-black text-[#071633]">
@@ -807,30 +843,43 @@ export default function GamesPage() {
           </div>
         </Modal>
       )}
-      {reviewing && (
-        <Modal title={`${reviewing.name} results & school review`} onClose={() => { setReviewing(null); setReviewResult(null); }}>
-          {busy === "reviews" ? <div className="grid h-40 place-items-center"><Loader2 className="h-6 w-6 animate-spin text-[#007f70]" /></div> : reviews.length === 0 ? (
+      {allResultsOpen && (
+        <Modal title="Games results & assessment history" onClose={() => setAllResultsOpen(false)}>
+          {busy === "reviews" ? <div className="grid h-40 place-items-center"><Loader2 className="h-6 w-6 animate-spin text-[#007f70]" /></div> : resultGroups.length === 0 ? (
             <div className="rounded-2xl border border-[#d7e7e3] bg-[#f7fbfa] p-6 text-center text-xs font-bold text-[#71818d]">No assignments or results yet. Assign this game to a student first.</div>
-          ) : <div className="space-y-3">
-            {reviews.map((result) => <div key={result.id} className="rounded-2xl border border-[#dce9e6] p-4">
+          ) : <div className="space-y-4">
+            {resultGroups.map((group) => {
+              const completed = group.results.filter((result) => result.status === "COMPLETED");
+              const average = completed.length ? completed.reduce((sum, result) => sum + Number(result.percentage || 0), 0) / completed.length : 0;
+              const best = completed.length ? Math.max(...completed.map((result) => Number(result.percentage || 0))) : 0;
+              const reviewed = group.results.filter((result) => result.reviewStatus !== "PENDING").length;
+              return <details key={group.key} className="group overflow-hidden rounded-2xl border border-[#cfe3de] bg-white shadow-[0_8px_24px_rgba(7,56,49,.06)]">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 transition hover:bg-[#f7fbfa] [&::-webkit-details-marker]:hidden">
+                  <div className="flex min-w-0 items-center gap-4"><span className="keep-white grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#006f62] to-[#10a990] text-sm font-black !text-white shadow-md">{group.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</span><div className="min-w-0"><h3 className="truncate text-sm font-black text-[#071633]">{group.name}</h3><p className="mt-1 text-[10px] font-extrabold uppercase tracking-wide text-[#526474]">{group.grade || "Student"} · {group.results.length} game{group.results.length === 1 ? "" : "s"} assigned</p></div></div>
+                  <div className="flex shrink-0 items-center gap-5"><div className="hidden text-right sm:block"><p className="text-lg font-black text-[#007f70]">{Math.round(average)}%</p><p className="text-[8px] font-black uppercase text-[#81919c]">Average</p></div><div className="hidden text-right md:block"><p className="text-sm font-black text-[#071633]">{Math.round(best)}%</p><p className="text-[8px] font-black uppercase text-[#81919c]">Best</p></div><div className="hidden text-right lg:block"><p className="text-sm font-black text-[#071633]">{reviewed}/{group.results.length}</p><p className="text-[8px] font-black uppercase text-[#81919c]">Reviewed</p></div><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#edf7f4] text-[#007f70] transition group-open:rotate-90">›</span></div>
+                </summary>
+                <div className="grid items-start gap-3 border-t border-[#e1ece9] bg-[#f7faf9] p-4 lg:grid-cols-2">
+            {group.results.map((result: GameReview & { gameId?: string }) => <div key={result.id} className="self-start rounded-2xl border border-[#dce9e6] bg-white p-4 shadow-[0_3px_12px_rgba(7,56,49,.04)]">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div><p className="text-xs font-black text-[#071633]">{result.student ? `${result.student.studentFirstName} ${result.student.studentLastName}` : "Student"}</p><p className="mt-1 text-[9px] text-[#71818d]">{result.student?.grade || ""} · {result.status.replaceAll("_", " ")}</p></div>
-                <div className="text-right"><p className="text-lg font-black text-[#007f70]">{result.status === "COMPLETED" ? `${Math.round(result.percentage)}%` : "—"}</p><p className="text-[8px] font-black uppercase text-[#81919c]">{result.reviewStatus.replaceAll("_", " ")}</p></div>
+                <div><p className="text-xs font-black text-[#071633]">{result.gameName || "Game assessment"}</p><p className="mt-1 text-[9px] font-medium text-[#71818d]">{result.student?.grade || group.grade || "Student"} · {result.status.replaceAll("_", " ")}</p></div>
+                <div className="text-right"><p className="text-lg font-black leading-none text-[#007f70]">{result.status === "COMPLETED" ? `${Math.round(result.percentage)}%` : "—"}</p><p className={`mt-1.5 inline-flex rounded-full px-2 py-1 text-[7px] font-black uppercase ${result.reviewStatus === "PENDING" ? "bg-amber-50 text-amber-700" : "bg-[#e9f7f3] text-[#007f70]"}`}>{result.reviewStatus.replaceAll("_", " ")}</p></div>
               </div>
               {result.status === "COMPLETED" && <MetricGrid metrics={result.performanceMetrics || {}} compact />}
-              {result.schoolReview && <p className="mt-3 rounded-xl bg-[#f3f8f7] p-3 text-[10px] leading-5 text-[#405762]">{result.schoolReview}</p>}
-              <button disabled={result.status !== "COMPLETED"} onClick={() => { setReviewResult(result); setReviewText(result.schoolReview || ""); setRecommendation(result.recommendation || ""); }} className="mt-3 rounded-lg bg-[#007f70] px-3 py-2 text-[9px] font-black text-white disabled:bg-slate-200 disabled:text-slate-500">{result.status === "COMPLETED" ? (result.reviewStatus === "PENDING" ? "Review result" : "Update review") : "Awaiting completion"}</button>
+              {result.attemptHistory && result.attemptHistory.length > 0 && (() => {
+                const history = result.attemptHistory || [];
+                const completed = history.filter((attempt) => attempt.status === "COMPLETED");
+                const first = Number(completed[0]?.percentage || 0);
+                const latest = Number(completed[completed.length - 1]?.percentage || 0);
+                const best = completed.length ? Math.max(...completed.map((attempt) => Number(attempt.percentage || 0))) : 0;
+                const remaining = Math.max(0, 1 + Number(result.allowedReassessments || 0) - history.length);
+                return <details className="group/history mt-3 overflow-hidden rounded-xl border border-[#b9ddd5] bg-[#f5fbf9]"><summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-[10px] font-black text-[#007f70] [&::-webkit-details-marker]:hidden"><span>Assessment history</span><span className="flex items-center gap-2"><span className="rounded-full bg-white px-2 py-1 text-[8px] text-[#526474]">{history.length} attempt{history.length === 1 ? "" : "s"}</span><span className="text-sm transition group-open/history:rotate-90">›</span></span></summary><div className="border-t border-[#cfe6e0] px-4 pb-4 pt-3"><div className="flex flex-wrap items-center gap-x-3 gap-y-1"><p className="text-[10px] font-black text-[#071633]">{completed.map((attempt) => `Attempt ${attempt.attemptNumber}`).join(" → ")}</p><p className="text-[10px] font-bold text-[#007f70]">{completed.map((attempt) => `${Math.round(Number(attempt.percentage || 0))}%`).join(" → ")}</p></div><div className="mt-3 grid grid-cols-2 gap-3 rounded-lg bg-white p-3 text-[9px] sm:grid-cols-3"><Summary label="First" value={`${Math.round(first)}%`} /><Summary label="Latest" value={`${Math.round(latest)}%`} /><Summary label="Best" value={`${Math.round(best)}%`} /><Summary label="Improvement" value={`${latest - first >= 0 ? "+" : ""}${Math.round(latest - first)} pts`} /><Summary label="Attempts used" value={String(history.length)} /><Summary label="Remaining" value={String(remaining)} /></div><div className="mt-3 space-y-2">{history.map((attempt) => <details key={String(attempt.id)} className="group/attempt overflow-hidden rounded-lg border border-[#dce9e6] bg-white"><summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 text-[9px] font-black text-[#071633] [&::-webkit-details-marker]:hidden"><span>Attempt {attempt.attemptNumber} · {attempt.percentage == null ? "In progress" : `${Math.round(Number(attempt.percentage))}%`}</span><span className="flex items-center gap-1 text-[#007f70]">Details <span className="text-xs transition group-open/attempt:rotate-90">›</span></span></summary><div className="border-t border-[#e5efec] px-3 pb-3 pt-2 text-[9px] leading-5 text-[#607080]"><div className="flex flex-wrap justify-between gap-2"><p>{attempt.completedAt ? new Date(String(attempt.completedAt)).toLocaleString() : "Not completed"}</p><p>Time: {attempt.timeTaken == null ? "—" : `${Math.floor(Number(attempt.timeTaken) / 60)}m ${Number(attempt.timeTaken) % 60}s`}</p></div><MetricGrid metrics={(attempt.analytics || {}) as Record<string, number | string>} compact /></div></details>)}</div></div></details>;
+              })()}
+              {result.schoolReview && <div className="mt-3 rounded-xl bg-[#f3f8f7] p-3"><p className="text-[8px] font-black uppercase text-[#81919c]">School review</p><p className="mt-1 text-[10px] leading-5 text-[#405762]">{result.schoolReview}</p></div>}
+              {result.recommendation && <div className="mt-2 rounded-xl bg-[#f3f8f7] p-3"><p className="text-[8px] font-black uppercase text-[#81919c]">Recommended next steps</p><p className="mt-1 text-[10px] leading-5 text-[#405762]">{result.recommendation}</p></div>}
             </div>)}
-          </div>}
-          {reviewResult && <div className="mt-5 space-y-3 border-t border-[#e5efec] pt-5">
-            <p className="text-xs font-black text-[#071633]">School evaluation</p>
-            <div className="rounded-2xl border border-[#dce9e6] bg-[#f7faf9] p-4">
-              <div className="mb-3 flex items-center justify-between"><div><p className="text-[9px] font-black uppercase tracking-wider text-[#007f70]">Game performance</p><p className="mt-1 text-xs font-black text-[#071633]">{reviewResult.gameName || reviewing.name}</p></div><span className="text-xl font-black text-[#007f70]">{Math.round(reviewResult.percentage)}%</span></div>
-              <MetricGrid metrics={reviewResult.performanceMetrics || {}} />
-            </div>
-            <textarea value={reviewText} onChange={(event) => setReviewText(event.target.value)} placeholder="Performance review and observations" rows={4} className="w-full rounded-xl border border-[#d5e7e2] p-3 text-xs outline-none focus:border-[#009b87]" />
-            <textarea value={recommendation} onChange={(event) => setRecommendation(event.target.value)} placeholder="Recommended next steps (optional)" rows={2} className="w-full rounded-xl border border-[#d5e7e2] p-3 text-xs outline-none focus:border-[#009b87]" />
-            <div className="flex justify-end gap-2"><button disabled={!reviewText.trim() || busy === "review-save"} onClick={() => void saveReview("NEEDS_FOLLOW_UP")} className="rounded-xl border border-amber-300 px-4 py-2.5 text-[10px] font-black text-amber-700 disabled:opacity-40">Needs follow-up</button><button disabled={!reviewText.trim() || busy === "review-save"} onClick={() => void saveReview("REVIEWED")} className="rounded-xl bg-[#007f70] px-4 py-2.5 text-[10px] font-black text-white disabled:opacity-40">Publish review</button></div>
+                </div>
+              </details>;
+            })}
           </div>}
         </Modal>
       )}
@@ -949,8 +998,9 @@ function MetricGrid({ metrics, compact = false }: { metrics: Record<string, numb
   const entries = Object.entries(metrics).filter(([, value]) => value !== null && value !== undefined);
   const visible = compact ? entries.slice(0, 4) : entries;
   if (!visible.length) return <p className="mt-3 text-[9px] font-bold text-[#81919c]">Detailed analytics are being processed.</p>;
-  return <div className={`mt-3 grid gap-2 ${compact ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-3"}`}>
-    {visible.map(([key, value]) => <div key={key} className="rounded-xl border border-[#deebe8] bg-white px-3 py-2.5"><p className="text-[7px] font-black uppercase tracking-wide text-[#81919c]">{metricLabel(key)}</p><p className="mt-1 text-[11px] font-black text-[#173244]">{metricValue(key, value)}</p></div>)}
+  const compactColumns = visible.length === 1 ? "grid-cols-1" : visible.length === 2 ? "grid-cols-2" : visible.length === 3 ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4";
+  return <div className={`mt-3 grid gap-2 ${compact ? compactColumns : "grid-cols-2 sm:grid-cols-3"}`}>
+    {visible.map(([key, value]) => <div key={key} className="flex min-w-0 flex-col justify-center rounded-xl border border-[#deebe8] bg-white px-2 py-2.5 text-center"><p className="min-h-6 [overflow-wrap:anywhere] text-[7px] font-black uppercase leading-3 tracking-normal text-[#81919c]">{metricLabel(key)}</p><p className="mt-1 text-[11px] font-black text-[#173244]">{metricValue(key, value)}</p></div>)}
   </div>;
 }
 

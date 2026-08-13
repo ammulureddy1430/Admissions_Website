@@ -36,11 +36,25 @@ export class GamesService implements OnModuleInit {
     const recordingSession = sessions.find((session: any) => typeof session.runtimeState?.recordingObjectKey === 'string');
     const events = includeEvents ? sessions.flatMap((session: any) => session.events || []).sort((a: any, b: any) => a.sequence - b.sequence) : undefined;
     const durationSeconds = result.startedAt && result.completedAt ? Math.max(0, Math.round((new Date(result.completedAt).getTime() - new Date(result.startedAt).getTime()) / 1000)) : (sessions[0]?.elapsedSeconds ?? null);
+    const attemptHistory = [...(result.attempts || [])].reverse().map((attempt: any) => {
+      const score = attempt.scores?.[0];
+      const details = (score?.details || {}) as Record<string, any>;
+      return {
+        id: attempt.id,
+        attemptNumber: attempt.attemptNumber,
+        startedAt: attempt.startedAt,
+        completedAt: attempt.submittedAt,
+        status: attempt.submittedAt ? 'COMPLETED' : 'IN_PROGRESS',
+        score: score?.score ?? null,
+        percentage: score ? Number(details.percentage ?? (Number(score.maxScore) > 0 ? Number(score.score) / Number(score.maxScore) * 100 : 0)) : null,
+        timeTaken: score?.timeTaken ?? null,
+      };
+    });
     return {
       id: result.id, studentId: result.studentId, student: student ? { id: student.id, name: `${student.studentFirstName} ${student.studentLastName}`.trim(), grade: student.grade } : null,
       game: result.game, status: result.status, reviewStatus: result.reviewStatus, schoolReview: result.schoolReview, recommendation: result.recommendation,
       score: result.percentage, totalScore: result.totalScore, passed: result.passed, startedAt: result.startedAt, completedAt: result.completedAt,
-      durationSeconds, accuracy, averageResponseTime: responseTime, attempts, mistakes, roundsCompleted: rounds, metrics, skills, events,
+      durationSeconds, accuracy, averageResponseTime: responseTime, attempts, mistakes, roundsCompleted: rounds, metrics, skills, events, attemptHistory,
       recordingSessionId: recordingSession?.id || null,
     };
   }
@@ -453,7 +467,8 @@ export class GamesService implements OnModuleInit {
       const assignment = await tx.gameAssignment.create({ data: {
         gameAssessmentId: assessment.id, generatedGameId: generated.id, assignedById: userId,
         targetType: 'STUDENT', targetIds: studentIds, startDate: dto.startsAt ? new Date(dto.startsAt) : null,
-        endDate: dto.endsAt ? new Date(dto.endsAt) : null, maxAttempts: 1,
+        endDate: dto.endsAt ? new Date(dto.endsAt) : null, maxAttempts: 1 + Number(dto.allowedReassessments || 0),
+        allowedReassessments: Number(dto.allowedReassessments || 0),
         timeLimitMinutes: Math.max(1, Math.ceil(game.durationSeconds / 60)), passingScore: 60,
         assignmentSettings: { deliveryMode: 'SCHOOL', allowTutorialSkip: false }, status: 'ASSIGNED',
       } });
@@ -556,7 +571,7 @@ export class GamesService implements OnModuleInit {
       for (const student of students) {
         const eligibleGameIds = requestedGames.filter((game) => studentMatchesAgeGroup(student.grade, student.studentDob, game.ageGroup)).map((game) => game.id);
         if (!eligibleGameIds.length) continue;
-        results.push(await this.bulkAssign({ ageGroup: dto.ageGroup, studentId: student.id, gameIds: eligibleGameIds }, schoolId, userId));
+        results.push(await this.bulkAssign({ ageGroup: dto.ageGroup, studentId: student.id, gameIds: eligibleGameIds, allowedReassessments: dto.allowedReassessments }, schoolId, userId));
       }
       const assignedCount = results.reduce((sum, result) => sum + result.assignedCount, 0);
       return { studentCount: results.length, assignedCount, results, message: `${assignedCount} assessments assigned successfully to ${results.length} students.` };
@@ -611,7 +626,8 @@ export class GamesService implements OnModuleInit {
         } });
         const assignment = await tx.gameAssignment.create({ data: {
           gameAssessmentId: assessment.id, generatedGameId: generated.id, assignedById: userId,
-          targetType: 'STUDENT', targetIds: [student.id], maxAttempts: 1,
+          targetType: 'STUDENT', targetIds: [student.id], maxAttempts: 1 + Number(dto.allowedReassessments || 0),
+          allowedReassessments: Number(dto.allowedReassessments || 0),
           timeLimitMinutes: Math.max(1, Math.ceil(game.durationSeconds / 60)), passingScore: 60,
           assignmentSettings: { deliveryMode: 'SCHOOL', allowTutorialSkip: false, bulkAgeGroup: ageGroup || 'ALL' }, status: 'ASSIGNED',
         } });
@@ -632,7 +648,15 @@ export class GamesService implements OnModuleInit {
   async reviews(id: string, schoolId: string) {
     const game = await this.one(id, schoolId);
     const results = await this.prisma.gameResult.findMany({
-      where: { gameId: id, assessment: { schoolId } },
+      where: {
+        gameId: id,
+        assessment: { schoolId },
+        status: 'COMPLETED',
+        OR: [
+          { reviewStatus: { in: ['REVIEWED', 'NEEDS_FOLLOW_UP'] } },
+          { reviewedAt: { not: null } },
+        ],
+      },
       include: {
         gameAssignment: { include: { generatedGame: true } }, attempts: { include: { scores: true }, orderBy: { attemptNumber: 'desc' } },
         followLightsAnalytics: true, ballStackAnalytics: true, soundDetectiveAnalytics: true,
@@ -655,13 +679,26 @@ export class GamesService implements OnModuleInit {
       ].includes(key))) : {};
       return {
         ...result, gameName: game.name, componentName: game.componentName, performanceMetrics,
+        allowedReassessments: result.gameAssignment.allowedReassessments,
+        attemptHistory: [...result.attempts].reverse().map((attempt) => {
+          const score = attempt.scores[0];
+          const details = (score?.details || {}) as Record<string, any>;
+          return {
+            id: attempt.id, attemptNumber: attempt.attemptNumber,
+            status: attempt.submittedAt ? 'COMPLETED' : 'IN_PROGRESS',
+            startedAt: attempt.startedAt, completedAt: attempt.submittedAt,
+            score: score?.score ?? null,
+            percentage: score ? Number(details.percentage ?? (score.maxScore > 0 ? score.score / score.maxScore * 100 : 0)) : null,
+            timeTaken: score?.timeTaken ?? null, analytics: details,
+          };
+        }),
         student: students.find((student) => student.id === result.studentId) || null,
       };
     });
   }
 
   async review(id: string, resultId: string, dto: ReviewGameResultDto, schoolId: string, userId: string) {
-    const result = await this.prisma.gameResult.findFirst({ where: { id: resultId, gameId: id, assessment: { schoolId }, status: 'COMPLETED' } });
+    const result = await this.prisma.gameResult.findFirst({ where: { id: resultId, gameId: id, assessment: { schoolId }, status: 'COMPLETED', finalSubmittedAt: { not: null } } });
     if (!result) throw new NotFoundException('A completed game result is required before school review.');
     const isFinalDecision = dto.reviewStatus !== 'PENDING';
     return this.prisma.gameResult.update({ where: { id: result.id }, data: {

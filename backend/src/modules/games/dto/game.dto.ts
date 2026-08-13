@@ -30,6 +30,7 @@ export class AssignRealTimeGameDto {
   @IsArray() @IsString({ each: true }) studentIds!: string[];
   @IsOptional() @IsDateString() startsAt?: string;
   @IsOptional() @IsDateString() endsAt?: string;
+  @IsOptional() @IsInt() @Min(0) allowedReassessments?: number;
 }
 
 export class BulkAssignRealTimeGamesDto {
@@ -37,6 +38,7 @@ export class BulkAssignRealTimeGamesDto {
   @IsOptional() @IsUUID() studentId?: string;
   @IsOptional() @IsArray() @ArrayMinSize(1) @IsUUID('4', { each: true }) studentIds?: string[];
   @IsArray() @ArrayMinSize(1) @IsUUID('4', { each: true }) gameIds!: string[];
+  @IsOptional() @IsInt() @Min(0) allowedReassessments?: number;
 }
 
 export class ReviewGameResultDto {

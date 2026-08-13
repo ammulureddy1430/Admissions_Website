@@ -956,7 +956,6 @@ export class AssessmentService {
           },
           attempts: {
             orderBy: { attemptNumber: 'desc' },
-            take: 1,
             include: { scores: true },
           },
         },
@@ -1048,7 +1047,11 @@ export class AssessmentService {
         submissionType: 'GAME',
         gameSource: String((assessment.settings as Record<string, any> | null)?.source || ''),
         status: result.status === 'COMPLETED'
-          ? 'EVALUATED'
+          ? ['REVIEWED', 'NEEDS_FOLLOW_UP'].includes(result.reviewStatus)
+            ? 'EVALUATED'
+            : result.finalSubmittedAt
+              ? result.submissionCount > 1 ? 'RESUBMITTED' : 'SUBMITTED'
+              : 'IN_PROGRESS'
           : session?.status === 'PAUSED' && runtime.interruptionReason === 'SCREEN_RECORDING_STOPPED'
             ? 'INTERRUPTED'
             : 'IN_PROGRESS',
@@ -1087,11 +1090,29 @@ export class AssessmentService {
           schoolReview: result.schoolReview,
           recommendation: result.recommendation,
           reviewedAt: result.reviewedAt,
+          finalSubmittedAt: result.finalSubmittedAt,
+          submissionCount: result.submissionCount,
           recordingSessionId: typeof runtime.recordingObjectKey === 'string' ? session?.id || null : null,
           aiReview: ((result.attempts[0]?.state || {}) as Record<string, any>).aiReview || null,
           review: questionReview,
           reviewCaptureStatus: questionReview.length ? 'AVAILABLE' : (session?.questionIds || []).length ? 'MISSING' : 'LEGACY_NOT_CAPTURED',
           performanceMetrics: runtime.cognitiveAnalytics || {},
+          attemptHistory: [...result.attempts].reverse().map((attempt) => {
+            const attemptScore = attempt.scores[0];
+            const details = (attemptScore?.details || {}) as Record<string, any>;
+            return {
+              id: attempt.id,
+              attemptNumber: attempt.attemptNumber,
+              status: attempt.submittedAt ? 'COMPLETED' : 'IN_PROGRESS',
+              startedAt: attempt.startedAt,
+              completedAt: attempt.submittedAt,
+              score: attemptScore?.score ?? null,
+              percentage: attemptScore ? Number(details.percentage ?? (attemptScore.maxScore > 0 ? attemptScore.score / attemptScore.maxScore * 100 : 0)) : null,
+              timeTaken: attemptScore?.timeTaken ?? null,
+              analytics: details,
+            };
+          }),
+          allowedReassessments: result.gameAssignment.allowedReassessments,
           dataVerification: {
             level: roundEvidenceCaptured && roundTotalsMatch && responseTotalMatchesRounds && scoreFormulaMatches && completionFormulaMatches ? 'ROUND_VERIFIED' : 'AGGREGATE_ONLY',
             sessionId: session?.id || null, recordedAt: session?.completedAt || result.completedAt,
@@ -1108,7 +1129,13 @@ export class AssessmentService {
     // school receives one submission per student only after the complete assigned
     // set is finished. The latest completed result is used to open the combined
     // review, whose analytics endpoint loads every completed game for the student.
-    const libraryGameSubmissions = gameSubmissions.filter((submission) => submission.gameSource.startsWith('REAL_TIME_GAMES'));
+    const libraryGameSubmissions = gameSubmissions.filter((submission) =>
+      submission.gameSource.startsWith('REAL_TIME_GAMES') && (
+        submission.gameResult.finalSubmittedAt
+        || ['REVIEWED', 'NEEDS_FOLLOW_UP'].includes(submission.gameResult.reviewStatus)
+        || submission.gameResult.reviewedAt
+      ),
+    );
     const gameBasedAssessmentSubmissions = gameSubmissions.filter((submission) => !submission.gameSource.startsWith('REAL_TIME_GAMES'));
     const gameSubmissionsByStudent = new Map<string, typeof libraryGameSubmissions>();
     for (const submission of libraryGameSubmissions) {
@@ -1119,10 +1146,13 @@ export class AssessmentService {
       const completed = rows.filter((row) => row.gameResult.status === 'COMPLETED');
       const allCompleted = rows.length > 0 && completed.length === rows.length;
       const representative = (allCompleted ? completed : rows).sort((a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime())[0];
+      const allReviewed = allCompleted && rows.every((row) => ['REVIEWED', 'NEEDS_FOLLOW_UP'].includes(row.gameResult.reviewStatus));
+      const submissionCycle = Math.max(...rows.map((row) => Number(row.gameResult.submissionCount || 0)));
+      const bundleStatus = !allCompleted ? 'IN_PROGRESS' : allReviewed ? 'EVALUATED' : submissionCycle > 1 ? 'RESUBMITTED' : 'SUBMITTED';
       return {
         ...representative,
         id: `game-bundle:${representative.gameResult.studentId}`,
-        status: allCompleted ? 'EVALUATED' : 'IN_PROGRESS',
+        status: bundleStatus,
         submittedAt: allCompleted ? representative.submittedAt : null,
         timeTaken: rows.reduce((sum, row) => sum + Number(row.timeTaken || 0), 0),
         totalWarnings: rows.reduce((sum, row) => sum + Number(row.totalWarnings || 0), 0),
@@ -1135,6 +1165,7 @@ export class AssessmentService {
           gameName: `${completed.length} of ${rows.length} assigned games completed`,
           gamesCompleted: completed.length,
           gamesAssigned: rows.length,
+          submissionCount: submissionCycle,
         },
       };
     });

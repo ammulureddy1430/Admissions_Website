@@ -4,7 +4,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { Roles } from '../../auth/guards/roles.decorator';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { SchoolId } from '../../core/tenant.decorator';
-import { CreateGameAssignmentDto, SubmitGameDto } from './dto/game-play.dto';
+import { CreateGameAssignmentDto, SubmitGameDto, UpdateGameAssignmentDto } from './dto/game-play.dto';
 import { GamePlayService } from './game-play.service';
 
 @Controller('game-assessments')
@@ -18,6 +18,16 @@ export class GamePlayController {
   @Get('game-assignments')
   @Roles(Role.SCHOOL_ADMIN, Role.PRINCIPAL, Role.TEACHER, Role.ADMISSIONS_STAFF)
   assignments(@SchoolId() schoolId: string, @Query() query: any) { return this.service.assignments(schoolId, query); }
+  @Patch('game-assignments/:assignmentId')
+  @Roles(Role.SCHOOL_ADMIN, Role.PRINCIPAL, Role.TEACHER, Role.ADMISSIONS_STAFF)
+  updateAssignment(@Param('assignmentId') assignmentId: string, @Body() dto: UpdateGameAssignmentDto, @SchoolId() schoolId: string) {
+    return this.service.updateAssignment(assignmentId, dto.allowedReassessments, schoolId);
+  }
+  @Get('game-assignments/:assignmentId/students/:studentId/history')
+  @Roles(Role.SCHOOL_ADMIN, Role.PRINCIPAL, Role.TEACHER, Role.ADMISSIONS_STAFF)
+  attemptHistory(@Param('assignmentId') assignmentId: string, @Param('studentId') studentId: string, @SchoolId() schoolId: string) {
+    return this.service.attemptHistory(assignmentId, studentId, schoolId);
+  }
   @Get('assignment-venue')
   @Roles(Role.SCHOOL_ADMIN, Role.PRINCIPAL, Role.TEACHER, Role.ADMISSIONS_STAFF)
   assignmentVenue(@SchoolId() schoolId: string, @Query('ageGroup') ageGroup: string) {
@@ -55,6 +65,16 @@ export class GamePlayController {
   @Roles(Role.PARENT)
   parentSubmit(@Param('assignmentId') assignmentId: string, @Body() body: { childId: string; sessionId: string }, @SchoolId() schoolId: string, @Req() req: any) {
     return this.service.parentSubmit(assignmentId, body.sessionId, body.childId, schoolId, req.user.id);
+  }
+  @Post('parent/games/:assignmentId/finalize')
+  @Roles(Role.PARENT)
+  parentFinalize(@Param('assignmentId') assignmentId: string, @Body() body: { childId: string }, @SchoolId() schoolId: string, @Req() req: any) {
+    return this.service.parentFinalize(assignmentId, body.childId, schoolId, req.user.id);
+  }
+  @Post('parent/children/:childId/games/finalize')
+  @Roles(Role.PARENT)
+  parentFinalizeGames(@Param('childId') childId: string, @SchoolId() schoolId: string, @Req() req: any) {
+    return this.service.parentFinalizeGames(childId, schoolId, req.user.id);
   }
   @Post('parent/games/:assignmentId/tutorial')
   @Roles(Role.PARENT)
