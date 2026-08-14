@@ -1,0 +1,358 @@
+.ball-sort-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at center, #0f2742 0%, #050d18 100%);
+  color: #ffffff;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  overflow: hidden;
+  position: relative;
+  user-select: none;
+  padding: 24px;
+}
+
+/* HUD styles */
+.ball-sort-hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 900px;
+  background: rgba(15, 39, 66, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  padding: 16px 24px;
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+}
+
+.ball-sort-level {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ball-sort-level span {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #00f2fe;
+}
+
+.ball-sort-level b {
+  font-size: 24px;
+  font-weight: 900;
+  color: #ffffff;
+}
+
+.ball-sort-hud-center {
+  text-align: center;
+}
+
+.ball-sort-hud-center h2 {
+  font-size: 16px;
+  font-weight: 800;
+  color: #e2e8f0;
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+
+.ball-sort-hud-center p {
+  font-size: 11px;
+  color: #94a3b8;
+  margin: 4px 0 0 0;
+}
+
+.ball-sort-timer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  padding: 8px 16px;
+  border-radius: 12px;
+  color: #ef4444;
+  font-weight: 800;
+  font-size: 18px;
+}
+
+/* Gameplay Grid */
+.ball-sort-gameplay {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 36px;
+  width: 100%;
+  max-width: 900px;
+  flex-grow: 1;
+  padding: 40px 20px;
+}
+
+/* Tube styles */
+.ball-sort-tube-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+}
+
+.ball-sort-tube {
+  width: 76px;
+  height: 240px;
+  border: 4px solid rgba(255, 255, 255, 0.15);
+  border-top: none;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom-left-radius: 38px;
+  border-bottom-right-radius: 38px;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  padding-bottom: 12px;
+  gap: 10px;
+  position: relative;
+  box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.05), 
+              0 8px 24px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.ball-sort-tube-container:hover .ball-sort-tube {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-4px);
+}
+
+.ball-sort-tube.selected {
+  border-color: #00f2fe;
+  box-shadow: inset 0 0 25px rgba(0, 242, 254, 0.15),
+              0 0 20px rgba(0, 242, 254, 0.3),
+              0 12px 28px rgba(0, 0, 0, 0.4);
+}
+
+.ball-sort-tube-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #94a3b8;
+  transition: color 0.2s;
+}
+
+.ball-sort-tube-container:hover .ball-sort-tube-label {
+  color: #ffffff;
+}
+
+/* Ball styles */
+.ball-sort-ball {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3),
+              inset 0 -6px 12px rgba(0, 0, 0, 0.2),
+              inset 0 6px 12px rgba(255, 255, 255, 0.3);
+  position: relative;
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1),
+              bottom 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  cursor: pointer;
+  z-index: 2;
+}
+
+.ball-sort-ball::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 12px;
+  width: 14px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  transform: rotate(-15deg);
+}
+
+/* Selected hovering state */
+.ball-sort-ball.selected-hover {
+  transform: translateY(-50px);
+  box-shadow: 0 15px 25px rgba(0, 0, 0, 0.5),
+              inset 0 -6px 12px rgba(0, 0, 0, 0.2),
+              inset 0 6px 12px rgba(255, 255, 255, 0.4);
+  animation: floatBall 2s ease-in-out infinite alternate;
+  z-index: 5;
+}
+
+@keyframes floatBall {
+  0% { transform: translateY(-50px); }
+  100% { transform: translateY(-58px); }
+}
+
+/* Ball color mappings */
+.ball-sort-ball.red {
+  background: radial-gradient(circle at 35% 35%, #ff7675 0%, #d63031 70%, #8b0000 100%);
+}
+
+.ball-sort-ball.blue {
+  background: radial-gradient(circle at 35% 35%, #74b9ff 0%, #0984e3 70%, #002d62 100%);
+}
+
+.ball-sort-ball.green {
+  background: radial-gradient(circle at 35% 35%, #55efc4 0%, #00b894 70%, #004d3c 100%);
+}
+
+.ball-sort-ball.yellow {
+  background: radial-gradient(circle at 35% 35%, #ffeaa7 0%, #fdcb6e 70%, #c08000 100%);
+}
+
+/* Footer Instructions */
+.ball-sort-footer {
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  text-align: center;
+  margin-top: 10px;
+}
+
+/* Interactive Info Screen styles */
+.ball-sort-intro {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 16, 29, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(16px);
+}
+
+.ball-sort-intro-card {
+  width: 100%;
+  max-width: 480px;
+  background: #0b2545;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 40px;
+  border-radius: 32px;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  animation: scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes scaleUp {
+  0% { transform: scale(0.9); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.ball-sort-intro-mark {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.ball-sort-intro-card p {
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+  color: #00f2fe;
+  letter-spacing: 2px;
+  margin: 0 0 12px 0;
+}
+
+.ball-sort-intro-card h2 {
+  font-size: 32px;
+  font-weight: 900;
+  color: #ffffff;
+  margin: 0 0 16px 0;
+}
+
+.ball-sort-intro-copy {
+  font-size: 14px;
+  color: #94a3b8;
+  line-height: 1.6;
+  display: block;
+  margin-bottom: 32px;
+}
+
+.ball-sort-intro-card button {
+  background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+  color: #050d18;
+  font-size: 16px;
+  font-weight: 900;
+  border: none;
+  padding: 16px 36px;
+  border-radius: 16px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 242, 254, 0.3);
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ball-sort-intro-card button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(0, 242, 254, 0.4);
+}
+
+/* Celebration Screen */
+.ball-sort-celebration {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 13, 24, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 80;
+  font-size: 40px;
+  font-weight: 900;
+  color: #00f2fe;
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.2s;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Finish Screen */
+.ball-sort-finish {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, #0a1f35 0%, #030810 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 90;
+  text-align: center;
+}
+
+.ball-sort-finish div {
+  max-width: 360px;
+  padding: 40px;
+  background: #0b2545;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 28px;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+}
+
+.ball-sort-finish span {
+  font-size: 64px;
+  display: block;
+  margin-bottom: 20px;
+}
+
+.ball-sort-finish h2 {
+  font-size: 28px;
+  font-weight: 900;
+  margin: 0 0 12px 0;
+}
+
+.ball-sort-finish p {
+  font-size: 14px;
+  color: #94a3b8;
+  margin: 0;
+}

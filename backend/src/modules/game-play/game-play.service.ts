@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { legacyGradesForAgeGroup } from '../games/age-groups';
@@ -8,42 +13,85 @@ import { CreateGameAssignmentDto } from './dto/game-play.dto';
 import { tutorialFor } from './game-tutorial.catalog';
 import { randomUUID } from 'crypto';
 
-const TARGETS = ['STUDENT','SECTION','CLASS','MULTIPLE_CLASSES','ENTIRE_GRADE'];
+const TARGETS = [
+  'STUDENT',
+  'SECTION',
+  'CLASS',
+  'MULTIPLE_CLASSES',
+  'ENTIRE_GRADE',
+];
 const SELF_CONTAINED_PRACTICE_ENGINES = new Set([
-  'FOLLOW_THE_LIGHTS', 'BALL_STACK', 'SOUND_DETECTIVE', 'COLOR_PATH',
-  'MAGIC_PAINT', 'TRAIN_TRACK_BUILDER', 'PACKAGE_SORTER', 'RESCUE_MISSION',
-  'PARKING_ESCAPE', 'WATER_PIPELINE',
+  'FOLLOW_THE_LIGHTS',
+  'BALL_STACK',
+  'SOUND_DETECTIVE',
+  'COLOR_PATH',
+  'MAGIC_PAINT',
+  'TRAIN_TRACK_BUILDER',
+  'PACKAGE_SORTER',
+  'RESCUE_MISSION',
+  'PARKING_ESCAPE',
+  'WATER_PIPELINE',
+  'PATTERN_MATRIX',
+  'NUMBER_BUILDER',
+  'BALL_SORT',
+  'RED_LIGHT_GREEN_LIGHT',
 ]);
 
 @Injectable()
 export class GamePlayService {
-  constructor(private readonly prisma: PrismaService, private readonly runtime: GameRuntimeService, private readonly insights: GameInsightsService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly runtime: GameRuntimeService,
+    private readonly insights: GameInsightsService,
+  ) {}
 
   async studentApplicationId(schoolId: string, userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true, firstName: true, lastName: true } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, firstName: true, lastName: true },
+    });
     if (!user) throw new ForbiddenException('Student account was not found.');
     const application = await this.prisma.application.findFirst({
       where: {
-        schoolId, status: { not: 'DRAFT' },
-        OR: [{ studentEmail: user.email }, { studentFirstName: user.firstName, studentLastName: user.lastName }],
+        schoolId,
+        status: { not: 'DRAFT' },
+        OR: [
+          { studentEmail: user.email },
+          { studentFirstName: user.firstName, studentLastName: user.lastName },
+        ],
       },
       select: { id: true },
     });
-    if (!application) throw new ForbiddenException('Student application was not found.');
+    if (!application)
+      throw new ForbiddenException('Student application was not found.');
     return application.id;
   }
 
   async assign(dto: CreateGameAssignmentDto, schoolId: string, userId: string) {
-    if (!TARGETS.includes(dto.targetType)) throw new BadRequestException('Unsupported assignment target.');
-    const deliveryMode = String((dto.settings as any)?.deliveryMode || 'HOME').toUpperCase();
-    if (!['HOME', 'SCHOOL'].includes(deliveryMode)) throw new BadRequestException('Delivery mode must be HOME or SCHOOL.');
-    const game = await this.prisma.generatedGame.findFirst({ where: { id: dto.generatedGameId, schoolId, status: 'PUBLISHED' } });
-    if (!game) throw new BadRequestException('Only a published game can be assigned.');
-    const assessment = await this.prisma.gameAssessment.findFirst({ where: { id: dto.gameAssessmentId, schoolId } });
-    if (!assessment) throw new BadRequestException('Game assessment not found.');
+    if (!TARGETS.includes(dto.targetType))
+      throw new BadRequestException('Unsupported assignment target.');
+    const deliveryMode = String(
+      (dto.settings as any)?.deliveryMode || 'HOME',
+    ).toUpperCase();
+    if (!['HOME', 'SCHOOL'].includes(deliveryMode))
+      throw new BadRequestException('Delivery mode must be HOME or SCHOOL.');
+    const game = await this.prisma.generatedGame.findFirst({
+      where: { id: dto.generatedGameId, schoolId, status: 'PUBLISHED' },
+    });
+    if (!game)
+      throw new BadRequestException('Only a published game can be assigned.');
+    const assessment = await this.prisma.gameAssessment.findFirst({
+      where: { id: dto.gameAssessmentId, schoolId },
+    });
+    if (!assessment)
+      throw new BadRequestException('Game assessment not found.');
     if (dto.targetType === 'STUDENT') {
       const optedOut = await this.prisma.application.findFirst({
-        where: { schoolId, id: { in: dto.targetIds }, assessmentRequired: false },
+        where: {
+          schoolId,
+          id: { in: dto.targetIds },
+          assessmentRequired: false,
+        },
         select: { studentFirstName: true, studentLastName: true },
       });
       if (optedOut) {
@@ -68,50 +116,99 @@ export class GamePlayService {
         data: {
           allowedReassessments: dto.allowedReassessments,
           maxAttempts: 1 + dto.allowedReassessments,
-          assignmentSettings: { ...((existing.assignmentSettings as Record<string, unknown>) || {}), ...(dto.settings || {}), deliveryMode } as Prisma.InputJsonValue,
+          assignmentSettings: {
+            ...((existing.assignmentSettings as Record<string, unknown>) || {}),
+            ...(dto.settings || {}),
+            deliveryMode,
+          } as Prisma.InputJsonValue,
         },
         include: { generatedGame: true, gameAssessment: true },
       });
       return { ...updated, alreadyAssigned: true, deliveryModeUpdated: true };
     }
-    const assignment = await this.prisma.gameAssignment.create({ data: {
-      gameAssessmentId: dto.gameAssessmentId, generatedGameId: game.id, assignedById: userId,
-      targetType: dto.targetType, targetIds: dto.targetIds, startDate: dto.startDate ? new Date(dto.startDate) : null,
-      endDate: dto.endDate ? new Date(dto.endDate) : null, scheduledAt: dto.startDate ? new Date(dto.startDate) : null,
-      dueDate: dto.endDate ? new Date(dto.endDate) : null, maxAttempts: 1 + dto.allowedReassessments,
-      allowedReassessments: dto.allowedReassessments,
-      timeLimitMinutes: dto.timeLimitMinutes, passingScore: dto.passingScore, allowRestart: dto.allowRestart || false,
-      assignmentSettings: { ...(dto.settings || {}), deliveryMode } as Prisma.InputJsonValue, status: 'ASSIGNED',
-    }, include: { generatedGame: true, gameAssessment: true } });
+    const assignment = await this.prisma.gameAssignment.create({
+      data: {
+        gameAssessmentId: dto.gameAssessmentId,
+        generatedGameId: game.id,
+        assignedById: userId,
+        targetType: dto.targetType,
+        targetIds: dto.targetIds,
+        startDate: dto.startDate ? new Date(dto.startDate) : null,
+        endDate: dto.endDate ? new Date(dto.endDate) : null,
+        scheduledAt: dto.startDate ? new Date(dto.startDate) : null,
+        dueDate: dto.endDate ? new Date(dto.endDate) : null,
+        maxAttempts: 1 + dto.allowedReassessments,
+        allowedReassessments: dto.allowedReassessments,
+        timeLimitMinutes: dto.timeLimitMinutes,
+        passingScore: dto.passingScore,
+        allowRestart: dto.allowRestart || false,
+        assignmentSettings: {
+          ...(dto.settings || {}),
+          deliveryMode,
+        } as Prisma.InputJsonValue,
+        status: 'ASSIGNED',
+      },
+      include: { generatedGame: true, gameAssessment: true },
+    });
     if (dto.targetType === 'STUDENT') {
-      const masterGame = await this.prisma.game.findUnique({ where: { componentName: game.engineKey }, select: { id: true } });
-      await this.prisma.gameResult.createMany({ data: dto.targetIds.map((studentId) => ({
-        gameAssignmentId: assignment.id,
-        studentId,
-        assessmentId: assessment.id,
-        gameId: masterGame?.id,
-      })), skipDuplicates: true });
+      const masterGame = await this.prisma.game.findUnique({
+        where: { componentName: game.engineKey },
+        select: { id: true },
+      });
+      await this.prisma.gameResult.createMany({
+        data: dto.targetIds.map((studentId) => ({
+          gameAssignmentId: assignment.id,
+          studentId,
+          assessmentId: assessment.id,
+          gameId: masterGame?.id,
+        })),
+        skipDuplicates: true,
+      });
       if (deliveryMode === 'SCHOOL') {
-        await Promise.all(dto.targetIds.map(async studentId => {
-          const application = await this.prisma.application.findFirst({ where: { id: studentId, schoolId }, select: { accessCode: true } });
-          if (!application) return;
-          await this.prisma.application.update({
-            where: { id: studentId },
-            data: {
-              assessmentAccessEnabled: true,
-              accessCode: application.accessCode || `STU-${randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()}`,
-            },
-          });
-        }));
+        await Promise.all(
+          dto.targetIds.map(async (studentId) => {
+            const application = await this.prisma.application.findFirst({
+              where: { id: studentId, schoolId },
+              select: { accessCode: true },
+            });
+            if (!application) return;
+            await this.prisma.application.update({
+              where: { id: studentId },
+              data: {
+                assessmentAccessEnabled: true,
+                accessCode:
+                  application.accessCode ||
+                  `STU-${randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()}`,
+              },
+            });
+          }),
+        );
       }
     }
     return { ...assignment, alreadyAssigned: false };
   }
   assignments(schoolId: string, q: any) {
-    return this.prisma.gameAssignment.findMany({ where: { gameAssessment: { schoolId }, ...(q.status && { status: q.status }) }, include: { generatedGame: true, gameAssessment: true, _count: { select: { results: true } } }, orderBy: { createdAt: 'desc' } });
+    return this.prisma.gameAssignment.findMany({
+      where: {
+        gameAssessment: { schoolId },
+        ...(q.status && { status: q.status }),
+      },
+      include: {
+        generatedGame: true,
+        gameAssessment: true,
+        _count: { select: { results: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
   }
-  async updateAssignment(id: string, allowedReassessments: number, schoolId: string) {
-    const assignment = await this.prisma.gameAssignment.findFirst({ where: { id, gameAssessment: { schoolId } } });
+  async updateAssignment(
+    id: string,
+    allowedReassessments: number,
+    schoolId: string,
+  ) {
+    const assignment = await this.prisma.gameAssignment.findFirst({
+      where: { id, gameAssessment: { schoolId } },
+    });
     if (!assignment) throw new NotFoundException('Game assignment not found.');
     return this.prisma.gameAssignment.update({
       where: { id },
@@ -120,13 +217,25 @@ export class GamePlayService {
     });
   }
 
-  async attemptHistory(assignmentId: string, studentId: string, schoolId: string) {
+  async attemptHistory(
+    assignmentId: string,
+    studentId: string,
+    schoolId: string,
+  ) {
     const assignment = await this.prisma.gameAssignment.findFirst({
       where: { id: assignmentId, gameAssessment: { schoolId } },
       include: {
         generatedGame: true,
         gameAssessment: true,
-        results: { where: { studentId }, include: { attempts: { include: { scores: true }, orderBy: { attemptNumber: 'asc' } } } },
+        results: {
+          where: { studentId },
+          include: {
+            attempts: {
+              include: { scores: true },
+              orderBy: { attemptNumber: 'asc' },
+            },
+          },
+        },
       },
     });
     if (!assignment) throw new NotFoundException('Game assignment not found.');
@@ -141,35 +250,75 @@ export class GamePlayService {
         startedAt: attempt.startedAt,
         completedAt: attempt.submittedAt,
         score: score?.score ?? null,
-        percentage: score ? Number(details.percentage ?? (score.maxScore > 0 ? Math.min(100, (score.score / score.maxScore) * 100) : 0)) : null,
+        percentage: score
+          ? Number(
+              details.percentage ??
+                (score.maxScore > 0
+                  ? Math.min(100, (score.score / score.maxScore) * 100)
+                  : 0),
+            )
+          : null,
         timeTaken: score?.timeTaken ?? null,
         accuracy: details.accuracy ?? details.observationAccuracy ?? null,
-        interactions: details.totalBallsDropped ?? details.roundsPlayed ?? details.totalSequences ?? details.objectsCompleted ?? details.levelsStarted ?? details.answers?.length ?? null,
-        mistakes: details.mistakes ?? details.wrongTaps ?? details.incorrectResponses ?? details.incorrectSelections ?? details.failedPlacements ?? details.unsuccessfulActions ?? details.unnecessaryMoves ?? details.failedConnections ?? details.incorrect ?? null,
+        interactions:
+          details.totalBallsDropped ??
+          details.roundsPlayed ??
+          details.totalSequences ??
+          details.objectsCompleted ??
+          details.levelsStarted ??
+          details.answers?.length ??
+          null,
+        mistakes:
+          details.mistakes ??
+          details.wrongTaps ??
+          details.incorrectResponses ??
+          details.incorrectSelections ??
+          details.failedPlacements ??
+          details.unsuccessfulActions ??
+          details.unnecessaryMoves ??
+          details.failedConnections ??
+          details.incorrect ??
+          null,
         analytics: details,
         state: attempt.state,
       };
     });
-    const completed = attempts.filter((attempt) => attempt.status === 'COMPLETED' && attempt.percentage !== null);
+    const completed = attempts.filter(
+      (attempt) =>
+        attempt.status === 'COMPLETED' && attempt.percentage !== null,
+    );
     const first = completed[0]?.percentage ?? null;
     const latest = completed.at(-1)?.percentage ?? null;
     const allowedReassessments = Number(assignment.allowedReassessments || 0);
     const attemptsUsed = attempts.length;
     return {
-      assignment: { id: assignment.id, gameName: assignment.generatedGame?.title || assignment.gameAssessment.name, allowedReassessments },
+      assignment: {
+        id: assignment.id,
+        gameName:
+          assignment.generatedGame?.title || assignment.gameAssessment.name,
+        allowedReassessments,
+      },
       attempts,
       progression: {
         firstAttemptScore: first,
         latestAttemptScore: latest,
-        bestScore: completed.length ? Math.max(...completed.map((attempt) => Number(attempt.percentage))) : null,
+        bestScore: completed.length
+          ? Math.max(...completed.map((attempt) => Number(attempt.percentage)))
+          : null,
         improvement: first !== null && latest !== null ? latest - first : null,
         attemptsUsed,
-        remainingReassessments: Math.max(0, 1 + allowedReassessments - attemptsUsed),
+        remainingReassessments: Math.max(
+          0,
+          1 + allowedReassessments - attemptsUsed,
+        ),
       },
     };
   }
   async assignmentVenue(schoolId: string, ageGroup: string) {
-    if (!ageGroup) throw new BadRequestException('Age group is required to find the school venue.');
+    if (!ageGroup)
+      throw new BadRequestException(
+        'Age group is required to find the school venue.',
+      );
     const schedule = await this.prisma.assessmentSchedule.findFirst({
       where: {
         assessment: {
@@ -182,7 +331,10 @@ export class GamePlayService {
       },
       include: {
         assessment: { select: { title: true } },
-        slots: { where: { status: 'AVAILABLE' }, orderBy: { startTime: 'asc' } },
+        slots: {
+          where: { status: 'AVAILABLE' },
+          orderBy: { startTime: 'asc' },
+        },
       },
       orderBy: { assessmentDate: 'asc' },
     });
@@ -205,7 +357,12 @@ export class GamePlayService {
   async parentGames(schoolId: string, parentId: string) {
     const children = await this.prisma.application.findMany({
       where: { schoolId, parentId },
-      select: { id: true, studentFirstName: true, studentLastName: true, grade: true },
+      select: {
+        id: true,
+        studentFirstName: true,
+        studentLastName: true,
+        grade: true,
+      },
     });
     const childIds = children.map((child) => child.id);
     if (!childIds.length) return [];
@@ -216,78 +373,183 @@ export class GamePlayService {
         targetIds: { hasSome: childIds },
         status: 'ASSIGNED',
       },
-      include: { generatedGame: { include: { template: { include: { category: true } } } }, gameAssessment: true, results: { include: {
-        attempts: { include: { scores: true }, orderBy: { attemptNumber: 'asc' } },
-        followLightsAnalytics: true, ballStackAnalytics: true, soundDetectiveAnalytics: true, colorPathAnalytics: true,
-        magicPaintAnalytics: true, trainTrackAnalytics: true, packageSorterAnalytics: true, rescueMissionAnalytics: true,
-        parkingEscapeAnalytics: true, waterPipelineAnalytics: true,
-      } } },
+      include: {
+        generatedGame: {
+          include: { template: { include: { category: true } } },
+        },
+        gameAssessment: true,
+        results: {
+          include: {
+            attempts: {
+              include: { scores: true },
+              orderBy: { attemptNumber: 'asc' },
+            },
+            followLightsAnalytics: true,
+            ballStackAnalytics: true,
+            soundDetectiveAnalytics: true,
+            colorPathAnalytics: true,
+            magicPaintAnalytics: true,
+            trainTrackAnalytics: true,
+            packageSorterAnalytics: true,
+            rescueMissionAnalytics: true,
+            parkingEscapeAnalytics: true,
+            waterPipelineAnalytics: true,
+            patternMatrixAnalytics: true,
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
     const seen = new Set<string>();
-    const rows = assignments.flatMap((assignment) => assignment.targetIds
-      .filter((studentId) => childIds.includes(studentId))
-      .map((studentId) => {
-        const gameIdentity = assignment.generatedGame?.templateId || assignment.generatedGame?.engineKey || assignment.generatedGame?.title || assignment.generatedGameId;
-        const key = `${gameIdentity}:${studentId}`;
-        if (seen.has(key)) return null;
-        seen.add(key);
-        const child = children.find((row) => row.id === studentId)!;
-        const result = assignment.results.find((row) => row.studentId === studentId) || null;
-        const { results: _results, ...safeAssignment } = assignment;
-        const reviewIsFinal = result?.reviewStatus === 'REVIEWED' || result?.reviewStatus === 'NEEDS_FOLLOW_UP';
-        const analytics = result && (result.followLightsAnalytics || result.ballStackAnalytics || result.soundDetectiveAnalytics
-          || result.colorPathAnalytics || result.magicPaintAnalytics || result.trainTrackAnalytics
-          || result.packageSorterAnalytics || result.rescueMissionAnalytics || result.parkingEscapeAnalytics
-          || result.waterPipelineAnalytics);
-        const ignoredMetrics = new Set(['id', 'studentId', 'assessmentId', 'gameId', 'gameResultId', 'createdAt', 'updatedAt', 'completionStatus']);
-        const performanceMetrics = analytics ? Object.fromEntries(Object.entries(analytics).filter(([metric, value]) =>
-          !ignoredMetrics.has(metric) && (typeof value === 'number' || typeof value === 'string'),
-        )) : {};
-        const skills = Object.entries(performanceMetrics)
-          .filter(([metric, value]) => metric.toLowerCase().endsWith('score') && metric !== 'overallScore' && typeof value === 'number')
-          .map(([metric, value]) => ({
-            name: metric.replace(/Score$/, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (letter) => letter.toUpperCase()),
-            score: Number(value),
-          }));
-        const parentResult = result ? {
-          ...result,
-          totalScore: reviewIsFinal ? result.totalScore : null,
-          percentage: reviewIsFinal ? result.percentage : null,
-          passed: reviewIsFinal ? result.passed : null,
-          reviewStatus: reviewIsFinal ? result.reviewStatus : 'PENDING',
-          schoolReview: reviewIsFinal ? result.schoolReview : null,
-          recommendation: reviewIsFinal ? result.recommendation : null,
-          performanceMetrics,
-          skills,
-        } : null;
-        return { ...safeAssignment, child, result: parentResult, ...this.attemptSummary(assignment, result), availability: this.availability(assignment, result) };
-      })
-      .filter(Boolean));
-    return this.withSequentialAvailability(rows).sort((a: any, b: any) =>
-      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    const rows = assignments.flatMap((assignment) =>
+      assignment.targetIds
+        .filter((studentId) => childIds.includes(studentId))
+        .map((studentId) => {
+          const gameIdentity =
+            assignment.generatedGame?.templateId ||
+            assignment.generatedGame?.engineKey ||
+            assignment.generatedGame?.title ||
+            assignment.generatedGameId;
+          const key = `${gameIdentity}:${studentId}`;
+          if (seen.has(key)) return null;
+          seen.add(key);
+          const child = children.find((row) => row.id === studentId)!;
+          const result =
+            assignment.results.find((row) => row.studentId === studentId) ||
+            null;
+          const { results: _results, ...safeAssignment } = assignment;
+          const reviewIsFinal =
+            result?.reviewStatus === 'REVIEWED' ||
+            result?.reviewStatus === 'NEEDS_FOLLOW_UP';
+          const analytics =
+            result &&
+            (result.followLightsAnalytics ||
+              result.ballStackAnalytics ||
+              result.soundDetectiveAnalytics ||
+              result.colorPathAnalytics ||
+              result.magicPaintAnalytics ||
+              result.trainTrackAnalytics ||
+              result.packageSorterAnalytics ||
+              result.rescueMissionAnalytics ||
+              result.parkingEscapeAnalytics ||
+              result.waterPipelineAnalytics ||
+              result.patternMatrixAnalytics);
+          const ignoredMetrics = new Set([
+            'id',
+            'studentId',
+            'assessmentId',
+            'gameId',
+            'gameResultId',
+            'createdAt',
+            'updatedAt',
+            'completionStatus',
+          ]);
+          const performanceMetrics = analytics
+            ? Object.fromEntries(
+                Object.entries(analytics).filter(
+                  ([metric, value]) =>
+                    !ignoredMetrics.has(metric) &&
+                    (typeof value === 'number' || typeof value === 'string'),
+                ),
+              )
+            : {};
+          const skills = Object.entries(performanceMetrics)
+            .filter(
+              ([metric, value]) =>
+                metric.toLowerCase().endsWith('score') &&
+                metric !== 'overallScore' &&
+                typeof value === 'number',
+            )
+            .map(([metric, value]) => ({
+              name: metric
+                .replace(/Score$/, '')
+                .replace(/([a-z])([A-Z])/g, '$1 $2')
+                .replace(/^./, (letter) => letter.toUpperCase()),
+              score: Number(value),
+            }));
+          const parentResult = result
+            ? {
+                ...result,
+                totalScore: reviewIsFinal ? result.totalScore : null,
+                percentage: reviewIsFinal ? result.percentage : null,
+                passed: reviewIsFinal ? result.passed : null,
+                reviewStatus: reviewIsFinal ? result.reviewStatus : 'PENDING',
+                schoolReview: reviewIsFinal ? result.schoolReview : null,
+                recommendation: reviewIsFinal ? result.recommendation : null,
+                performanceMetrics,
+                skills,
+              }
+            : null;
+          return {
+            ...safeAssignment,
+            child,
+            result: parentResult,
+            ...this.attemptSummary(assignment, result),
+            availability: this.availability(assignment, result),
+          };
+        })
+        .filter(Boolean),
+    );
+    return this.withSequentialAvailability(rows).sort(
+      (a: any, b: any) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     );
   }
-  async parentStart(assignmentId: string, childId: string, schoolId: string, parentId: string, restart = false) {
+  async parentStart(
+    assignmentId: string,
+    childId: string,
+    schoolId: string,
+    parentId: string,
+    restart = false,
+  ) {
     await this.parentChild(childId, schoolId, parentId);
     const assignment = await this.prisma.gameAssignment.findFirst({
-      where: { id: assignmentId, gameAssessment: { schoolId }, targetType: 'STUDENT', targetIds: { has: childId } },
+      where: {
+        id: assignmentId,
+        gameAssessment: { schoolId },
+        targetType: 'STUDENT',
+        targetIds: { has: childId },
+      },
     });
-    if (!assignment) throw new ForbiddenException('This game is not assigned to your child.');
+    if (!assignment)
+      throw new ForbiddenException('This game is not assigned to your child.');
     return this.start(assignmentId, schoolId, childId, restart);
   }
-  async requestGameReassessment(assignmentId: string, childId: string, schoolId: string, parentId: string, reason?: string) {
+  async requestGameReassessment(
+    assignmentId: string,
+    childId: string,
+    schoolId: string,
+    parentId: string,
+    reason?: string,
+  ) {
     await this.parentChild(childId, schoolId, parentId);
     const result = await this.prisma.gameResult.findFirst({
-      where: { gameAssignmentId: assignmentId, studentId: childId, gameAssignment: { gameAssessment: { schoolId } } },
+      where: {
+        gameAssignmentId: assignmentId,
+        studentId: childId,
+        gameAssignment: { gameAssessment: { schoolId } },
+      },
       include: { gameAssignment: true },
     });
-    if (!result || result.status !== 'COMPLETED') throw new BadRequestException('The game must be completed before requesting re-assessment.');
-    if (!['REVIEWED', 'NEEDS_FOLLOW_UP'].includes(result.reviewStatus)) throw new BadRequestException('Please wait until the school publishes its review.');
-    if (result.reassessmentRequestStatus) throw new BadRequestException('The one-time re-assessment request has already been used for this game.');
+    if (!result || result.status !== 'COMPLETED')
+      throw new BadRequestException(
+        'The game must be completed before requesting re-assessment.',
+      );
+    if (!['REVIEWED', 'NEEDS_FOLLOW_UP'].includes(result.reviewStatus))
+      throw new BadRequestException(
+        'Please wait until the school publishes its review.',
+      );
+    if (result.reassessmentRequestStatus)
+      throw new BadRequestException(
+        'The one-time re-assessment request has already been used for this game.',
+      );
     return this.prisma.gameResult.update({
       where: { id: result.id },
-      data: { reassessmentRequestStatus: 'PENDING', reassessmentRequestedAt: new Date(), reassessmentReason: reason?.trim() || null },
+      data: {
+        reassessmentRequestStatus: 'PENDING',
+        reassessmentRequestedAt: new Date(),
+        reassessmentReason: reason?.trim() || null,
+      },
     });
   }
 
@@ -295,55 +557,116 @@ export class GamePlayService {
     const results = await this.prisma.gameResult.findMany({
       where: {
         gameAssignment: { gameAssessment: { schoolId } },
-        reassessmentRequestStatus: status && status !== 'ALL' ? status : { not: null },
+        reassessmentRequestStatus:
+          status && status !== 'ALL' ? status : { not: null },
       },
-      include: { gameAssignment: { include: { generatedGame: { include: { template: { include: { category: true } } } }, gameAssessment: true } } },
+      include: {
+        gameAssignment: {
+          include: {
+            generatedGame: {
+              include: { template: { include: { category: true } } },
+            },
+            gameAssessment: true,
+          },
+        },
+      },
       orderBy: { reassessmentRequestedAt: 'desc' },
     });
     const students = await this.prisma.application.findMany({
-      where: { schoolId, id: { in: results.map(result => result.studentId) } },
+      where: {
+        schoolId,
+        id: { in: results.map((result) => result.studentId) },
+      },
       include: { parent: { select: { firstName: true, lastName: true } } },
     });
-    return results.map(result => ({ ...result, student: students.find(student => student.id === result.studentId) || null }));
+    return results.map((result) => ({
+      ...result,
+      student:
+        students.find((student) => student.id === result.studentId) || null,
+    }));
   }
 
-  async decideGameReassessment(resultId: string, decision: 'APPROVED' | 'REJECTED', schoolId: string, userId: string) {
-    if (!['APPROVED', 'REJECTED'].includes(decision)) throw new BadRequestException('Decision must be APPROVED or REJECTED.');
+  async decideGameReassessment(
+    resultId: string,
+    decision: 'APPROVED' | 'REJECTED',
+    schoolId: string,
+    userId: string,
+  ) {
+    if (!['APPROVED', 'REJECTED'].includes(decision))
+      throw new BadRequestException('Decision must be APPROVED or REJECTED.');
     const result = await this.prisma.gameResult.findFirst({
       where: { id: resultId, gameAssignment: { gameAssessment: { schoolId } } },
       include: { gameAssignment: true },
     });
-    if (!result) throw new NotFoundException('Game re-assessment request not found.');
-    if (result.reassessmentRequestStatus !== 'PENDING') throw new BadRequestException('This request has already been decided.');
-    return this.prisma.$transaction(async tx => {
+    if (!result)
+      throw new NotFoundException('Game re-assessment request not found.');
+    if (result.reassessmentRequestStatus !== 'PENDING')
+      throw new BadRequestException('This request has already been decided.');
+    return this.prisma.$transaction(async (tx) => {
       const updated = await tx.gameResult.update({
         where: { id: result.id },
-        data: { reassessmentRequestStatus: decision, reassessmentDecidedAt: new Date(), reassessmentDecidedById: userId },
+        data: {
+          reassessmentRequestStatus: decision,
+          reassessmentDecidedAt: new Date(),
+          reassessmentDecidedById: userId,
+        },
       });
       return updated;
     });
   }
-  async parentSubmit(assignmentId: string, sessionId: string, childId: string, schoolId: string, parentId: string) {
+  async parentSubmit(
+    assignmentId: string,
+    sessionId: string,
+    childId: string,
+    schoolId: string,
+    parentId: string,
+  ) {
     await this.parentChild(childId, schoolId, parentId);
     const assignment = await this.prisma.gameAssignment.findFirst({
-      where: { id: assignmentId, gameAssessment: { schoolId }, targetType: 'STUDENT', targetIds: { has: childId } },
+      where: {
+        id: assignmentId,
+        gameAssessment: { schoolId },
+        targetType: 'STUDENT',
+        targetIds: { has: childId },
+      },
     });
-    if (!assignment) throw new ForbiddenException('This game is not assigned to your child.');
+    if (!assignment)
+      throw new ForbiddenException('This game is not assigned to your child.');
     return this.submit(assignmentId, sessionId, schoolId, childId);
   }
-  async parentFinalize(assignmentId: string, childId: string, schoolId: string, parentId: string) {
+  async parentFinalize(
+    assignmentId: string,
+    childId: string,
+    schoolId: string,
+    parentId: string,
+  ) {
     await this.parentChild(childId, schoolId, parentId);
     const result = await this.prisma.gameResult.findFirst({
-      where: { gameAssignmentId: assignmentId, studentId: childId, gameAssignment: { gameAssessment: { schoolId } } },
+      where: {
+        gameAssignmentId: assignmentId,
+        studentId: childId,
+        gameAssignment: { gameAssessment: { schoolId } },
+      },
     });
-    if (!result || result.status !== 'COMPLETED') throw new BadRequestException('Complete an assessment attempt before submitting.');
+    if (!result || result.status !== 'COMPLETED')
+      throw new BadRequestException(
+        'Complete an assessment attempt before submitting.',
+      );
     if (result.finalSubmittedAt) return result;
     return this.prisma.gameResult.update({
       where: { id: result.id },
-      data: { finalSubmittedAt: new Date(), submissionCount: { increment: 1 }, reviewStatus: 'PENDING' },
+      data: {
+        finalSubmittedAt: new Date(),
+        submissionCount: { increment: 1 },
+        reviewStatus: 'PENDING',
+      },
     });
   }
-  async parentFinalizeGames(childId: string, schoolId: string, parentId: string) {
+  async parentFinalizeGames(
+    childId: string,
+    schoolId: string,
+    parentId: string,
+  ) {
     await this.parentChild(childId, schoolId, parentId);
     const assignments = await this.prisma.gameAssignment.findMany({
       where: {
@@ -358,53 +681,121 @@ export class GamePlayService {
       },
     });
     const games = assignments.filter((assignment) =>
-      String((assignment.gameAssessment.settings as any)?.source || '').startsWith('REAL_TIME_GAMES'),
+      String(
+        (assignment.gameAssessment.settings as any)?.source || '',
+      ).startsWith('REAL_TIME_GAMES'),
     );
-    if (!games.length) throw new NotFoundException('No assigned games were found for this student.');
-    if (games.some((assignment) => assignment.results[0]?.status !== 'COMPLETED')) {
-      throw new BadRequestException('Complete all assigned games before submitting them for review.');
+    if (!games.length)
+      throw new NotFoundException(
+        'No assigned games were found for this student.',
+      );
+    if (
+      games.some((assignment) => assignment.results[0]?.status !== 'COMPLETED')
+    ) {
+      throw new BadRequestException(
+        'Complete all assigned games before submitting them for review.',
+      );
     }
     const resultIds = games.map((assignment) => assignment.results[0].id);
     const submittedAt = new Date();
-    await this.prisma.$transaction(resultIds.map((id) => this.prisma.gameResult.update({
-      where: { id },
-      data: { finalSubmittedAt: submittedAt, submissionCount: { increment: 1 }, reviewStatus: 'PENDING' },
-    })));
+    await this.prisma.$transaction(
+      resultIds.map((id) =>
+        this.prisma.gameResult.update({
+          where: { id },
+          data: {
+            finalSubmittedAt: submittedAt,
+            submissionCount: { increment: 1 },
+            reviewStatus: 'PENDING',
+          },
+        }),
+      ),
+    );
     return { submitted: resultIds.length, submittedAt };
   }
-  async parentTutorial(assignmentId: string, childId: string, schoolId: string, parentId: string) {
+  async parentTutorial(
+    assignmentId: string,
+    childId: string,
+    schoolId: string,
+    parentId: string,
+  ) {
     await this.parentChild(childId, schoolId, parentId);
     return this.tutorial(assignmentId, schoolId, childId);
   }
-  async parentTutorialProgress(assignmentId: string, childId: string, schoolId: string, parentId: string, data: { tutorialViewed?: boolean; practiceCompleted?: boolean }) {
+  async parentTutorialProgress(
+    assignmentId: string,
+    childId: string,
+    schoolId: string,
+    parentId: string,
+    data: { tutorialViewed?: boolean; practiceCompleted?: boolean },
+  ) {
     await this.parentChild(childId, schoolId, parentId);
     return this.saveTutorialProgress(assignmentId, schoolId, childId, data);
   }
-  async parentPractice(assignmentId: string, childId: string, schoolId: string, parentId: string) {
+  async parentPractice(
+    assignmentId: string,
+    childId: string,
+    schoolId: string,
+    parentId: string,
+  ) {
     await this.parentChild(childId, schoolId, parentId);
     return this.startPractice(assignmentId, schoolId, childId);
   }
-  async parentFinishPractice(assignmentId: string, sessionId: string, childId: string, schoolId: string, parentId: string) {
+  async parentFinishPractice(
+    assignmentId: string,
+    sessionId: string,
+    childId: string,
+    schoolId: string,
+    parentId: string,
+  ) {
     await this.parentChild(childId, schoolId, parentId);
     return this.finishPractice(assignmentId, sessionId, schoolId, childId);
   }
   async studentGames(schoolId: string, studentId: string) {
     const direct = await this.prisma.gameAssignment.findMany({
-      where: { gameAssessment: { schoolId }, OR: [{ targetType: 'STUDENT', targetIds: { has: studentId } }, { results: { some: { studentId } } }] },
-      include: { generatedGame: { include: { template: true } }, gameAssessment: true, results: { where: { studentId }, include: { attempts: { include: { scores: true }, orderBy: { attemptNumber: 'asc' } } } } },
+      where: {
+        gameAssessment: { schoolId },
+        OR: [
+          { targetType: 'STUDENT', targetIds: { has: studentId } },
+          { results: { some: { studentId } } },
+        ],
+      },
+      include: {
+        generatedGame: { include: { template: true } },
+        gameAssessment: true,
+        results: {
+          where: { studentId },
+          include: {
+            attempts: {
+              include: { scores: true },
+              orderBy: { attemptNumber: 'asc' },
+            },
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
     const rows = direct.map((assignment) => {
       const result = assignment.results[0] || null;
-      return { ...assignment, ...this.attemptSummary(assignment, result), availability: this.availability(assignment, result), result };
+      return {
+        ...assignment,
+        ...this.attemptSummary(assignment, result),
+        availability: this.availability(assignment, result),
+        result,
+      };
     });
-    return this.withSequentialAvailability(rows, studentId).sort((a: any, b: any) =>
-      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    return this.withSequentialAvailability(rows, studentId).sort(
+      (a: any, b: any) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     );
   }
   async tutorial(assignmentId: string, schoolId: string, studentId: string) {
-    const assignment = await this.assignmentForStudent(assignmentId, schoolId, studentId);
-    if (!assignment.generatedGame) throw new BadRequestException('The assigned game is unavailable.');
+    const assignment = await this.assignmentForStudent(
+      assignmentId,
+      schoolId,
+      studentId,
+    );
+    if (!assignment.generatedGame)
+      throw new BadRequestException('The assigned game is unavailable.');
     const game = await this.prisma.generatedGame.findUnique({
       where: { id: assignment.generatedGame.id },
       include: { template: { include: { category: true } } },
@@ -414,7 +805,9 @@ export class GamePlayService {
     const configuration = game.configuration as Record<string, any>;
     const correctPoints = Number(configuration?.scoringRules?.correct ?? 10);
     const incorrectPoints = Number(configuration?.scoringRules?.incorrect ?? 0);
-    const maxScore = game.questionIds.length ? game.questionIds.length * correctPoints : 100;
+    const maxScore = game.questionIds.length
+      ? game.questionIds.length * correctPoints
+      : 100;
     const content = {
       category: game.template?.category?.name || copy.category,
       icon: copy.icon,
@@ -424,16 +817,29 @@ export class GamePlayService {
       avoid: copy.avoid,
       strategy: copy.strategy,
       timer: {
-        minutes: assignment.timeLimitMinutes || assignment.gameAssessment?.timeLimit || null,
-        pauses: !['COLOR_PATH','MAGIC_PAINT','TRAIN_TRACK_BUILDER'].includes(game.engineKey),
+        minutes:
+          assignment.timeLimitMinutes ||
+          assignment.gameAssessment?.timeLimit ||
+          null,
+        pauses: !['COLOR_PATH', 'MAGIC_PAINT', 'TRAIN_TRACK_BUILDER'].includes(
+          game.engineKey,
+        ),
         expiry: 'The practice or assessment ends when the timer reaches zero.',
       },
       scoring: {
         correctAction: correctPoints,
         wrongAction: incorrectPoints,
-        hintPenalty: ['COLOR_PATH','MAGIC_PAINT','TRAIN_TRACK_BUILDER'].includes(game.engineKey) ? 0 : 2,
+        hintPenalty: [
+          'COLOR_PATH',
+          'MAGIC_PAINT',
+          'TRAIN_TRACK_BUILDER',
+        ].includes(game.engineKey)
+          ? 0
+          : 2,
         timeBonus: Number(configuration?.scoringRules?.timeBonus ?? 0),
-        completionBonus: Number(configuration?.scoringRules?.completionBonus ?? 0),
+        completionBonus: Number(
+          configuration?.scoringRules?.completionBonus ?? 0,
+        ),
         maximumScore: maxScore,
         passingScore: assignment.passingScore,
       },
@@ -446,7 +852,12 @@ export class GamePlayService {
         tutorialDescription: copy.objective,
         instructions: content.steps,
         controls: content.controls,
-        objectives: { goal: copy.objective, skills: copy.skills, strategy: copy.strategy, avoid: copy.avoid },
+        objectives: {
+          goal: copy.objective,
+          skills: copy.skills,
+          strategy: copy.strategy,
+          avoid: copy.avoid,
+        },
         scoringRules: content.scoring,
       },
       update: {
@@ -454,36 +865,59 @@ export class GamePlayService {
         tutorialDescription: copy.objective,
         instructions: content.steps,
         controls: content.controls,
-        objectives: { goal: copy.objective, skills: copy.skills, strategy: copy.strategy, avoid: copy.avoid },
+        objectives: {
+          goal: copy.objective,
+          skills: copy.skills,
+          strategy: copy.strategy,
+          avoid: copy.avoid,
+        },
         scoringRules: content.scoring,
       },
     });
     const progress = await this.prisma.gameTutorialProgress.findUnique({
-      where: { studentId_assessmentId: { studentId, assessmentId: assignmentId } },
+      where: {
+        studentId_assessmentId: { studentId, assessmentId: assignmentId },
+      },
     });
     return {
       ...tutorial,
       ...content,
-      game: { id: game.id, name: game.title, thumbnail: game.template?.thumbnail, engineKey: game.engineKey },
+      game: {
+        id: game.id,
+        name: game.title,
+        thumbnail: game.template?.thumbnail,
+        engineKey: game.engineKey,
+      },
       assessment: {
         id: assignment.id,
         name: assignment.gameAssessment?.name,
         subject: assignment.gameAssessment?.subject,
         ageGroup: assignment.gameAssessment?.ageGroup,
-        difficulty: assignment.gameAssessment?.difficulty || game.template?.difficulty,
-        duration: assignment.timeLimitMinutes || assignment.gameAssessment?.timeLimit,
+        difficulty:
+          assignment.gameAssessment?.difficulty || game.template?.difficulty,
+        duration:
+          assignment.timeLimitMinutes || assignment.gameAssessment?.timeLimit,
         maximumMarks: maxScore,
         passingMarks: assignment.passingScore,
         allowRestart: assignment.allowRestart,
       },
       progress: progress || { tutorialViewed: false, practiceCompleted: false },
-      skipAllowed: Boolean((assignment.assignmentSettings as any)?.allowTutorialSkip),
+      skipAllowed: Boolean(
+        (assignment.assignmentSettings as any)?.allowTutorialSkip,
+      ),
     };
   }
-  async saveTutorialProgress(assignmentId: string, schoolId: string, studentId: string, data: { tutorialViewed?: boolean; practiceCompleted?: boolean }) {
+  async saveTutorialProgress(
+    assignmentId: string,
+    schoolId: string,
+    studentId: string,
+    data: { tutorialViewed?: boolean; practiceCompleted?: boolean },
+  ) {
     await this.assignmentForStudent(assignmentId, schoolId, studentId);
     return this.prisma.gameTutorialProgress.upsert({
-      where: { studentId_assessmentId: { studentId, assessmentId: assignmentId } },
+      where: {
+        studentId_assessmentId: { studentId, assessmentId: assignmentId },
+      },
       create: {
         studentId,
         assessmentId: assignmentId,
@@ -492,30 +926,56 @@ export class GamePlayService {
         viewedAt: data.tutorialViewed ? new Date() : null,
       },
       update: {
-        ...(data.tutorialViewed && { tutorialViewed: true, viewedAt: new Date() }),
+        ...(data.tutorialViewed && {
+          tutorialViewed: true,
+          viewedAt: new Date(),
+        }),
         ...(data.practiceCompleted && { practiceCompleted: true }),
       },
     });
   }
-  async startPractice(assignmentId: string, schoolId: string, studentId: string) {
-    const assignment = await this.assignmentForStudent(assignmentId, schoolId, studentId);
+  async startPractice(
+    assignmentId: string,
+    schoolId: string,
+    studentId: string,
+  ) {
+    const assignment = await this.assignmentForStudent(
+      assignmentId,
+      schoolId,
+      studentId,
+    );
     await this.assertSequentialAccess(assignment, schoolId, studentId);
-    if (!assignment.generatedGame) throw new BadRequestException('The assigned game is unavailable.');
-    return this.runtime.start({
-      engineKey: assignment.generatedGame.engineKey,
-      questionIds: SELF_CONTAINED_PRACTICE_ENGINES.has(assignment.generatedGame.engineKey)
-        ? []
-        : assignment.generatedGame.questionIds.slice(0, 1),
-      configuration: {
-        ...(assignment.generatedGame.configuration as Record<string, unknown>),
-        practiceMode: true,
-        maxRounds: 1,
-        timerEnabled: false,
+    if (!assignment.generatedGame)
+      throw new BadRequestException('The assigned game is unavailable.');
+    return this.runtime.start(
+      {
+        engineKey: assignment.generatedGame.engineKey,
+        questionIds: SELF_CONTAINED_PRACTICE_ENGINES.has(
+          assignment.generatedGame.engineKey,
+        )
+          ? []
+          : assignment.generatedGame.questionIds.slice(0, 1),
+        configuration: {
+          ...(assignment.generatedGame.configuration as Record<
+            string,
+            unknown
+          >),
+          practiceMode: true,
+          maxRounds: 1,
+          timerEnabled: false,
+        },
+        mode: 'PRACTICE',
       },
-      mode: 'PRACTICE',
-    }, schoolId, studentId);
+      schoolId,
+      studentId,
+    );
   }
-  async finishPractice(assignmentId: string, sessionId: string, schoolId: string, studentId: string) {
+  async finishPractice(
+    assignmentId: string,
+    sessionId: string,
+    schoolId: string,
+    studentId: string,
+  ) {
     await this.assignmentForStudent(assignmentId, schoolId, studentId);
     const session = await this.prisma.gameRuntimeSession.findFirst({
       where: { id: sessionId, schoolId, userId: studentId, mode: 'PRACTICE' },
@@ -531,25 +991,60 @@ export class GamePlayService {
       practiceCompleted: true,
     });
   }
-  async start(assignmentId: string, schoolId: string, studentId: string, restart = false, bypassTutorial = false) {
-    const assignment = await this.assignmentForStudent(assignmentId, schoolId, studentId);
+  async start(
+    assignmentId: string,
+    schoolId: string,
+    studentId: string,
+    restart = false,
+    bypassTutorial = false,
+  ) {
+    const assignment = await this.assignmentForStudent(
+      assignmentId,
+      schoolId,
+      studentId,
+    );
     await this.assertSequentialAccess(assignment, schoolId, studentId);
     const savedResult = assignment.results[0] || null;
     const tutorialProgress = await this.prisma.gameTutorialProgress.findUnique({
-      where: { studentId_assessmentId: { studentId, assessmentId: assignmentId } },
+      where: {
+        studentId_assessmentId: { studentId, assessmentId: assignmentId },
+      },
     });
-    const skipAllowed = Boolean((assignment.assignmentSettings as any)?.allowTutorialSkip);
+    const skipAllowed = Boolean(
+      (assignment.assignmentSettings as any)?.allowTutorialSkip,
+    );
     if (!bypassTutorial && !tutorialProgress?.tutorialViewed && !skipAllowed) {
-      throw new BadRequestException('Complete the game tutorial before starting the assessment.');
+      throw new BadRequestException(
+        'Complete the game tutorial before starting the assessment.',
+      );
     }
-    if (!assignment.generatedGame) throw new BadRequestException('The assigned game is unavailable.');
-    const masterGame = await this.prisma.game.findUnique({ where: { componentName: assignment.generatedGame?.engineKey || '' }, select: { id: true } });
-    let result = await this.prisma.gameResult.upsert({
-      where: { gameAssignmentId_studentId: { gameAssignmentId: assignmentId, studentId } },
-      create: { gameAssignmentId: assignmentId, studentId, gameId: masterGame?.id, assessmentId: assignment.gameAssessmentId },
-      update: { gameId: masterGame?.id, assessmentId: assignment.gameAssessmentId },
+    if (!assignment.generatedGame)
+      throw new BadRequestException('The assigned game is unavailable.');
+    const masterGame = await this.prisma.game.findUnique({
+      where: { componentName: assignment.generatedGame?.engineKey || '' },
+      select: { id: true },
     });
-    const attempts = await this.prisma.gameAttempt.count({ where: { gameResultId: result.id } });
+    let result = await this.prisma.gameResult.upsert({
+      where: {
+        gameAssignmentId_studentId: {
+          gameAssignmentId: assignmentId,
+          studentId,
+        },
+      },
+      create: {
+        gameAssignmentId: assignmentId,
+        studentId,
+        gameId: masterGame?.id,
+        assessmentId: assignment.gameAssessmentId,
+      },
+      update: {
+        gameId: masterGame?.id,
+        assessmentId: assignment.gameAssessmentId,
+      },
+    });
+    const attempts = await this.prisma.gameAttempt.count({
+      where: { gameResultId: result.id },
+    });
     const active = await this.prisma.gameRuntimeSession.findFirst({
       where: {
         gameResultId: result.id,
@@ -558,7 +1053,11 @@ export class GamePlayService {
       },
       orderBy: { createdAt: 'desc' },
     });
-    if (active && !restart) return this.runtime.state(active.id, schoolId, { id: studentId, role: 'STUDENT' as any });
+    if (active && !restart)
+      return this.runtime.state(active.id, schoolId, {
+        id: studentId,
+        role: 'STUDENT' as any,
+      });
     if (!restart && savedResult?.status === 'IN_PROGRESS') {
       const completedSession = await this.prisma.gameRuntimeSession.findFirst({
         where: {
@@ -579,19 +1078,46 @@ export class GamePlayService {
       }
     }
     const availability = this.availability(assignment, savedResult);
-    if (!availability.available) throw new BadRequestException(availability.reason);
-    if (restart && !assignment.allowRestart) throw new ForbiddenException('Restart is not permitted for this assignment.');
+    if (!availability.available)
+      throw new BadRequestException(availability.reason);
+    if (restart && !assignment.allowRestart)
+      throw new ForbiddenException(
+        'Restart is not permitted for this assignment.',
+      );
     const permittedAttempts = 1 + Number(assignment.allowedReassessments || 0);
-    if (attempts >= permittedAttempts) throw new BadRequestException('Maximum attempts reached.');
-    const session = await this.runtime.start({
-      engineKey: assignment.generatedGame.engineKey,
-      questionIds: assignment.generatedGame.questionIds,
-      configuration: { ...(assignment.generatedGame.configuration as Record<string, unknown>), timeLimitMinutes: assignment.timeLimitMinutes },
-      mode: 'ASSIGNMENT',
-    }, schoolId, studentId);
-    const attempt = await this.prisma.gameAttempt.create({ data: { gameResultId: result.id, attemptNumber: attempts + 1, state: { status: 'STARTED' } } });
+    if (attempts >= permittedAttempts)
+      throw new BadRequestException('Maximum attempts reached.');
+    const session = await this.runtime.start(
+      {
+        engineKey: assignment.generatedGame.engineKey,
+        questionIds: assignment.generatedGame.questionIds,
+        configuration: {
+          ...(assignment.generatedGame.configuration as Record<
+            string,
+            unknown
+          >),
+          timeLimitMinutes: assignment.timeLimitMinutes,
+        },
+        mode: 'ASSIGNMENT',
+      },
+      schoolId,
+      studentId,
+    );
+    const attempt = await this.prisma.gameAttempt.create({
+      data: {
+        gameResultId: result.id,
+        attemptNumber: attempts + 1,
+        state: { status: 'STARTED' },
+      },
+    });
     await this.prisma.$transaction([
-      this.prisma.gameRuntimeSession.update({ where: { id: session.id }, data: { generatedGameId: assignment.generatedGame.id, gameResultId: result.id } }),
+      this.prisma.gameRuntimeSession.update({
+        where: { id: session.id },
+        data: {
+          generatedGameId: assignment.generatedGame.id,
+          gameResultId: result.id,
+        },
+      }),
       this.prisma.gameResult.update({
         where: { id: result.id },
         data: {
@@ -606,10 +1132,21 @@ export class GamePlayService {
         },
       }),
     ]);
-    return { ...(await this.runtime.state(session.id, schoolId, { id: studentId, role: 'STUDENT' as any })), attemptId: attempt.id, attemptNumber: attempt.attemptNumber };
+    return {
+      ...(await this.runtime.state(session.id, schoolId, {
+        id: studentId,
+        role: 'STUDENT' as any,
+      })),
+      attemptId: attempt.id,
+      attemptNumber: attempt.attemptNumber,
+    };
   }
   async resume(assignmentId: string, schoolId: string, studentId: string) {
-    const assignment = await this.assignmentForStudent(assignmentId, schoolId, studentId);
+    const assignment = await this.assignmentForStudent(
+      assignmentId,
+      schoolId,
+      studentId,
+    );
     const result = assignment.results[0];
     if (!result) throw new NotFoundException('No saved gameplay exists.');
     const session = await this.prisma.gameRuntimeSession.findFirst({
@@ -620,67 +1157,304 @@ export class GamePlayService {
       },
       orderBy: { updatedAt: 'desc' },
     });
-    if (!session) throw new NotFoundException('No resumable gameplay session exists.');
-    return this.runtime.state(session.id, schoolId, { id: studentId, role: 'STUDENT' as any });
+    if (!session)
+      throw new NotFoundException('No resumable gameplay session exists.');
+    return this.runtime.state(session.id, schoolId, {
+      id: studentId,
+      role: 'STUDENT' as any,
+    });
   }
-  async submit(assignmentId: string, sessionId: string, schoolId: string, studentId: string) {
-    const assignment = await this.assignmentForStudent(assignmentId, schoolId, studentId);
+  async submit(
+    assignmentId: string,
+    sessionId: string,
+    schoolId: string,
+    studentId: string,
+  ) {
+    const assignment = await this.assignmentForStudent(
+      assignmentId,
+      schoolId,
+      studentId,
+    );
     const result = assignment.results[0];
     if (!result) throw new NotFoundException('Gameplay result not found.');
-    const session = await this.prisma.gameRuntimeSession.findFirst({ where: { id: sessionId, schoolId, userId: studentId, gameResultId: result.id } });
+    const session = await this.prisma.gameRuntimeSession.findFirst({
+      where: {
+        id: sessionId,
+        schoolId,
+        userId: studentId,
+        gameResultId: result.id,
+      },
+    });
     if (!session) throw new ForbiddenException('Invalid gameplay session.');
     const runtime = session.runtimeState as any;
-    const followLights = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'FOLLOW_THE_LIGHTS' ? runtime.cognitiveAnalytics : null;
-    const ballStack = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'BALL_STACK' ? runtime.cognitiveAnalytics : null;
-    const soundDetective = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'SOUND_DETECTIVE' ? runtime.cognitiveAnalytics : null;
-    const colorPath = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'COLOR_PATH' ? runtime.cognitiveAnalytics : null;
-    const magicPaint = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'MAGIC_PAINT' ? runtime.cognitiveAnalytics : null;
-    const trainTrack = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'TRAIN_TRACK_BUILDER' ? runtime.cognitiveAnalytics : null;
-    const packageSorter = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'PACKAGE_SORTER' ? runtime.cognitiveAnalytics : null;
-    const rescueMission = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'RESCUE_MISSION' ? runtime.cognitiveAnalytics : null;
-    const parkingEscape = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'PARKING_ESCAPE' ? runtime.cognitiveAnalytics : null;
-    const waterPipeline = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'WATER_PIPELINE' ? runtime.cognitiveAnalytics : null;
-    const cognitive = followLights || ballStack || soundDetective || colorPath || magicPaint || trainTrack || packageSorter || rescueMission || parkingEscape || waterPipeline;
-    const answered = followLights ? Number(followLights.correctTaps || 0) + Number(followLights.wrongTaps || 0) : ballStack ? Number(ballStack.totalBallsDropped || 0) : soundDetective ? Number(soundDetective.roundsPlayed || 0) : colorPath ? Number(colorPath.roundsPlayed || 0) : magicPaint ? Number(magicPaint.objectsCompleted || 0) : trainTrack ? Number(trainTrack.roundsPlayed || 0) : packageSorter ? Number(packageSorter.packagesSorted || 0) : rescueMission ? Number(rescueMission.missionsCompleted || 0) : parkingEscape ? Number(parkingEscape.levelsCompleted || 0) : waterPipeline ? Number(waterPipeline.levelsCompleted || 0) : runtime?.answers?.length || 0;
-    const total = cognitive ? Math.max(1, answered) : session.questionIds.length;
-    const percentage = followLights ? Number(followLights.overallScore || 0) : ballStack ? Number(ballStack.overallCognitiveScore || 0) : soundDetective ? Number(soundDetective.overallScore || 0) : colorPath ? Number(colorPath.overallScore || 0) : magicPaint ? Number(magicPaint.overallScore || 0) : trainTrack ? Number(trainTrack.overallScore || 0) : packageSorter ? Number(packageSorter.overallScore || 0) : rescueMission ? Number(rescueMission.overallScore || 0) : parkingEscape ? Number(parkingEscape.overallScore || 0) : waterPipeline ? Number(waterPipeline.overallScore || 0) : total ? (Number(runtime?.correct || 0) / total) * 100 : 0;
+    const followLights =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'FOLLOW_THE_LIGHTS'
+        ? runtime.cognitiveAnalytics
+        : null;
+    const ballStack =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'BALL_STACK'
+        ? runtime.cognitiveAnalytics
+        : null;
+    const soundDetective =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'SOUND_DETECTIVE'
+        ? runtime.cognitiveAnalytics
+        : null;
+    const colorPath =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'COLOR_PATH'
+        ? runtime.cognitiveAnalytics
+        : null;
+    const magicPaint =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'MAGIC_PAINT'
+        ? runtime.cognitiveAnalytics
+        : null;
+    const trainTrack =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'TRAIN_TRACK_BUILDER'
+        ? runtime.cognitiveAnalytics
+        : null;
+    const packageSorter =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'PACKAGE_SORTER'
+        ? runtime.cognitiveAnalytics
+        : null;
+    const rescueMission =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'RESCUE_MISSION'
+        ? runtime.cognitiveAnalytics
+        : null;
+    const parkingEscape =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'PARKING_ESCAPE'
+        ? runtime.cognitiveAnalytics
+        : null;
+    const waterPipeline =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'WATER_PIPELINE'
+        ? runtime.cognitiveAnalytics
+        : null;
+    const patternMatrix =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'PATTERN_MATRIX'
+        ? runtime.cognitiveAnalytics
+        : null;
+    const numberBuilder =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'NUMBER_BUILDER'
+        ? runtime.cognitiveAnalytics
+        : null;
+    const ballSort =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'BALL_SORT'
+        ? runtime.cognitiveAnalytics
+        : null;
+    const redLightGreenLight =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'RED_LIGHT_GREEN_LIGHT'
+        ? runtime.cognitiveAnalytics
+        : null;
+    const cognitive =
+      followLights ||
+      ballStack ||
+      soundDetective ||
+      colorPath ||
+      magicPaint ||
+      trainTrack ||
+      packageSorter ||
+      rescueMission ||
+      parkingEscape ||
+      waterPipeline ||
+      patternMatrix ||
+      numberBuilder ||
+      ballSort ||
+      redLightGreenLight;
+    const answered = followLights
+      ? Number(followLights.correctTaps || 0) +
+        Number(followLights.wrongTaps || 0)
+      : ballStack
+        ? Number(ballStack.totalBallsDropped || 0)
+        : soundDetective
+          ? Number(soundDetective.roundsPlayed || 0)
+          : colorPath
+            ? Number(colorPath.roundsPlayed || 0)
+            : magicPaint
+              ? Number(magicPaint.objectsCompleted || 0)
+              : trainTrack
+                ? Number(trainTrack.roundsPlayed || 0)
+                : packageSorter
+                  ? Number(packageSorter.packagesSorted || 0)
+                  : rescueMission
+                    ? Number(rescueMission.missionsCompleted || 0)
+                    : parkingEscape
+                      ? Number(parkingEscape.levelsCompleted || 0)
+                      : waterPipeline
+                        ? Number(waterPipeline.levelsCompleted || 0)
+                        : patternMatrix
+                          ? Number(patternMatrix.roundsCompleted || 0)
+                        : numberBuilder
+                          ? Number(numberBuilder.roundsCompleted || 0)
+                        : ballSort
+                          ? Number(ballSort.levelsCompleted || 0)
+                        : redLightGreenLight
+                          ? Number(redLightGreenLight.difficultyReached || 1)
+                        : runtime?.answers?.length || 0;
+    const total = cognitive
+      ? Math.max(1, answered)
+      : session.questionIds.length;
+    const percentage = followLights
+      ? Number(followLights.overallScore || 0)
+      : ballStack
+        ? Number(ballStack.overallCognitiveScore || 0)
+        : soundDetective
+          ? Number(soundDetective.overallScore || 0)
+          : colorPath
+            ? Number(colorPath.overallScore || 0)
+            : magicPaint
+              ? Number(magicPaint.overallScore || 0)
+              : trainTrack
+                ? Number(trainTrack.overallScore || 0)
+                : packageSorter
+                  ? Number(packageSorter.overallScore || 0)
+                  : rescueMission
+                    ? Number(rescueMission.overallScore || 0)
+                    : parkingEscape
+                      ? Number(parkingEscape.overallScore || 0)
+                      : waterPipeline
+                        ? Number(waterPipeline.overallScore || 0)
+                        : patternMatrix
+                          ? Number(patternMatrix.overallScore || 0)
+                        : numberBuilder
+                          ? Number(numberBuilder.overallScore || 0)
+                        : ballSort
+                          ? Number(ballSort.overallScore || 0)
+                        : redLightGreenLight
+                          ? Number(redLightGreenLight.overallScore || 0)
+                        : total
+                          ? (Number(runtime?.correct || 0) / total) * 100
+                          : 0;
     const passed = percentage >= assignment.passingScore;
-    const attempt = await this.prisma.gameAttempt.findFirst({ where: { gameResultId: result.id, submittedAt: null }, orderBy: { attemptNumber: 'desc' } });
+    const attempt = await this.prisma.gameAttempt.findFirst({
+      where: { gameResultId: result.id, submittedAt: null },
+      orderBy: { attemptNumber: 'desc' },
+    });
     await this.prisma.$transaction(async (tx) => {
-      await tx.gameRuntimeSession.update({ where: { id: session.id }, data: { status: 'COMPLETED', completedAt: new Date() } });
-      await tx.gameResult.update({ where: { id: result.id }, data: { status: 'COMPLETED', totalScore: session.score, percentage, passed, completedAt: new Date() } });
+      await tx.gameRuntimeSession.update({
+        where: { id: session.id },
+        data: { status: 'COMPLETED', completedAt: new Date() },
+      });
+      await tx.gameResult.update({
+        where: { id: result.id },
+        data: {
+          status: 'COMPLETED',
+          totalScore: session.score,
+          percentage,
+          passed,
+          completedAt: new Date(),
+        },
+      });
       if (followLights && result.gameId) {
         await tx.followLightsAnalytics.upsert({
           where: { gameResultId: result.id },
           create: {
-            gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId,
-            totalSequences: Number(followLights.totalSequences || 0), completedSequences: Number(followLights.completedSequences || 0), longestSequence: Number(followLights.longestSequence || 0),
-            mistakes: Number(followLights.mistakes || 0), correctTaps: Number(followLights.correctTaps || 0), wrongTaps: Number(followLights.wrongTaps || 0),
-            averageReactionTime: Number(followLights.averageReactionTime || 0), averageTapDelay: Number(followLights.averageTapDelay || 0), completionPercentage: Number(followLights.completionPercentage || 0),
-            memoryScore: Number(followLights.memoryScore || 0), focusScore: Number(followLights.focusScore || 0), processingSpeed: Number(followLights.processingSpeed || 0),
-            learningPotential: Number(followLights.learningPotential || 0), accuracy: Number(followLights.accuracy || 0), attention: Number(followLights.attention || 0),
-            visualMemory: Number(followLights.visualMemory || 0), overallScore: Number(followLights.overallScore || 0),
+            gameResultId: result.id,
+            gameId: result.gameId,
+            studentId,
+            assessmentId: assignment.gameAssessmentId,
+            totalSequences: Number(followLights.totalSequences || 0),
+            completedSequences: Number(followLights.completedSequences || 0),
+            longestSequence: Number(followLights.longestSequence || 0),
+            mistakes: Number(followLights.mistakes || 0),
+            correctTaps: Number(followLights.correctTaps || 0),
+            wrongTaps: Number(followLights.wrongTaps || 0),
+            averageReactionTime: Number(followLights.averageReactionTime || 0),
+            averageTapDelay: Number(followLights.averageTapDelay || 0),
+            completionPercentage: Number(
+              followLights.completionPercentage || 0,
+            ),
+            memoryScore: Number(followLights.memoryScore || 0),
+            focusScore: Number(followLights.focusScore || 0),
+            processingSpeed: Number(followLights.processingSpeed || 0),
+            learningPotential: Number(followLights.learningPotential || 0),
+            accuracy: Number(followLights.accuracy || 0),
+            attention: Number(followLights.attention || 0),
+            visualMemory: Number(followLights.visualMemory || 0),
+            overallScore: Number(followLights.overallScore || 0),
           },
           update: {
-            totalSequences: Number(followLights.totalSequences || 0), completedSequences: Number(followLights.completedSequences || 0), longestSequence: Number(followLights.longestSequence || 0),
-            mistakes: Number(followLights.mistakes || 0), correctTaps: Number(followLights.correctTaps || 0), wrongTaps: Number(followLights.wrongTaps || 0),
-            averageReactionTime: Number(followLights.averageReactionTime || 0), averageTapDelay: Number(followLights.averageTapDelay || 0), completionPercentage: Number(followLights.completionPercentage || 0),
-            memoryScore: Number(followLights.memoryScore || 0), focusScore: Number(followLights.focusScore || 0), processingSpeed: Number(followLights.processingSpeed || 0),
-            learningPotential: Number(followLights.learningPotential || 0), accuracy: Number(followLights.accuracy || 0), attention: Number(followLights.attention || 0),
-            visualMemory: Number(followLights.visualMemory || 0), overallScore: Number(followLights.overallScore || 0),
+            totalSequences: Number(followLights.totalSequences || 0),
+            completedSequences: Number(followLights.completedSequences || 0),
+            longestSequence: Number(followLights.longestSequence || 0),
+            mistakes: Number(followLights.mistakes || 0),
+            correctTaps: Number(followLights.correctTaps || 0),
+            wrongTaps: Number(followLights.wrongTaps || 0),
+            averageReactionTime: Number(followLights.averageReactionTime || 0),
+            averageTapDelay: Number(followLights.averageTapDelay || 0),
+            completionPercentage: Number(
+              followLights.completionPercentage || 0,
+            ),
+            memoryScore: Number(followLights.memoryScore || 0),
+            focusScore: Number(followLights.focusScore || 0),
+            processingSpeed: Number(followLights.processingSpeed || 0),
+            learningPotential: Number(followLights.learningPotential || 0),
+            accuracy: Number(followLights.accuracy || 0),
+            attention: Number(followLights.attention || 0),
+            visualMemory: Number(followLights.visualMemory || 0),
+            overallScore: Number(followLights.overallScore || 0),
           },
         });
       }
       if (ballStack && result.gameId) {
         const data = {
-          totalBallsDropped: Number(ballStack.totalBallsDropped || 0), successfulPlacements: Number(ballStack.successfulPlacements || 0), failedPlacements: Number(ballStack.failedPlacements || 0),
-          highestTowerHeight: Number(ballStack.highestTowerHeight || 0), averageAlignment: Number(ballStack.averageAlignment || 0), perfectPlacements: Number(ballStack.perfectPlacements || 0),
-          averageReactionTime: Number(ballStack.averageReactionTime || 0), towerStabilityScore: Number(ballStack.towerStabilityScore || 0), handEyeCoordinationScore: Number(ballStack.handEyeCoordinationScore || 0),
-          fineMotorScore: Number(ballStack.fineMotorScore || 0), precisionScore: Number(ballStack.precisionScore || 0), concentrationScore: Number(ballStack.concentrationScore || 0),
-          patienceScore: Number(ballStack.patienceScore || 0), reactionSpeedScore: Number(ballStack.reactionSpeedScore || 0), consistencyScore: Number(ballStack.consistencyScore || 0),
-          timingAccuracyScore: Number(ballStack.timingAccuracyScore || 0), overallCognitiveScore: Number(ballStack.overallCognitiveScore || 0), completionStatus: String(ballStack.completionStatus || 'COMPLETED'),
+          totalBallsDropped: Number(ballStack.totalBallsDropped || 0),
+          successfulPlacements: Number(ballStack.successfulPlacements || 0),
+          failedPlacements: Number(ballStack.failedPlacements || 0),
+          highestTowerHeight: Number(ballStack.highestTowerHeight || 0),
+          averageAlignment: Number(ballStack.averageAlignment || 0),
+          perfectPlacements: Number(ballStack.perfectPlacements || 0),
+          averageReactionTime: Number(ballStack.averageReactionTime || 0),
+          towerStabilityScore: Number(ballStack.towerStabilityScore || 0),
+          handEyeCoordinationScore: Number(
+            ballStack.handEyeCoordinationScore || 0,
+          ),
+          fineMotorScore: Number(ballStack.fineMotorScore || 0),
+          precisionScore: Number(ballStack.precisionScore || 0),
+          concentrationScore: Number(ballStack.concentrationScore || 0),
+          patienceScore: Number(ballStack.patienceScore || 0),
+          reactionSpeedScore: Number(ballStack.reactionSpeedScore || 0),
+          consistencyScore: Number(ballStack.consistencyScore || 0),
+          timingAccuracyScore: Number(ballStack.timingAccuracyScore || 0),
+          overallCognitiveScore: Number(ballStack.overallCognitiveScore || 0),
+          completionStatus: String(ballStack.completionStatus || 'COMPLETED'),
         };
-        await tx.ballStackAnalytics.upsert({ where: { gameResultId: result.id }, create: { ...data, gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId }, update: data });
+        await tx.ballStackAnalytics.upsert({
+          where: { gameResultId: result.id },
+          create: {
+            ...data,
+            gameResultId: result.id,
+            gameId: result.gameId,
+            studentId,
+            assessmentId: assignment.gameAssessmentId,
+          },
+          update: data,
+        });
       }
       if (soundDetective && result.gameId) {
         const data = {
@@ -689,30 +1463,114 @@ export class GamePlayService {
           incorrectResponses: Number(soundDetective.incorrectResponses || 0),
           averageResponseTime: Number(soundDetective.averageResponseTime || 0),
           listeningScore: Number(soundDetective.listeningScore || 0),
-          auditoryRecognitionScore: Number(soundDetective.auditoryRecognitionScore || 0),
-          completionPercentage: Number(soundDetective.completionPercentage || 0),
+          auditoryRecognitionScore: Number(
+            soundDetective.auditoryRecognitionScore || 0,
+          ),
+          completionPercentage: Number(
+            soundDetective.completionPercentage || 0,
+          ),
           overallScore: Number(soundDetective.overallScore || 0),
           highestDifficulty: Number(soundDetective.highestDifficulty || 1),
-          completionStatus: String(soundDetective.completionStatus || 'COMPLETED'),
+          completionStatus: String(
+            soundDetective.completionStatus || 'COMPLETED',
+          ),
         };
-        await tx.soundDetectiveAnalytics.upsert({ where: { gameResultId: result.id }, create: { ...data, gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId }, update: data });
+        await tx.soundDetectiveAnalytics.upsert({
+          where: { gameResultId: result.id },
+          create: {
+            ...data,
+            gameResultId: result.id,
+            gameId: result.gameId,
+            studentId,
+            assessmentId: assignment.gameAssessmentId,
+          },
+          update: data,
+        });
       }
       if (colorPath && result.gameId) {
         const data = {
-          roundsPlayed: Number(colorPath.roundsPlayed || 0), correctSelections: Number(colorPath.correctSelections || 0), incorrectSelections: Number(colorPath.incorrectSelections || 0),
-          averageResponseTime: Number(colorPath.averageResponseTime || 0), observationAccuracy: Number(colorPath.observationAccuracy || 0), observationScore: Number(colorPath.observationScore || 0),
-          visualRecognitionScore: Number(colorPath.visualRecognitionScore || 0), highestDifficulty: Number(colorPath.highestDifficulty || 1), completionPercentage: Number(colorPath.completionPercentage || 0),
-          overallScore: Number(colorPath.overallScore || 0), completionStatus: String(colorPath.completionStatus || 'COMPLETED'),
+          roundsPlayed: Number(colorPath.roundsPlayed || 0),
+          correctSelections: Number(colorPath.correctSelections || 0),
+          incorrectSelections: Number(colorPath.incorrectSelections || 0),
+          averageResponseTime: Number(colorPath.averageResponseTime || 0),
+          observationAccuracy: Number(colorPath.observationAccuracy || 0),
+          observationScore: Number(colorPath.observationScore || 0),
+          visualRecognitionScore: Number(colorPath.visualRecognitionScore || 0),
+          highestDifficulty: Number(colorPath.highestDifficulty || 1),
+          completionPercentage: Number(colorPath.completionPercentage || 0),
+          overallScore: Number(colorPath.overallScore || 0),
+          completionStatus: String(colorPath.completionStatus || 'COMPLETED'),
         };
-        await tx.colorPathAnalytics.upsert({ where: { gameResultId: result.id }, create: { ...data, gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId }, update: data });
+        await tx.colorPathAnalytics.upsert({
+          where: { gameResultId: result.id },
+          create: {
+            ...data,
+            gameResultId: result.id,
+            gameId: result.gameId,
+            studentId,
+            assessmentId: assignment.gameAssessmentId,
+          },
+          update: data,
+        });
       }
       if (magicPaint && result.gameId) {
-        const data={objectsCompleted:Number(magicPaint.objectsCompleted||0),colorsUsed:Array.isArray(magicPaint.colorsUsed)?magicPaint.colorsUsed:[],interactionsPerObject:Array.isArray(magicPaint.interactionsPerObject)?magicPaint.interactionsPerObject:[],averageCompletionTime:Number(magicPaint.averageCompletionTime||0),interactionConsistency:Number(magicPaint.interactionConsistency||0),completionPercentage:Number(magicPaint.completionPercentage||0),creativityScore:Number(magicPaint.creativityScore||0),causeEffectScore:Number(magicPaint.causeEffectScore||0),overallScore:Number(magicPaint.overallScore||0),completionStatus:String(magicPaint.completionStatus||'COMPLETED')};
-        await tx.magicPaintAnalytics.upsert({where:{gameResultId:result.id},create:{...data,gameResultId:result.id,gameId:result.gameId,studentId,assessmentId:assignment.gameAssessmentId},update:data});
+        const data = {
+          objectsCompleted: Number(magicPaint.objectsCompleted || 0),
+          colorsUsed: Array.isArray(magicPaint.colorsUsed)
+            ? magicPaint.colorsUsed
+            : [],
+          interactionsPerObject: Array.isArray(magicPaint.interactionsPerObject)
+            ? magicPaint.interactionsPerObject
+            : [],
+          averageCompletionTime: Number(magicPaint.averageCompletionTime || 0),
+          interactionConsistency: Number(
+            magicPaint.interactionConsistency || 0,
+          ),
+          completionPercentage: Number(magicPaint.completionPercentage || 0),
+          creativityScore: Number(magicPaint.creativityScore || 0),
+          causeEffectScore: Number(magicPaint.causeEffectScore || 0),
+          overallScore: Number(magicPaint.overallScore || 0),
+          completionStatus: String(magicPaint.completionStatus || 'COMPLETED'),
+        };
+        await tx.magicPaintAnalytics.upsert({
+          where: { gameResultId: result.id },
+          create: {
+            ...data,
+            gameResultId: result.id,
+            gameId: result.gameId,
+            studentId,
+            assessmentId: assignment.gameAssessmentId,
+          },
+          update: data,
+        });
       }
       if (trainTrack && result.gameId) {
-        const data={roundsPlayed:Number(trainTrack.roundsPlayed||0),tracksCompleted:Number(trainTrack.tracksCompleted||0),successfulRoutes:Number(trainTrack.successfulRoutes||0),correctRotations:Number(trainTrack.correctRotations||0),incorrectRotations:Number(trainTrack.incorrectRotations||0),averageCompletionTime:Number(trainTrack.averageCompletionTime||0),highestDifficulty:Number(trainTrack.highestDifficulty||1),logicalAccuracy:Number(trainTrack.logicalAccuracy||0),logicalThinkingScore:Number(trainTrack.logicalThinkingScore||0),causeEffectScore:Number(trainTrack.causeEffectScore||0),completionPercentage:Number(trainTrack.completionPercentage||0),overallScore:Number(trainTrack.overallScore||0),completionStatus:String(trainTrack.completionStatus||'COMPLETED')};
-        await tx.trainTrackAnalytics.upsert({where:{gameResultId:result.id},create:{...data,gameResultId:result.id,gameId:result.gameId,studentId,assessmentId:assignment.gameAssessmentId},update:data});
+        const data = {
+          roundsPlayed: Number(trainTrack.roundsPlayed || 0),
+          tracksCompleted: Number(trainTrack.tracksCompleted || 0),
+          successfulRoutes: Number(trainTrack.successfulRoutes || 0),
+          correctRotations: Number(trainTrack.correctRotations || 0),
+          incorrectRotations: Number(trainTrack.incorrectRotations || 0),
+          averageCompletionTime: Number(trainTrack.averageCompletionTime || 0),
+          highestDifficulty: Number(trainTrack.highestDifficulty || 1),
+          logicalAccuracy: Number(trainTrack.logicalAccuracy || 0),
+          logicalThinkingScore: Number(trainTrack.logicalThinkingScore || 0),
+          causeEffectScore: Number(trainTrack.causeEffectScore || 0),
+          completionPercentage: Number(trainTrack.completionPercentage || 0),
+          overallScore: Number(trainTrack.overallScore || 0),
+          completionStatus: String(trainTrack.completionStatus || 'COMPLETED'),
+        };
+        await tx.trainTrackAnalytics.upsert({
+          where: { gameResultId: result.id },
+          create: {
+            ...data,
+            gameResultId: result.id,
+            gameId: result.gameId,
+            studentId,
+            assessmentId: assignment.gameAssessmentId,
+          },
+          update: data,
+        });
       }
       if (packageSorter && result.gameId) {
         const data = {
@@ -726,81 +1584,362 @@ export class GamePlayService {
           highestDifficulty: Number(packageSorter.highestDifficulty || 1),
           completionPercentage: Number(packageSorter.completionPercentage || 0),
           overallScore: Number(packageSorter.overallScore || 0),
-          completionStatus: String(packageSorter.completionStatus || 'COMPLETED'),
+          completionStatus: String(
+            packageSorter.completionStatus || 'COMPLETED',
+          ),
         };
         await tx.packageSorterAnalytics.upsert({
           where: { gameResultId: result.id },
-          create: { ...data, gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId },
+          create: {
+            ...data,
+            gameResultId: result.id,
+            gameId: result.gameId,
+            studentId,
+            assessmentId: assignment.gameAssessmentId,
+          },
           update: data,
         });
       }
       if (rescueMission && result.gameId) {
         const data = {
-          missionsStarted: Number(rescueMission.missionsStarted || 0), missionsCompleted: Number(rescueMission.missionsCompleted || 0), successfulRescues: Number(rescueMission.successfulRescues || 0), unsuccessfulActions: Number(rescueMission.unsuccessfulActions || 0), strategyChanges: Number(rescueMission.strategyChanges || 0), successfulStrategyChanges: Number(rescueMission.successfulStrategyChanges || 0), averageDecisionTime: Number(rescueMission.averageDecisionTime || 0), averageSolutionTime: Number(rescueMission.averageSolutionTime || 0), highestDifficulty: Number(rescueMission.highestDifficulty || 1), problemSolvingScore: Number(rescueMission.problemSolvingScore || 0), cognitiveFlexibilityScore: Number(rescueMission.cognitiveFlexibilityScore || 0), completionPercentage: Number(rescueMission.completionPercentage || 0), overallScore: Number(rescueMission.overallScore || 0), completionStatus: String(rescueMission.completionStatus || 'COMPLETED'),
+          missionsStarted: Number(rescueMission.missionsStarted || 0),
+          missionsCompleted: Number(rescueMission.missionsCompleted || 0),
+          successfulRescues: Number(rescueMission.successfulRescues || 0),
+          unsuccessfulActions: Number(rescueMission.unsuccessfulActions || 0),
+          strategyChanges: Number(rescueMission.strategyChanges || 0),
+          successfulStrategyChanges: Number(
+            rescueMission.successfulStrategyChanges || 0,
+          ),
+          averageDecisionTime: Number(rescueMission.averageDecisionTime || 0),
+          averageSolutionTime: Number(rescueMission.averageSolutionTime || 0),
+          highestDifficulty: Number(rescueMission.highestDifficulty || 1),
+          problemSolvingScore: Number(rescueMission.problemSolvingScore || 0),
+          cognitiveFlexibilityScore: Number(
+            rescueMission.cognitiveFlexibilityScore || 0,
+          ),
+          completionPercentage: Number(rescueMission.completionPercentage || 0),
+          overallScore: Number(rescueMission.overallScore || 0),
+          completionStatus: String(
+            rescueMission.completionStatus || 'COMPLETED',
+          ),
         };
-        await tx.rescueMissionAnalytics.upsert({ where: { gameResultId: result.id }, create: { ...data, gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId }, update: data });
+        await tx.rescueMissionAnalytics.upsert({
+          where: { gameResultId: result.id },
+          create: {
+            ...data,
+            gameResultId: result.id,
+            gameId: result.gameId,
+            studentId,
+            assessmentId: assignment.gameAssessmentId,
+          },
+          update: data,
+        });
       }
       if (parkingEscape && result.gameId) {
-        const data = { levelsStarted: Number(parkingEscape.levelsStarted || 0), levelsCompleted: Number(parkingEscape.levelsCompleted || 0), targetCarsEscaped: Number(parkingEscape.targetCarsEscaped || 0), totalVehicleMoves: Number(parkingEscape.totalVehicleMoves || 0), efficientMoves: Number(parkingEscape.efficientMoves || 0), unnecessaryMoves: Number(parkingEscape.unnecessaryMoves || 0), averageLevelCompletionTime: Number(parkingEscape.averageLevelCompletionTime || 0), highestLevel: Number(parkingEscape.highestLevel || 1), strategicPlanningScore: Number(parkingEscape.strategicPlanningScore || 0), spatialReasoningScore: Number(parkingEscape.spatialReasoningScore || 0), completionPercentage: Number(parkingEscape.completionPercentage || 0), overallScore: Number(parkingEscape.overallScore || 0), completionStatus: String(parkingEscape.completionStatus || 'COMPLETED') };
-        await tx.parkingEscapeAnalytics.upsert({ where: { gameResultId: result.id }, create: { ...data, gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId }, update: data });
+        const data = {
+          levelsStarted: Number(parkingEscape.levelsStarted || 0),
+          levelsCompleted: Number(parkingEscape.levelsCompleted || 0),
+          targetCarsEscaped: Number(parkingEscape.targetCarsEscaped || 0),
+          totalVehicleMoves: Number(parkingEscape.totalVehicleMoves || 0),
+          efficientMoves: Number(parkingEscape.efficientMoves || 0),
+          unnecessaryMoves: Number(parkingEscape.unnecessaryMoves || 0),
+          averageLevelCompletionTime: Number(
+            parkingEscape.averageLevelCompletionTime || 0,
+          ),
+          highestLevel: Number(parkingEscape.highestLevel || 1),
+          strategicPlanningScore: Number(
+            parkingEscape.strategicPlanningScore || 0,
+          ),
+          spatialReasoningScore: Number(
+            parkingEscape.spatialReasoningScore || 0,
+          ),
+          completionPercentage: Number(parkingEscape.completionPercentage || 0),
+          overallScore: Number(parkingEscape.overallScore || 0),
+          completionStatus: String(
+            parkingEscape.completionStatus || 'COMPLETED',
+          ),
+        };
+        await tx.parkingEscapeAnalytics.upsert({
+          where: { gameResultId: result.id },
+          create: {
+            ...data,
+            gameResultId: result.id,
+            gameId: result.gameId,
+            studentId,
+            assessmentId: assignment.gameAssessmentId,
+          },
+          update: data,
+        });
+      }
+      if (ballSort && result.gameId) {
+        const data = {
+          levelsStarted: Number(ballSort.levelsStarted || 0),
+          levelsCompleted: Number(ballSort.levelsCompleted || 0),
+          totalMoves: Number(ballSort.totalMoves || 0),
+          correctMoves: Number(ballSort.correctMoves || 0),
+          incorrectMoves: Number(ballSort.incorrectMoves || 0),
+          completionTime: Number(ballSort.completionTime || 0),
+          highestLevel: Number(ballSort.highestLevel || 1),
+          sortingAccuracy: Number(ballSort.sortingAccuracy || 0),
+          efficiency: Number(ballSort.efficiency || 0),
+          overallScore: Number(ballSort.overallScore || 0),
+          completionStatus: String(ballSort.completionStatus || 'COMPLETED'),
+        };
+        await tx.ballSortAnalytics.upsert({
+          where: { gameResultId: result.id },
+          create: {
+            ...data,
+            gameResultId: result.id,
+            gameId: result.gameId,
+            studentId,
+            assessmentId: assignment.gameAssessmentId,
+          },
+          update: data,
+        });
+      }
+      if (redLightGreenLight && result.gameId) {
+        const data = {
+          greenLightEvents: Number(redLightGreenLight.greenLightEvents || 0),
+          redLightEvents: Number(redLightGreenLight.redLightEvents || 0),
+          correctStarts: Number(redLightGreenLight.correctStarts || 0),
+          correctStops: Number(redLightGreenLight.correctStops || 0),
+          prematureMovements: Number(redLightGreenLight.prematureMovements || 0),
+          averageStartReactionTime: Number(redLightGreenLight.averageStartReactionTime || 0),
+          averageStopReactionTime: Number(redLightGreenLight.averageStopReactionTime || 0),
+          progress: Number(redLightGreenLight.progress || 0),
+          difficultyReached: Number(redLightGreenLight.difficultyReached || 1),
+          overallScore: Number(redLightGreenLight.overallScore || 0),
+          completionStatus: String(redLightGreenLight.completionStatus || 'COMPLETED'),
+        };
+        await tx.redLightGreenLightAnalytics.upsert({
+          where: { gameResultId: result.id },
+          create: {
+            ...data,
+            gameResultId: result.id,
+            gameId: result.gameId,
+            studentId,
+            assessmentId: assignment.gameAssessmentId,
+          },
+          update: data,
+        });
       }
       if (waterPipeline && result.gameId) {
-        const data={levelsStarted:Number(waterPipeline.levelsStarted||0),levelsCompleted:Number(waterPipeline.levelsCompleted||0),pipesRotated:Number(waterPipeline.pipesRotated||0),successfulConnections:Number(waterPipeline.successfulConnections||0),failedConnections:Number(waterPipeline.failedConnections||0),completedPipelines:Number(waterPipeline.completedPipelines||0),averageSolutionTime:Number(waterPipeline.averageSolutionTime||0),averageRotationsPerLevel:Number(waterPipeline.averageRotationsPerLevel||0),highestLevel:Number(waterPipeline.highestLevel||1),logicalReasoningScore:Number(waterPipeline.logicalReasoningScore||0),problemSolvingScore:Number(waterPipeline.problemSolvingScore||0),completionPercentage:Number(waterPipeline.completionPercentage||0),overallScore:Number(waterPipeline.overallScore||0),completionStatus:String(waterPipeline.completionStatus||'COMPLETED')};
-        await tx.waterPipelineAnalytics.upsert({where:{gameResultId:result.id},create:{...data,gameResultId:result.id,gameId:result.gameId,studentId,assessmentId:assignment.gameAssessmentId},update:data});
+        const data = {
+          levelsStarted: Number(waterPipeline.levelsStarted || 0),
+          levelsCompleted: Number(waterPipeline.levelsCompleted || 0),
+          pipesRotated: Number(waterPipeline.pipesRotated || 0),
+          successfulConnections: Number(
+            waterPipeline.successfulConnections || 0,
+          ),
+          failedConnections: Number(waterPipeline.failedConnections || 0),
+          completedPipelines: Number(waterPipeline.completedPipelines || 0),
+          averageSolutionTime: Number(waterPipeline.averageSolutionTime || 0),
+          averageRotationsPerLevel: Number(
+            waterPipeline.averageRotationsPerLevel || 0,
+          ),
+          highestLevel: Number(waterPipeline.highestLevel || 1),
+          logicalReasoningScore: Number(
+            waterPipeline.logicalReasoningScore || 0,
+          ),
+          problemSolvingScore: Number(waterPipeline.problemSolvingScore || 0),
+          completionPercentage: Number(waterPipeline.completionPercentage || 0),
+          overallScore: Number(waterPipeline.overallScore || 0),
+          completionStatus: String(
+            waterPipeline.completionStatus || 'COMPLETED',
+          ),
+        };
+        await tx.waterPipelineAnalytics.upsert({
+          where: { gameResultId: result.id },
+          create: {
+            ...data,
+            gameResultId: result.id,
+            gameId: result.gameId,
+            studentId,
+            assessmentId: assignment.gameAssessmentId,
+          },
+          update: data,
+        });
+      }
+      if (patternMatrix && result.gameId) {
+        const data = {
+          ageGroup: '5–7 Years',
+          roundsPresented: Number(patternMatrix.roundsPresented || 0),
+          roundsCompleted: Number(patternMatrix.roundsCompleted || 0),
+          correctCells: Number(patternMatrix.correctCells || 0),
+          missedCells: Number(patternMatrix.missedCells || 0),
+          incorrectCells: Number(patternMatrix.incorrectCells || 0),
+          totalActions: Number(patternMatrix.totalActions || 0),
+          averageResponseTime: Number(patternMatrix.averageResponseTime || 0),
+          highestDifficulty: Number(patternMatrix.highestDifficulty || 1),
+          accuracy: Number(patternMatrix.accuracy || 0),
+          visualMemoryScore: Number(patternMatrix.visualMemoryScore || 0),
+          attentionScore: Number(patternMatrix.attentionScore || 0),
+          spatialRecallScore: Number(patternMatrix.spatialRecallScore || 0),
+          processingSpeedScore: Number(patternMatrix.processingSpeedScore || 0),
+          completionPercentage: Number(patternMatrix.completionPercentage || 0),
+          overallScore: Number(patternMatrix.overallScore || 0),
+          completionStatus: String(patternMatrix.completionStatus || 'COMPLETED'),
+          startedAt: session.startedAt || new Date(),
+          completedAt: session.completedAt || new Date(),
+        };
+        await tx.patternMatrixAnalytics.upsert({
+          where: { gameResultId: result.id },
+          create: { ...data, gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId },
+          update: data,
+        });
+      }
+      if (numberBuilder && result.gameId) {
+        const data = {
+          ageGroup: '5–7 Years',
+          roundsPresented: Number(numberBuilder.roundsPresented || 0),
+          roundsCompleted: Number(numberBuilder.roundsCompleted || 0),
+          correctInteractions: Number(numberBuilder.correctInteractions || 0),
+          incorrectInteractions: Number(numberBuilder.incorrectInteractions || 0),
+          totalScore: Number(numberBuilder.totalScore || 0),
+          accuracy: Number(numberBuilder.accuracy || 0),
+          averageResponseTime: Number(numberBuilder.averageResponseTime || 0),
+          highestDifficulty: Number(numberBuilder.highestDifficulty || 1),
+          numberRangeReached: Number(numberBuilder.numberRangeReached || 5),
+          earlyNumeracyScore: Number(numberBuilder.earlyNumeracyScore || 0),
+          numberSenseScore: Number(numberBuilder.numberSenseScore || 0),
+          countingScore: Number(numberBuilder.countingScore || 0),
+          sequencingScore: Number(numberBuilder.sequencingScore || 0),
+          quantityComparisonScore: Number(numberBuilder.quantityComparisonScore || 0),
+          attentionScore: Number(numberBuilder.attentionScore || 0),
+          processingSpeedScore: Number(numberBuilder.processingSpeedScore || 0),
+          accuracyScore: Number(numberBuilder.accuracyScore || 0),
+          overallScore: Number(numberBuilder.overallScore || 0),
+          completionStatus: String(numberBuilder.completionStatus || 'COMPLETED'),
+          startedAt: session.startedAt || new Date(),
+          completedAt: session.completedAt || new Date(),
+        };
+        await tx.numberBuilderAnalytics.upsert({
+          where: { gameResultId: result.id },
+          create: { ...data, gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId },
+          update: data,
+        });
       }
       if (attempt) {
-        await tx.gameAttempt.update({ where: { id: attempt.id }, data: { submittedAt: new Date(), state: session.runtimeState as Prisma.InputJsonValue } });
-        await tx.gameScore.create({ data: {
-          gameAttemptId: attempt.id,
-          gameKey: assignment.generatedGame?.engineKey || 'GAME',
-          score: session.score,
-          maxScore: cognitive ? 100 : total * 10,
-          timeTaken: session.elapsedSeconds,
-          details: { ...(cognitive || { answered, correct: runtime?.correct || 0, incorrect: runtime?.incorrect || 0 }), percentage, passed } as Prisma.InputJsonValue,
-        } });
+        await tx.gameAttempt.update({
+          where: { id: attempt.id },
+          data: {
+            submittedAt: new Date(),
+            state: session.runtimeState as Prisma.InputJsonValue,
+          },
+        });
+        await tx.gameScore.create({
+          data: {
+            gameAttemptId: attempt.id,
+            gameKey: assignment.generatedGame?.engineKey || 'GAME',
+            score: session.score,
+            maxScore: cognitive ? 100 : total * 10,
+            timeTaken: session.elapsedSeconds,
+            details: {
+              ...(cognitive || {
+                answered,
+                correct: runtime?.correct || 0,
+                incorrect: runtime?.incorrect || 0,
+              }),
+              percentage,
+              passed,
+            } as Prisma.InputJsonValue,
+          },
+        });
       }
     });
     const rewards = await this.insights.processResult(result.id, schoolId);
-    return { score: session.score, percentage, passed, answered, total, timeTaken: session.elapsedSeconds, status: 'COMPLETED', rewards };
+    return {
+      score: session.score,
+      percentage,
+      passed,
+      answered,
+      total,
+      timeTaken: session.elapsedSeconds,
+      status: 'COMPLETED',
+      rewards,
+    };
   }
 
-  private async assignmentForStudent(id: string, schoolId: string, studentId: string) {
-    const assignment = await this.prisma.gameAssignment.findFirst({ where: { id, gameAssessment: { schoolId } }, include: { generatedGame: true, gameAssessment: true, results: { where: { studentId }, include: { attempts: true } } } });
+  private async assignmentForStudent(
+    id: string,
+    schoolId: string,
+    studentId: string,
+  ) {
+    const assignment = await this.prisma.gameAssignment.findFirst({
+      where: { id, gameAssessment: { schoolId } },
+      include: {
+        generatedGame: true,
+        gameAssessment: true,
+        results: { where: { studentId }, include: { attempts: true } },
+      },
+    });
     if (!assignment) throw new NotFoundException('Game assignment not found.');
-    if (assignment.targetType === 'STUDENT' && !assignment.targetIds.includes(studentId)) throw new ForbiddenException('This game is not assigned to you.');
+    if (
+      assignment.targetType === 'STUDENT' &&
+      !assignment.targetIds.includes(studentId)
+    )
+      throw new ForbiddenException('This game is not assigned to you.');
     return assignment;
   }
-  private async parentChild(childId: string, schoolId: string, parentId: string) {
-    const child = await this.prisma.application.findFirst({ where: { id: childId, schoolId, parentId }, select: { id: true } });
-    if (!child) throw new ForbiddenException('This student is not linked to your parent account.');
+  private async parentChild(
+    childId: string,
+    schoolId: string,
+    parentId: string,
+  ) {
+    const child = await this.prisma.application.findFirst({
+      where: { id: childId, schoolId, parentId },
+      select: { id: true },
+    });
+    if (!child)
+      throw new ForbiddenException(
+        'This student is not linked to your parent account.',
+      );
     return child;
   }
   private sequenceGroup(assignment: any) {
-    return String(assignment.gameAssessment?.settings?.source || '').startsWith('REAL_TIME_GAMES') ? 'GAMES' : 'ASSESSMENTS';
+    return String(assignment.gameAssessment?.settings?.source || '').startsWith(
+      'REAL_TIME_GAMES',
+    )
+      ? 'GAMES'
+      : 'ASSESSMENTS';
   }
   private withSequentialAvailability(assignments: any[], studentId?: string) {
     const groups = new Map<string, any[]>();
     for (const assignment of assignments) {
-      const childId = studentId || assignment.child?.id || assignment.result?.studentId;
+      const childId =
+        studentId || assignment.child?.id || assignment.result?.studentId;
       const key = `${childId}:${this.sequenceGroup(assignment)}`;
       const group = groups.get(key) || [];
       group.push(assignment);
       groups.set(key, group);
     }
     for (const group of groups.values()) {
-      group.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      group.sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      );
       let waitingForPrevious = false;
       group.forEach((assignment, index) => {
         assignment.sequence = { position: index + 1, total: group.length };
         if (waitingForPrevious && assignment.result?.status !== 'COMPLETED') {
-          assignment.availability = { ...assignment.availability, available: false, reason: 'Complete the previous game first.', sequenceLocked: true };
+          assignment.availability = {
+            ...assignment.availability,
+            available: false,
+            reason: 'Complete the previous game first.',
+            sequenceLocked: true,
+          };
         }
-        if (assignment.result?.status !== 'COMPLETED') waitingForPrevious = true;
+        if (assignment.result?.status !== 'COMPLETED')
+          waitingForPrevious = true;
       });
     }
     return assignments;
   }
-  private async assertSequentialAccess(assignment: any, schoolId: string, studentId: string) {
+  private async assertSequentialAccess(
+    assignment: any,
+    schoolId: string,
+    studentId: string,
+  ) {
     if (assignment.results?.[0]?.status === 'IN_PROGRESS') return;
     const source = String(assignment.gameAssessment?.settings?.source || '');
     const regularGame = source.startsWith('REAL_TIME_GAMES');
@@ -810,42 +1949,87 @@ export class GamePlayService {
         createdAt: { lt: assignment.createdAt },
         status: 'ASSIGNED',
         gameAssessment: { schoolId },
-        OR: [{ targetType: 'STUDENT', targetIds: { has: studentId } }, { results: { some: { studentId } } }],
+        OR: [
+          { targetType: 'STUDENT', targetIds: { has: studentId } },
+          { results: { some: { studentId } } },
+        ],
       },
-      include: { gameAssessment: true, results: { where: { studentId }, select: { status: true } } },
+      include: {
+        gameAssessment: true,
+        results: { where: { studentId }, select: { status: true } },
+      },
       orderBy: { createdAt: 'asc' },
     });
-    const incomplete = earlier.find((candidate) =>
-      String(candidate.gameAssessment?.settings && (candidate.gameAssessment.settings as any).source || '').startsWith('REAL_TIME_GAMES') === regularGame
-      && candidate.results[0]?.status !== 'COMPLETED',
+    const incomplete = earlier.find(
+      (candidate) =>
+        String(
+          (candidate.gameAssessment?.settings &&
+            (candidate.gameAssessment.settings as any).source) ||
+            '',
+        ).startsWith('REAL_TIME_GAMES') === regularGame &&
+        candidate.results[0]?.status !== 'COMPLETED',
     );
-    if (incomplete) throw new BadRequestException('Complete the previous game first. Games must be played in their assigned order.');
+    if (incomplete)
+      throw new BadRequestException(
+        'Complete the previous game first. Games must be played in their assigned order.',
+      );
   }
   private availability(assignment: any, result?: any) {
     const now = new Date();
-    if (assignment.status !== 'ASSIGNED') return { available: false, reason: 'Assignment is not active.' };
-    if (assignment.startDate && now < assignment.startDate) return { available: false, reason: 'Assignment has not started.' };
-    if (assignment.endDate && now > assignment.endDate) return { available: false, reason: 'Assignment has ended.' };
+    if (assignment.status !== 'ASSIGNED')
+      return { available: false, reason: 'Assignment is not active.' };
+    if (assignment.startDate && now < assignment.startDate)
+      return { available: false, reason: 'Assignment has not started.' };
+    if (assignment.endDate && now > assignment.endDate)
+      return { available: false, reason: 'Assignment has ended.' };
     const attemptsUsed = Number(result?.attempts?.length || 0);
     const permittedAttempts = 1 + Number(assignment.allowedReassessments || 0);
     if (result?.finalSubmittedAt && result.reviewStatus === 'REVIEWED') {
-      return { available: false, reason: 'The school review has been published.', attemptsUsed, remainingReassessments: 0 };
+      return {
+        available: false,
+        reason: 'The school review has been published.',
+        attemptsUsed,
+        remainingReassessments: 0,
+      };
     }
     if (result?.status !== 'IN_PROGRESS' && attemptsUsed >= permittedAttempts) {
-      return { available: false, reason: 'No reassessments remaining.', attemptsUsed, remainingReassessments: 0 };
+      return {
+        available: false,
+        reason: 'No reassessments remaining.',
+        attemptsUsed,
+        remainingReassessments: 0,
+      };
     }
-    return { available: true, reason: null, attemptsUsed, remainingReassessments: Math.max(0, permittedAttempts - attemptsUsed) };
+    return {
+      available: true,
+      reason: null,
+      attemptsUsed,
+      remainingReassessments: Math.max(0, permittedAttempts - attemptsUsed),
+    };
   }
 
   private attemptSummary(assignment: any, result?: any) {
     const attempts = result?.attempts || [];
-    const percentages = attempts.map((attempt: any) => {
-      const score = attempt.scores?.[0];
-      const details = (score?.details || {}) as Record<string, any>;
-      return score ? Number(details.percentage ?? (Number(score.maxScore) > 0 ? Math.min(100, Number(score.score) / Number(score.maxScore) * 100) : 0)) : null;
-    }).filter((value: number | null): value is number => value !== null);
+    const percentages = attempts
+      .map((attempt: any) => {
+        const score = attempt.scores?.[0];
+        const details = (score?.details || {}) as Record<string, any>;
+        return score
+          ? Number(
+              details.percentage ??
+                (Number(score.maxScore) > 0
+                  ? Math.min(
+                      100,
+                      (Number(score.score) / Number(score.maxScore)) * 100,
+                    )
+                  : 0),
+            )
+          : null;
+      })
+      .filter((value: number | null): value is number => value !== null);
     const attemptsUsed = attempts.length;
-    const totalPossibleAttempts = 1 + Number(assignment.allowedReassessments || 0);
+    const totalPossibleAttempts =
+      1 + Number(assignment.allowedReassessments || 0);
     return {
       attemptsUsed,
       remainingReassessments: Math.max(0, totalPossibleAttempts - attemptsUsed),

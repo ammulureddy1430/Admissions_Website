@@ -1,0 +1,395 @@
+.rlgl-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at center, #0e2439 0%, #050b12 100%);
+  color: #ffffff;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  overflow: hidden;
+  position: relative;
+  user-select: none;
+  padding: 24px;
+}
+
+/* HUD bar */
+.rlgl-hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 900px;
+  background: rgba(14, 36, 57, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  padding: 16px 24px;
+  border-radius: 24px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  z-index: 10;
+}
+
+.rlgl-level {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rlgl-level span {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #34d399;
+}
+
+.rlgl-level b {
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.rlgl-timer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  padding: 8px 16px;
+  border-radius: 12px;
+  color: #ef4444;
+  font-weight: 800;
+  font-size: 18px;
+}
+
+/* Signal Light Display */
+.rlgl-signal-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  z-index: 5;
+}
+
+.rlgl-light-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #111b27;
+  border: 4px solid #1f2e3f;
+  padding: 16px 36px;
+  border-radius: 30px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4),
+              inset 0 4px 10px rgba(0, 0, 0, 0.5);
+  gap: 24px;
+}
+
+.rlgl-light-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #19232e;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+  transition: all 0.2s ease-in-out;
+}
+
+.rlgl-light-circle.green.active {
+  background: #10b981;
+  box-shadow: 0 0 24px #10b981, 0 0 40px rgba(16, 185, 129, 0.5);
+}
+
+.rlgl-light-circle.red.active {
+  background: #ef4444;
+  box-shadow: 0 0 24px #ef4444, 0 0 40px rgba(239, 68, 68, 0.5);
+}
+
+.rlgl-signal-status {
+  font-size: 14px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.rlgl-signal-status.green {
+  color: #34d399;
+  text-shadow: 0 0 8px rgba(52, 211, 153, 0.4);
+}
+
+.rlgl-signal-status.red {
+  color: #f87171;
+  text-shadow: 0 0 8px rgba(248, 113, 113, 0.4);
+}
+
+/* Road Area */
+.rlgl-playfield {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  max-width: 900px;
+  flex-grow: 1;
+  padding: 20px 0;
+  position: relative;
+}
+
+.rlgl-track-lane {
+  width: 100%;
+  height: 120px;
+  background: rgba(255, 255, 255, 0.03);
+  border-top: 4px dashed rgba(255, 255, 255, 0.1);
+  border-bottom: 4px dashed rgba(255, 255, 255, 0.1);
+  position: relative;
+  border-radius: 12px;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.2);
+}
+
+.rlgl-character {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 64px;
+  height: 64px;
+  font-size: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: left 0.1s linear;
+  z-index: 5;
+}
+
+.rlgl-character.walking {
+  animation: rlglWalk 0.3s steps(2) infinite;
+}
+
+@keyframes rlglWalk {
+  0% { transform: translateY(-50%) rotate(0deg); }
+  50% { transform: translateY(-50%) rotate(-4deg); }
+  100% { transform: translateY(-50%) rotate(4deg); }
+}
+
+.rlgl-finish-gate {
+  position: absolute;
+  right: 16px;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  background: repeating-linear-gradient(
+    45deg,
+    #ffffff,
+    #ffffff 10px,
+    #111b27 10px,
+    #111b27 20px
+  );
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+}
+
+.rlgl-finish-label {
+  position: absolute;
+  right: 36px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+/* Control Panel */
+.rlgl-controls-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  z-index: 10;
+}
+
+.rlgl-hold-btn {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  border: 6px solid #10b981;
+  background: radial-gradient(circle at center, #059669 0%, #065f46 100%);
+  box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3),
+              inset 0 4px 10px rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.rlgl-hold-btn:active {
+  transform: scale(0.92);
+  border-color: #34d399;
+  background: radial-gradient(circle at center, #10b981 0%, #047857 100%);
+  box-shadow: 0 5px 12px rgba(16, 185, 129, 0.2),
+              inset 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.rlgl-hold-btn.danger-state {
+  border-color: #ef4444;
+  background: radial-gradient(circle at center, #dc2626 0%, #991b1b 100%);
+  box-shadow: 0 10px 25px rgba(239, 68, 68, 0.3);
+}
+
+.rlgl-hold-btn.danger-state:active {
+  border-color: #f87171;
+  background: radial-gradient(circle at center, #ef4444 0%, #7f1d1d 100%);
+  box-shadow: 0 5px 12px rgba(239, 68, 68, 0.2);
+}
+
+.rlgl-hold-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Screens / Overlays */
+.rlgl-intro {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 11, 18, 0.96);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(16px);
+}
+
+.rlgl-intro-card {
+  width: 100%;
+  max-width: 480px;
+  background: #0d2439;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 40px;
+  border-radius: 32px;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  animation: rlglScaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes rlglScaleUp {
+  0% { transform: scale(0.9); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.rlgl-intro-mark {
+  font-size: 52px;
+  margin-bottom: 16px;
+}
+
+.rlgl-intro-card p {
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+  color: #34d399;
+  letter-spacing: 2px;
+  margin: 0 0 12px 0;
+}
+
+.rlgl-intro-card h2 {
+  font-size: 32px;
+  font-weight: 900;
+  color: #ffffff;
+  margin: 0 0 16px 0;
+}
+
+.rlgl-intro-copy {
+  font-size: 14px;
+  color: #94a3b8;
+  line-height: 1.6;
+  display: block;
+  margin-bottom: 32px;
+}
+
+.rlgl-intro-card button {
+  background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 900;
+  border: none;
+  padding: 16px 36px;
+  border-radius: 16px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(52, 211, 153, 0.3);
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rlgl-intro-card button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(52, 211, 153, 0.4);
+}
+
+/* Celebration Overlay */
+.rlgl-celebration {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 11, 18, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 80;
+  font-size: 40px;
+  font-weight: 900;
+  color: #34d399;
+  backdrop-filter: blur(8px);
+  animation: rlglFadeIn 0.2s;
+}
+
+@keyframes rlglFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Finish Screen */
+.rlgl-finish {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, #0b1a29 0%, #03060a 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 90;
+  text-align: center;
+}
+
+.rlgl-finish div {
+  max-width: 360px;
+  padding: 40px;
+  background: #0d2439;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 28px;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+}
+
+.rlgl-finish span {
+  font-size: 64px;
+  display: block;
+  margin-bottom: 20px;
+}
+
+.rlgl-finish h2 {
+  font-size: 28px;
+  font-weight: 900;
+  margin: 0 0 12px 0;
+}
+
+.rlgl-finish p {
+  font-size: 14px;
+  color: #94a3b8;
+  margin: 0;
+}

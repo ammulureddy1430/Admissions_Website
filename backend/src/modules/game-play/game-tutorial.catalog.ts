@@ -29,6 +29,25 @@ export const GAME_TUTORIALS: Record<string, TutorialCopy> = {
   RESCUE_MISSION: { category: 'Problem Solving & Cognitive Flexibility', icon: '🐾', objective: 'Use the rescue tools inside each scene to help the friendly character.', skills: ['Problem Solving', 'Cognitive Flexibility'], steps: ['Look at the friendly scene.', 'Tap a tool to see what it does.', 'Change tools when the situation needs a different approach.', 'Continue helping new characters until time ends.'], controls: { desktop: ['Click a rescue tool'], touch: ['Tap a rescue tool'] }, avoid: ['Using the same tool for every scene'], strategy: 'Look at what blocks the character, then choose a tool whose shape can help.' },
   PARKING_ESCAPE: { category: 'Strategic Planning & Spatial Reasoning', icon: '🚗', objective: 'Create an open route so the highlighted car can leave through the exit.', skills: ['Strategic Planning', 'Spatial Reasoning'], steps: ['Find the highlighted car and exit.', 'Inspect the available parking spaces.', 'Drag vehicles only along their parking direction.', 'Continue until the highlighted car can leave.'], controls: { desktop: ['Drag a vehicle along its lane'], touch: ['Touch and drag along the lane'] }, avoid: ['Moving vehicles without checking the space they need'], strategy: 'Study the whole parking area and plan several moves before dragging.' },
   WATER_PIPELINE: { category: 'Logical Reasoning & Problem Solving', icon: '💧', objective: 'Turn the pipe pieces until water has one connected route from the tank to the garden.', skills: ['Logical Reasoning', 'Problem Solving'], steps: ['Find the water tank and garden.', 'Look at every pipe opening.', 'Tap pipes to rotate them.', 'Continue adjusting until water reaches the garden.'], controls: { desktop: ['Click a pipe to rotate it'], touch: ['Tap a pipe to rotate it'] }, avoid: ['Rotating without following the connected route'], strategy: 'Trace the route from the water tank one pipe at a time.' },
+  PATTERN_MATRIX: { category: 'Visual Memory & Pattern Recognition', icon: '🟦', objective: 'Remember the glowing tiles and select the same positions after they hide.', skills: ['Visual Memory', 'Attention', 'Spatial Recall', 'Processing Speed'], steps: ['Watch the glowing tiles carefully.', 'Wait for the tiles to hide.', 'Tap every position you remember.', 'Select Continue to move to the next challenge.'], controls: { desktop: ['Click tiles to select or clear them'], touch: ['Tap tiles to select or clear them'] }, avoid: ['Looking away while the pattern is visible'], strategy: 'Notice the shape and position of the whole pattern.' },
+  NUMBER_BUILDER: {
+    category: 'Early Numeracy',
+    icon: '🔢',
+    objective: 'Interact directly with numbers and objects to build quantities, sequences, and comparisons.',
+    skills: ['Early Numeracy', 'Number Sense', 'Counting', 'Sequencing', 'Quantity Comparison', 'Attention', 'Processing Speed', 'Accuracy'],
+    steps: [
+      'Read the visual instruction at the top.',
+      'Interact with the objects or numbers directly (drag-and-drop or select).',
+      'Make sure the quantity, sequence, or comparison is correct.',
+      'Complete as many challenges as you can before the time runs out.'
+    ],
+    controls: {
+      desktop: ['Click and drag objects, or click numbers to place them'],
+      touch: ['Touch and drag objects, or tap numbers to place them']
+    },
+    avoid: ['Rushing without counting the visual items'],
+    strategy: 'Count the visual objects carefully before matching or submitting.'
+  },
 };
 
 export function tutorialFor(engineKey: string): TutorialCopy {

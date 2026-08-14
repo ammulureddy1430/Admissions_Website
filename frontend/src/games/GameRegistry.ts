@@ -105,10 +105,7 @@ registerGame({
   componentName: "MAGIC_TRAIN",
   load: () => import("./magic-train/Game"),
 });
-registerGame({
-  componentName: "ROOM_DESIGNER",
-  load: () => import("./room-designer/Game"),
-});
+
 registerGame({
   componentName: "RESCUE_MISSION",
   load: () => import("./rescue-mission/Game"),
@@ -120,6 +117,22 @@ registerGame({
 registerGame({
   componentName: "WATER_PIPELINE",
   load: () => import("./water-pipeline/Game"),
+});
+registerGame({
+  componentName: "PATTERN_MATRIX",
+  load: () => import("./pattern-matrix/Game"),
+});
+registerGame({
+  componentName: "NUMBER_BUILDER",
+  load: () => import("./number-builder/Game"),
+});
+registerGame({
+  componentName: "BALL_SORT",
+  load: () => import("./ball-sort/Game"),
+});
+registerGame({
+  componentName: "RED_LIGHT_GREEN_LIGHT",
+  load: () => import("./red-light-green-light/Game"),
 });
 registerGame({
   componentName: "RACING_GAME",

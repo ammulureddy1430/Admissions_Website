@@ -73,9 +73,10 @@ const describeGamePlay = (game: { componentName?: string; name?: string; ageGrou
   PACKAGE_SORTER: "The student sorts moving packages into the correct destinations. The game records correct and incorrect deliveries, organization, decision-making, and decision time.",
   RESCUE_MISSION: "The student chooses tools and actions to complete friendly rescue scenarios. The game records successful rescues, problem-solving choices, strategy changes, and solution time.",
   PARKING_ESCAPE: "The student moves vehicles to clear a path for the target car. The game records levels completed, efficient and unnecessary moves, planning, spatial reasoning, and completion time.",
+  BALL_SORT: "The student sorts mixed colored balls into containers so that each container contains balls of a single color. The game records levels completed, total/correct/incorrect moves, sorting accuracy, planning, visual discrimination, and completion time.",
+  RED_LIGHT_GREEN_LIGHT: "The student controls a character on screen by holding down a button to walk forward during Green Light signals, and releasing the button to freeze immediately during Red Light signals. The game records starts, stops, reaction speeds, and premature movement violations.",
   WATER_PIPELINE: "The student rotates pipe pieces to connect a complete water route. The game records successful connections, failed connections, rotations, logical reasoning, and solution time.",
   MAGIC_TRAIN: "The student builds a train by recognizing and continuing visual patterns. The game records sequence completion, pattern accuracy, and progression.",
-  ROOM_DESIGNER: "The student studies a room and places furniture to recreate it. The game records visual-memory accuracy, placement choices, and planning performance.",
 } as Record<string, string>)[game?.componentName || ""] || `The student completes the interactive ${game?.name || "game"} tasks designed for ${game?.ageGroup || "the assigned age group"}. The game records submitted progress and performance metrics as the student plays.`;
 const formatGameMetricLabel = (key: string) => ({
   colorsUsed: "Colors explored",

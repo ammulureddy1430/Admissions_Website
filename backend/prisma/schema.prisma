@@ -174,6 +174,10 @@ model Game {
   rescueMissionAnalytics  RescueMissionAnalytics[]
   parkingEscapeAnalytics  ParkingEscapeAnalytics[]
   waterPipelineAnalytics  WaterPipelineAnalytics[]
+  patternMatrixAnalytics  PatternMatrixAnalytics[]
+  numberBuilderAnalytics  NumberBuilderAnalytics[]
+  ballSortAnalytics       BallSortAnalytics[]
+  redLightGreenLightAnalytics RedLightGreenLightAnalytics[]
   realTimeAssignments     RealTimeGameAssignment[]
   createdAt               DateTime                  @default(now()) @map("created_at")
   updatedAt               DateTime                  @updatedAt @map("updated_at")
@@ -258,29 +262,29 @@ model GameQuestion {
 }
 
 model GameAssignment {
-  id                 String             @id @default(uuid())
-  gameAssessmentId   String
-  gameAssessment     GameAssessment     @relation(fields: [gameAssessmentId], references: [id], onDelete: Cascade)
-  generatedGameId    String?
-  generatedGame      GeneratedGame?     @relation(fields: [generatedGameId], references: [id], onDelete: Cascade)
-  assignedById       String
-  targetType         String
-  targetIds          String[]
-  scheduledAt        DateTime?
-  dueDate            DateTime?
-  startDate          DateTime?
-  endDate            DateTime?
-  maxAttempts        Int                @default(1)
-  allowedReassessments Int              @default(0)
-  timeLimitMinutes   Int?
-  passingScore       Float              @default(60)
-  allowRestart       Boolean            @default(false)
-  assignmentSettings Json?
-  status             String             @default("ASSIGNED")
-  results            GameResult[]
-  notifications      GameNotification[]
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  id                   String             @id @default(uuid())
+  gameAssessmentId     String
+  gameAssessment       GameAssessment     @relation(fields: [gameAssessmentId], references: [id], onDelete: Cascade)
+  generatedGameId      String?
+  generatedGame        GeneratedGame?     @relation(fields: [generatedGameId], references: [id], onDelete: Cascade)
+  assignedById         String
+  targetType           String
+  targetIds            String[]
+  scheduledAt          DateTime?
+  dueDate              DateTime?
+  startDate            DateTime?
+  endDate              DateTime?
+  maxAttempts          Int                @default(1)
+  allowedReassessments Int                @default(0)
+  timeLimitMinutes     Int?
+  passingScore         Float              @default(60)
+  allowRestart         Boolean            @default(false)
+  assignmentSettings   Json?
+  status               String             @default("ASSIGNED")
+  results              GameResult[]
+  notifications        GameNotification[]
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
   @@index([gameAssessmentId, status])
   @@index([generatedGameId, status])
@@ -327,6 +331,10 @@ model GameResult {
   rescueMissionAnalytics    RescueMissionAnalytics?
   parkingEscapeAnalytics    ParkingEscapeAnalytics?
   waterPipelineAnalytics    WaterPipelineAnalytics?
+  patternMatrixAnalytics    PatternMatrixAnalytics?
+  numberBuilderAnalytics    NumberBuilderAnalytics?
+  ballSortAnalytics         BallSortAnalytics?
+  redLightGreenLightAnalytics RedLightGreenLightAnalytics?
   createdAt                 DateTime                 @default(now())
   updatedAt                 DateTime                 @updatedAt
 
@@ -3234,6 +3242,60 @@ model ParkingEscapeAnalytics {
   @@map("ParkingEscapeAnalytics")
 }
 
+model BallSortAnalytics {
+  id               String     @id @default(uuid())
+  studentId        String
+  assessmentId     String
+  gameId           String
+  gameResultId     String     @unique
+  gameResult       GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
+  game             Game       @relation(fields: [gameId], references: [id])
+  levelsStarted    Int
+  levelsCompleted  Int
+  totalMoves       Int
+  correctMoves     Int
+  incorrectMoves   Int
+  completionTime   Float
+  highestLevel     Int
+  sortingAccuracy  Float
+  efficiency       Float
+  overallScore     Float
+  completionStatus String
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@index([gameId, assessmentId])
+  @@index([studentId, assessmentId])
+  @@map("BallSortAnalytics")
+}
+
+model RedLightGreenLightAnalytics {
+  id                      String     @id @default(uuid())
+  studentId               String
+  assessmentId            String
+  gameId                  String
+  gameResultId            String     @unique
+  gameResult              GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
+  game                    Game       @relation(fields: [gameId], references: [id])
+  greenLightEvents        Int
+  redLightEvents          Int
+  correctStarts           Int
+  correctStops            Int
+  prematureMovements      Int
+  averageStartReactionTime Float
+  averageStopReactionTime  Float
+  progress                Float
+  difficultyReached       Int
+  overallScore            Float
+  completionStatus        String
+  createdAt               DateTime   @default(now())
+  updatedAt               DateTime   @updatedAt
+
+  @@index([gameId, assessmentId])
+  @@index([studentId, assessmentId])
+  @@map("RedLightGreenLightAnalytics")
+}
+
 model WaterPipelineAnalytics {
   id                       String     @id @default(uuid())
   studentId                String
@@ -3262,4 +3324,82 @@ model WaterPipelineAnalytics {
   @@index([gameId, assessmentId])
   @@index([studentId, assessmentId])
   @@map("WaterPipelineAnalytics")
+}
+
+model PatternMatrixAnalytics {
+  id                   String     @id @default(uuid())
+  studentId            String
+  assessmentId         String
+  gameId               String
+  gameResultId         String     @unique
+  gameResult           GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
+  game                 Game       @relation(fields: [gameId], references: [id])
+  ageGroup             String
+  roundsPresented      Int
+  roundsCompleted      Int
+  correctCells         Int
+  missedCells          Int
+  incorrectCells       Int
+  totalActions         Int
+  averageResponseTime  Float
+  highestDifficulty    Int
+  accuracy             Float
+  visualMemoryScore    Float
+  attentionScore       Float
+  spatialRecallScore   Float
+  processingSpeedScore Float
+  completionPercentage Float
+  overallScore         Float
+  completionStatus     String
+  startedAt            DateTime
+  completedAt          DateTime
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  @@index([gameId, assessmentId])
+  @@index([studentId, assessmentId])
+  @@map("PatternMatrixAnalytics")
+}
+
+model NumberBuilderAnalytics {
+  id                      String     @id @default(uuid())
+  studentId               String
+  assessmentId            String
+  gameId                  String
+  gameResultId            String     @unique
+  gameResult              GameResult @relation(fields: [gameResultId], references: [id], onDelete: Cascade)
+  game                    Game       @relation(fields: [gameId], references: [id])
+  ageGroup                String     @default("5–7 Years")
+  
+  // Gameplay metrics
+  roundsPresented         Int
+  roundsCompleted         Int
+  correctInteractions     Int
+  incorrectInteractions   Int
+  totalScore              Float
+  accuracy                Float
+  averageResponseTime     Float
+  highestDifficulty       Int
+  numberRangeReached      Int
+  completionStatus        String
+  
+  // Skills breakdown
+  earlyNumeracyScore      Float
+  numberSenseScore        Float
+  countingScore           Float
+  sequencingScore         Float
+  quantityComparisonScore Float
+  attentionScore          Float
+  processingSpeedScore    Float
+  accuracyScore           Float
+  overallScore            Float
+  
+  startedAt               DateTime
+  completedAt             DateTime
+  createdAt               DateTime   @default(now())
+  updatedAt               DateTime   @updatedAt
+
+  @@index([gameId, assessmentId])
+  @@index([studentId, assessmentId])
+  @@map("NumberBuilderAnalytics")
 }

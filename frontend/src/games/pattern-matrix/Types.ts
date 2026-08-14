@@ -1,0 +1,21 @@
+export type PatternMatrixMetrics = {
+  age_group: "5–7 Years";
+  rounds_presented: number;
+  rounds_completed: number;
+  correct_cells: number;
+  missed_cells: number;
+  incorrect_cells: number;
+  total_actions: number;
+  average_response_time: number;
+  highest_difficulty: number;
+  accuracy: number;
+  visual_memory_score: number;
+  attention_score: number;
+  spatial_recall_score: number;
+  processing_speed_score: number;
+  completion_percentage: number;
+  overall_score: number;
+  started_at: string;
+  completed_at: string;
+  completionStatus: "COMPLETED" | "PARTIAL";
+};
