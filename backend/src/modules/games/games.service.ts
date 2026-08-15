@@ -35,6 +35,9 @@ export class GamesService implements OnModuleInit {
       result.numberBuilderAnalytics ||
       result.ballSortAnalytics ||
       result.redLightGreenLightAnalytics ||
+      (result.game?.componentName === 'CATCH_THE_TARGET'
+        ? result.attempts?.[0]?.scores?.[0]?.details
+        : null) ||
       null
     );
   }
@@ -91,6 +94,7 @@ export class GamesService implements OnModuleInit {
         'missionsStarted',
         'objectsCompleted',
         'roundsPresented',
+        'totalRounds',
       ]) ??
       result.attempts?.length ??
       null;
@@ -110,6 +114,7 @@ export class GamesService implements OnModuleInit {
         'logicalAccuracy',
         'observationAccuracy',
         'completionPercentage',
+        'accuracy',
       ]) ??
       (attempts && mistakes !== null
         ? Math.max(0, ((attempts - mistakes) / attempts) * 100)

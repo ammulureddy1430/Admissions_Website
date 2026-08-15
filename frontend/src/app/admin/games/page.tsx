@@ -33,6 +33,7 @@ import PatternMatrixGame from "@/games/pattern-matrix/Game";
 import NumberBuilderGame from "@/games/number-builder/Game";
 import BallSortGame from "@/games/ball-sort/Game";
 import RedLightGreenLightGame from "@/games/red-light-green-light/Game";
+import CatchTheTargetGame from "@/games/catch-the-target/Game";
 
 type Game = {
   id: string;
@@ -1630,6 +1631,11 @@ export default function GamesPage() {
                 practiceOnly
                 onComplete={() => setPreviewing(null)}
               />
+            ) : previewing.componentName === "CATCH_THE_TARGET" ? (
+              <CatchTheTargetGame
+                durationSeconds={previewing.durationSeconds}
+                onComplete={() => setPreviewing(null)}
+              />
             ) : (
               <div className="grid h-full place-items-center text-center text-white">
                 <div>
@@ -1986,6 +1992,12 @@ function GameArtwork({ componentName }: { componentName: string }) {
         </span>
       </div>
     );
+  if (componentName === "CATCH_THE_TARGET")
+    return (
+      <div className={`${common} bg-gradient-to-br from-[#51a7c4] to-[#79ba69]`} aria-hidden>
+        <img src="/games/catch-the-target.svg" alt="" className="h-full w-full object-cover" />
+      </div>
+    );
   return (
     <div className={`${common} place-items-center`} aria-hidden>
       <Gamepad2 className="h-9 w-9 text-[#007f70]" />
@@ -2048,6 +2060,8 @@ function gameCardTheme(componentName: string) {
     return "from-[#137da1] via-[#20a7b0] to-[#68bd70]";
   if (componentName === "PATTERN_MATRIX")
     return "from-[#312e81] via-[#5b21b6] to-[#9333ea]";
+  if (componentName === "CATCH_THE_TARGET")
+    return "from-[#257e9c] via-[#4ea8a0] to-[#79ba69]";
   return "from-[#0b6870] via-[#168e84] to-[#54baa5]";
 }
 

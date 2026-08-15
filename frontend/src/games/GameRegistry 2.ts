@@ -123,8 +123,8 @@ registerGame({
   load: () => import("./pattern-matrix/Game"),
 });
 registerGame({
-  componentName: "CATCH_THE_TARGET",
-  load: () => import("./catch-the-target/Game"),
+  componentName: "RHYTHM_COPY",
+  load: () => import("./rhythm-copy/Game"),
 });
 registerGame({
   componentName: "NUMBER_BUILDER",

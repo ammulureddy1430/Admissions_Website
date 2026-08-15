@@ -1,0 +1,16 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { catcherWidth, chooseTarget, difficultyFor, fallSpeed, intersects, moveCatcher, moveObject, objectSize, spawnInterval, spawnObject, timedOut } from "./CatchTheTargetEngine";
+import { scoreCatchGame } from "./ScoringEngine";
+import type { CatchEvent } from "./Types";
+
+const event = (changes: Partial<CatchEvent> = {}): CatchEvent => ({ target: true, caught: true, timestamp: 1000, objectX: 200, catcherX: 150, horizontalDistance: 10, difficulty: 1, speed: 90, symbol: "★", responseTime: 450, ...changes });
+test("target selection rotates without reading or numbers", () => { assert.notEqual(chooseTarget(0), chooseTarget(1)); assert.equal(chooseTarget(4), chooseTarget(0)); });
+test("spawning creates targets and distractors at safe positions", () => { const target = spawnObject(1, 1, "★", 500, 10, () => .1); const distractor = spawnObject(2, 1, "★", 500, 10, () => .9); assert.equal(target.target, true); assert.equal(distractor.target, false); assert.ok(target.x > 0 && target.x < 500); });
+test("falling movement is frame-rate independent", () => { const object = spawnObject(1, 1, "★", 500, 0, () => .1); assert.equal(moveObject(object, .5).y, object.y + object.speed * .5); });
+test("catcher movement stays within both boundaries", () => { assert.equal(moveCatcher(-50, 500, 150), 0); assert.equal(moveCatcher(600, 500, 150), 350); });
+test("collision includes child-friendly tolerance", () => { const object = { ...spawnObject(1, 1, "★", 500, 0, () => .1), x: 190, y: 510, size: 60 }; assert.equal(intersects(object, 200, 500, 150, 58), true); assert.equal(intersects({ ...object, x: 20 }, 200, 500, 150, 58), false); });
+test("difficulty increases gradually and caps at five", () => { assert.equal(difficultyFor(0), 1); assert.equal(difficultyFor(3), 2); assert.equal(difficultyFor(30), 5); assert.ok(spawnInterval(5) < spawnInterval(1)); assert.ok(fallSpeed(5, () => 0) > fallSpeed(1, () => 0)); assert.ok(objectSize(5) < objectSize(1)); assert.ok(catcherWidth(5) < catcherWidth(1)); });
+test("analytics distinguish catches, distractors, and misses", () => { const result = scoreCatchGame([event(), event({ target: true, caught: false }), event({ target: false, caught: true, symbol: "●" }), event({ target: false, caught: false, symbol: "◆" })], 300, 2, 1, "COMPLETED"); assert.equal(result.targetsCaught, 1); assert.equal(result.targetsMissed, 1); assert.equal(result.distractorsCaught, 1); assert.equal(result.distractorsAvoided, 1); assert.equal(result.catchAccuracy, 50); });
+test("response timing, consistency, movement, skills, and overall score are calculated", () => { const result = scoreCatchGame([event({ responseTime: 400 }), event({ responseTime: 600, difficulty: 2 })], 240, 2, 2, "TIME_LIMIT_REACHED"); assert.equal(result.responseTime, 500); assert.equal(result.highestDifficulty, 2); assert.ok(result.performanceConsistency > 0); assert.ok(result.visualTrackingScore > 0); assert.ok(result.handEyeCoordinationScore > 0); assert.ok(result.selectiveAttentionScore > 0); assert.ok(result.overallScore > 0); });
+test("shared timer controls timeout", () => { assert.equal(timedOut(0), true); assert.equal(timedOut(1), false); });

@@ -32,6 +32,7 @@ const SELF_CONTAINED_PRACTICE_ENGINES = new Set([
   'PARKING_ESCAPE',
   'WATER_PIPELINE',
   'PATTERN_MATRIX',
+  'CATCH_THE_TARGET',
   'NUMBER_BUILDER',
   'BALL_SORT',
   'RED_LIGHT_GREEN_LIGHT',
@@ -1271,6 +1272,10 @@ export class GamePlayService {
       assignment.generatedGame?.engineKey === 'RED_LIGHT_GREEN_LIGHT'
         ? runtime.cognitiveAnalytics
         : null;
+    const catchTheTarget =
+      session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'CATCH_THE_TARGET'
+        ? runtime.cognitiveAnalytics
+        : null;
     const cognitive =
       followLights ||
       ballStack ||
@@ -1285,7 +1290,8 @@ export class GamePlayService {
       patternMatrix ||
       numberBuilder ||
       ballSort ||
-      redLightGreenLight;
+      redLightGreenLight ||
+      catchTheTarget;
     const answered = followLights
       ? Number(followLights.correctTaps || 0) +
         Number(followLights.wrongTaps || 0)
@@ -1315,6 +1321,8 @@ export class GamePlayService {
                           ? Number(ballSort.levelsCompleted || 0)
                         : redLightGreenLight
                           ? Number(redLightGreenLight.difficultyReached || 1)
+                        : catchTheTarget
+                          ? Number(catchTheTarget.totalObjects || 0)
                         : runtime?.answers?.length || 0;
     const total = cognitive
       ? Math.max(1, answered)
@@ -1347,6 +1355,8 @@ export class GamePlayService {
                           ? Number(ballSort.overallScore || 0)
                         : redLightGreenLight
                           ? Number(redLightGreenLight.overallScore || 0)
+                        : catchTheTarget
+                          ? Number(catchTheTarget.overallScore || 0)
                         : total
                           ? (Number(runtime?.correct || 0) / total) * 100
                           : 0;

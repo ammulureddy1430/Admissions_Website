@@ -227,6 +227,21 @@ export const GAME_CATALOG: RegisteredGame[] = [
     cognitiveSkill: 'Visual Memory, Attention & Spatial Recall',
   },
   {
+    name: 'Catch the Target',
+    slug: 'catch-the-target',
+    description:
+      'A Magic Garden assessment where children track falling objects, move a basket, catch the current target, and avoid distractors.',
+    category: 'Visual Tracking & Hand-Eye Coordination',
+    ageGroup: '5–7 Years',
+    difficulty: 'PROGRESSIVE',
+    durationSeconds: 120,
+    thumbnail: '/games/catch-the-target.svg',
+    componentName: 'CATCH_THE_TARGET',
+    gameType: 'REAL_TIME',
+    templateCode: 'GT-CATCH-THE-TARGET',
+    cognitiveSkill: 'Visual Tracking',
+  },
+  {
     name: 'Board Game Arena',
     slug: 'board-game-arena',
     description: 'An interactive real-time board game experience.',

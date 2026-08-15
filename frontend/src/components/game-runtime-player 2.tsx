@@ -51,9 +51,9 @@ import ParkingEscapeGame from "@/games/parking-escape/Game";
 import WaterPipelineGame from "@/games/water-pipeline/Game";
 import PatternMatrixGame from "@/games/pattern-matrix/Game";
 import NumberBuilderGame from "@/games/number-builder/Game";
+import RhythmCopyGame from "@/games/rhythm-copy/Game";
 import BallSortGame from "@/games/ball-sort/Game";
 import RedLightGreenLightGame from "@/games/red-light-green-light/Game";
-import CatchTheTargetGame from "@/games/catch-the-target/Game";
 
 const MAX_SECURITY_WARNINGS = 3;
 const SELF_CONTAINED_GAME_ENGINES = new Set([
@@ -69,9 +69,9 @@ const SELF_CONTAINED_GAME_ENGINES = new Set([
   "WATER_PIPELINE",
   "PATTERN_MATRIX",
   "NUMBER_BUILDER",
+  "RHYTHM_COPY",
   "BALL_SORT",
   "RED_LIGHT_GREEN_LIGHT",
-  "CATCH_THE_TARGET",
 ]);
 type GameOption = { id?: string; optionKey?: string; optionText: string };
 type AnswerResult = {
@@ -475,7 +475,8 @@ export function GameRuntimePlayer({
           actionName === "PARKING_ESCAPE_COMPLETE" ||
           actionName === "WATER_PIPELINE_COMPLETE" ||
           actionName === "PATTERN_MATRIX_COMPLETE" ||
-          actionName === "CATCH_THE_TARGET_COMPLETE") &&
+          actionName === "NUMBER_BUILDER_COMPLETE" ||
+          actionName === "RHYTHM_COPY_COMPLETE") &&
         next.status === "COMPLETED"
       ) {
         setAssessmentCompleted(true);
@@ -587,7 +588,7 @@ export function GameRuntimePlayer({
       state.engine?.engineKey === "WATER_PIPELINE" ||
       state.engine?.engineKey === "PATTERN_MATRIX" ||
       state.engine?.engineKey === "NUMBER_BUILDER" ||
-      state.engine?.engineKey === "CATCH_THE_TARGET"
+      state.engine?.engineKey === "RHYTHM_COPY"
     )
       return;
     timeoutHandled.current = true;
@@ -617,9 +618,9 @@ export function GameRuntimePlayer({
   const isWaterPipeline = state.engine?.engineKey === "WATER_PIPELINE";
   const isPatternMatrix = state.engine?.engineKey === "PATTERN_MATRIX";
   const isNumberBuilder = state.engine?.engineKey === "NUMBER_BUILDER";
+  const isRhythmCopy = state.engine?.engineKey === "RHYTHM_COPY";
   const isBallSort = state.engine?.engineKey === "BALL_SORT";
   const isRedLightGreenLight = state.engine?.engineKey === "RED_LIGHT_GREEN_LIGHT";
-  const isCatchTheTarget = state.engine?.engineKey === "CATCH_THE_TARGET";
   const isPracticeMode =
     state.mode === "PRACTICE" || state.configuration?.practiceMode === true;
   const showGameIntro =
@@ -860,6 +861,16 @@ export function GameRuntimePlayer({
                 action("NUMBER_BUILDER_COMPLETE", metrics)
               }
             />
+          ) : isRhythmCopy ? (
+            <RhythmCopyGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              sound={sound}
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              onComplete={(metrics) =>
+                action("RHYTHM_COPY_COMPLETE", metrics)
+              }
+            />
           ) : isBallSort ? (
             <BallSortGame
               disabled={!isPracticeMode && state.status !== "RUNNING"}
@@ -874,15 +885,6 @@ export function GameRuntimePlayer({
               durationSeconds={120}
               onComplete={(metrics) =>
                 action("RED_LIGHT_GREEN_LIGHT_COMPLETE", metrics)
-              }
-            />
-          ) : isCatchTheTarget ? (
-            <CatchTheTargetGame
-              disabled={!isPracticeMode && state.status !== "RUNNING"}
-              remainingSeconds={seconds}
-              practiceOnly={isPracticeMode}
-              onComplete={(metrics) =>
-                action("CATCH_THE_TARGET_COMPLETE", metrics)
               }
             />
           ) : q ? (
@@ -2027,7 +2029,7 @@ function ActualGameTutorialDemo({ preview }: { preview: any }) {
     "PARKING_ESCAPE",
     "WATER_PIPELINE",
     "PATTERN_MATRIX",
-    "CATCH_THE_TARGET",
+    "RHYTHM_COPY",
   ];
   if (builtInPracticeEngines.includes(engineKey)) {
     return <BuiltInGamePractice key={mockAttempt} engineKey={engineKey} />;
@@ -2346,11 +2348,12 @@ function BuiltInGamePractice({ engineKey }: { engineKey: string }) {
         onComplete={finish}
       />
     );
-  else if (engineKey === "CATCH_THE_TARGET")
+  else if (engineKey === "RHYTHM_COPY")
     game = (
-      <CatchTheTargetGame
+      <RhythmCopyGame
         key={attempt}
         disabled={false}
+        sound
         remainingSeconds={mockDurationSeconds}
         practiceOnly
         onComplete={finish}
