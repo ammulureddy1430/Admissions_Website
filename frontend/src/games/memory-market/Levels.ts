@@ -1,0 +1,68 @@
+import type { Level } from "./Types";
+export const LEVELS: Level[] = [
+  {
+    stage: 1,
+    orderSize: 1,
+    maxCustomers: 1,
+    arrivalMs: 7000,
+    showMs: 3500,
+    relocation: false,
+    unavailableChance: 0,
+  },
+  {
+    stage: 2,
+    orderSize: 2,
+    maxCustomers: 1,
+    arrivalMs: 6500,
+    showMs: 3300,
+    relocation: false,
+    unavailableChance: 0,
+  },
+  {
+    stage: 3,
+    orderSize: 2,
+    maxCustomers: 2,
+    arrivalMs: 6200,
+    showMs: 3100,
+    relocation: false,
+    unavailableChance: 0.03,
+  },
+  {
+    stage: 4,
+    orderSize: 3,
+    maxCustomers: 2,
+    arrivalMs: 5900,
+    showMs: 2900,
+    relocation: true,
+    unavailableChance: 0.05,
+  },
+  {
+    stage: 5,
+    orderSize: 3,
+    maxCustomers: 2,
+    arrivalMs: 5600,
+    showMs: 2700,
+    relocation: true,
+    unavailableChance: 0.07,
+  },
+  {
+    stage: 6,
+    orderSize: 3,
+    maxCustomers: 3,
+    arrivalMs: 5300,
+    showMs: 2500,
+    relocation: true,
+    unavailableChance: 0.09,
+  },
+  {
+    stage: 7,
+    orderSize: 4,
+    maxCustomers: 3,
+    arrivalMs: 5000,
+    showMs: 2300,
+    relocation: true,
+    unavailableChance: 0.1,
+  },
+];
+export const levelAt = (ms: number) =>
+  LEVELS[Math.min(6, Math.floor(ms / 17000))];

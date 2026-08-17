@@ -1,0 +1,77 @@
+import type { Level } from "./Types";
+export const LEVELS: Level[] = [
+  {
+    stage: 1,
+    gateCount: 2,
+    maxPlanes: 1,
+    arrivalMs: 5200,
+    speed: 92,
+    priorityChance: 0,
+    closureChance: 0,
+    memoryComplexity: 1,
+  },
+  {
+    stage: 2,
+    gateCount: 3,
+    maxPlanes: 2,
+    arrivalMs: 4800,
+    speed: 96,
+    priorityChance: 0,
+    closureChance: 0,
+    memoryComplexity: 1,
+  },
+  {
+    stage: 3,
+    gateCount: 3,
+    maxPlanes: 3,
+    arrivalMs: 4400,
+    speed: 100,
+    priorityChance: 0.08,
+    closureChance: 0,
+    memoryComplexity: 1,
+  },
+  {
+    stage: 4,
+    gateCount: 3,
+    maxPlanes: 3,
+    arrivalMs: 4100,
+    speed: 104,
+    priorityChance: 0.12,
+    closureChance: 0,
+    memoryComplexity: 1,
+  },
+  {
+    stage: 5,
+    gateCount: 4,
+    maxPlanes: 3,
+    arrivalMs: 3900,
+    speed: 108,
+    priorityChance: 0.28,
+    closureChance: 0,
+    memoryComplexity: 2,
+  },
+  {
+    stage: 6,
+    gateCount: 4,
+    maxPlanes: 4,
+    arrivalMs: 3700,
+    speed: 112,
+    priorityChance: 0.3,
+    closureChance: 0.3,
+    memoryComplexity: 2,
+  },
+  {
+    stage: 7,
+    gateCount: 4,
+    maxPlanes: 4,
+    arrivalMs: 3500,
+    speed: 116,
+    priorityChance: 0.34,
+    closureChance: 0.4,
+    memoryComplexity: 2,
+  },
+];
+export const levelAt = (ms: number) =>
+  LEVELS[
+    Math.max(0, Math.min(6, Math.floor((Number.isFinite(ms) ? ms : 0) / 17000)))
+  ];

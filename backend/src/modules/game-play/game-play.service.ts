@@ -40,6 +40,10 @@ const SELF_CONTAINED_PRACTICE_ENGINES = new Set([
   'NUMBER_BUILDER',
   'BALL_SORT',
   'RED_LIGHT_GREEN_LIGHT',
+  'COLOR_SHIFT',
+  'AIR_HOCKEY_CHALLENGE',
+  'MEMORY_MARKET',
+  'AIRPORT_CONTROLLER',
 ]);
 
 @Injectable()
@@ -1369,13 +1373,14 @@ export class GamePlayService {
                                         )
                                       : tangramBuilder
                                         ? Number(
-                                            tangramBuilder.puzzlesCompleted || 0,
+                                            tangramBuilder.puzzlesCompleted ||
+                                              0,
                                           )
                                         : sokoban
                                           ? Number(
                                               sokoban.puzzlesCompleted || 0,
                                             )
-                                      : runtime?.answers?.length || 0;
+                                          : runtime?.answers?.length || 0;
     const total = cognitive
       ? Math.max(1, answered)
       : session.questionIds.length;
@@ -1419,11 +1424,11 @@ export class GamePlayService {
                                           )
                                         : sokoban
                                           ? Number(sokoban.overallScore || 0)
-                                      : total
-                                      ? (Number(runtime?.correct || 0) /
-                                          total) *
-                                        100
-                                      : 0;
+                                          : total
+                                            ? (Number(runtime?.correct || 0) /
+                                                total) *
+                                              100
+                                            : 0;
     const passed = percentage >= assignment.passingScore;
     const attempt = await this.prisma.gameAttempt.findFirst({
       where: { gameResultId: result.id, submittedAt: null },

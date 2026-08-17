@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Play, Timer, Footprints } from "lucide-react";
+import { Play, Timer, Footprints, Keyboard, MousePointer2, Target } from "lucide-react";
 import { RedLightGreenLightAnalyticsService } from "./AnalyticsService";
 import { scoreRedLightGreenLight } from "./ScoringEngine";
 import type { RawRedLightGreenLightMetrics, RedLightGreenLightScores } from "./Types";
@@ -18,7 +18,7 @@ class SoundSynth {
 
   private init() {
     if (!this.ctx && typeof window !== "undefined") {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (AudioCtx) this.ctx = new AudioCtx();
     }
   }
@@ -114,6 +114,8 @@ export default function RedLightGreenLightGame({
   const [seconds, setSeconds] = useState(durationSeconds);
   const [celebrating, setCelebrating] = useState(false);
   const [result, setResult] = useState<RedLightGreenLightScores | null>(null);
+  const [feedback, setFeedback] = useState("Wait for GREEN, then hold to walk");
+  const [mistakes, setMistakes] = useState(0);
 
   // Performance metrics logs
   const greenLightEvents = useRef(0);
@@ -126,6 +128,11 @@ export default function RedLightGreenLightGame({
   const lightStateChangedAt = useRef(0);
   const greenStartTimes = useRef<number[]>([]);
   const redStopTimes = useRef<number[]>([]);
+  const startedOnThisGreen = useRef(false);
+  const violatedThisRed = useRef(false);
+  const pressingRef = useRef(false);
+
+  const overallProgress = Math.min(100, Math.round((((level - 1) + characterProgress / 85) / 4) * 100));
 
   // Sound and analytics instance init
   useEffect(() => {
@@ -140,8 +147,6 @@ export default function RedLightGreenLightGame({
       finished.current = true;
       setIsPressing(false);
 
-      const elapsed = Math.min(durationSeconds, Math.floor((Date.now() - startedAt.current) / 1000));
-      
       const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
       const averageStartReactionTime = Math.round(avg(greenStartTimes.current));
       const averageStopReactionTime = Math.round(avg(redStopTimes.current));
@@ -154,7 +159,7 @@ export default function RedLightGreenLightGame({
         prematureMovements: prematureMovements.current,
         averageStartReactionTime,
         averageStopReactionTime,
-        progress: characterProgress,
+        progress: overallProgress,
         difficultyReached: level,
         completionStatus: status,
       };
@@ -163,7 +168,7 @@ export default function RedLightGreenLightGame({
       setResult(finalScores);
       await analytics.current.save(finalScores);
     },
-    [durationSeconds, characterProgress, level]
+    [overallProgress, level]
   );
 
   // Main countdown timer loop
@@ -208,9 +213,13 @@ export default function RedLightGreenLightGame({
 
       if (nextState === "GREEN") {
         greenLightEvents.current++;
+        startedOnThisGreen.current = false;
+        setFeedback("GREEN — hold the button or Space to walk!");
         sounds.current?.playGreen();
       } else {
         redLightEvents.current++;
+        violatedThisRed.current = false;
+        setFeedback("RED — release now and freeze!");
         sounds.current?.playRed();
       }
     }, delay);
@@ -226,9 +235,11 @@ export default function RedLightGreenLightGame({
     const interval = window.setInterval(() => {
       if (lightState === "GREEN") {
         setCharacterProgress((prev) => Math.min(85, prev + 1.2));
-      } else {
-        // Violating Red Light!
+      } else if (!violatedThisRed.current) {
+        violatedThisRed.current = true;
         prematureMovements.current++;
+        setMistakes(prematureMovements.current);
+        setFeedback("Oops! Freeze on RED — try again");
       }
     }, 80);
 
@@ -260,21 +271,29 @@ export default function RedLightGreenLightGame({
     e.preventDefault();
     if (disabled || finished.current || celebrating) return;
     
+    if (pressingRef.current) return;
+    pressingRef.current = true;
     setIsPressing(true);
 
     if (lightState === "GREEN") {
-      correctStarts.current++;
-      // Log start reaction latency (time since light turned green)
-      const latency = Date.now() - lightStateChangedAt.current;
-      greenStartTimes.current.push(latency);
-    } else {
+      if (!startedOnThisGreen.current) {
+        startedOnThisGreen.current = true;
+        correctStarts.current++;
+        greenStartTimes.current.push(Date.now() - lightStateChangedAt.current);
+      }
+      setFeedback("Great! Keep holding while it is GREEN");
+    } else if (!violatedThisRed.current) {
       // Immediate red light walk violation
+      violatedThisRed.current = true;
       prematureMovements.current++;
+      setMistakes(prematureMovements.current);
+      setFeedback("Not yet — wait for GREEN");
     }
   };
 
   const handlePressEnd = () => {
-    if (!isPressing) return;
+    if (!pressingRef.current) return;
+    pressingRef.current = false;
     setIsPressing(false);
 
     if (lightState === "RED") {
@@ -282,8 +301,30 @@ export default function RedLightGreenLightGame({
       // Log stop reaction latency (time since light turned red)
       const latency = Date.now() - lightStateChangedAt.current;
       redStopTimes.current.push(latency);
+      if (!violatedThisRed.current) setFeedback("Perfect stop! Wait for GREEN");
     }
   };
+
+  useEffect(() => {
+    if (!started || result || disabled || celebrating) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== "Space" || event.repeat) return;
+      event.preventDefault();
+      handlePressStart(event as unknown as React.MouseEvent);
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.code !== "Space") return;
+      event.preventDefault();
+      handlePressEnd();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      pressingRef.current = false;
+    };
+  }, [started, result, disabled, celebrating, lightState]);
 
   // Convert timer formatting
   const formatTime = (time: number) => {
@@ -301,13 +342,18 @@ export default function RedLightGreenLightGame({
           <b>{level} / 4</b>
         </div>
         <div className="rlgl-level">
-          <span>PROGRESS</span>
-          <b>{Math.round((characterProgress / 85) * 100)}%</b>
+          <span>GAME PROGRESS</span>
+          <b>{overallProgress}%</b>
         </div>
-        <div className="rlgl-timer">
+        <div className="rlgl-level rlgl-mistakes"><span>MISTAKES</span><b>{mistakes}</b></div>
+        <div className={`rlgl-timer ${seconds <= 10 ? "warning" : ""}`} aria-label={`${seconds} seconds left`}>
           <Timer className="h-5 w-5" />
-          <strong>{formatTime(seconds)}</strong>
+          <span><small>TIME LEFT</small><strong>{formatTime(seconds)}</strong></span>
         </div>
+      </div>
+
+      <div className="rlgl-time-track" aria-hidden="true">
+        <span style={{ width: `${Math.max(0, (seconds / durationSeconds) * 100)}%` }} />
       </div>
 
       {/* Graphical Signal Light */}
@@ -319,6 +365,7 @@ export default function RedLightGreenLightGame({
         <span className={`rlgl-signal-status ${lightState.toLowerCase()}`}>
           {lightState === "GREEN" ? "🟢 WALK" : "🔴 STOP"}
         </span>
+        <span className="rlgl-feedback" aria-live="polite">{feedback}</span>
       </div>
 
       {/* Path Playfield */}
@@ -346,11 +393,14 @@ export default function RedLightGreenLightGame({
           onMouseLeave={handlePressEnd}
           onTouchStart={handlePressStart}
           onTouchEnd={handlePressEnd}
+          onTouchCancel={handlePressEnd}
+          disabled={!started || disabled || Boolean(result)}
+          aria-label="Hold to walk on green; release to stop on red"
         >
           <Footprints className="h-10 w-10" />
           <span>{isPressing ? "WALKING..." : "HOLD TO WALK"}</span>
         </button>
-        <span className="rlgl-hold-label mt-4">Release button instantly when light is RED!</span>
+        <span className="rlgl-hold-label mt-4">Hold button or Space on GREEN · release on RED</span>
       </div>
 
       {/* Intro Overlay Card */}
@@ -358,12 +408,14 @@ export default function RedLightGreenLightGame({
         <div className="rlgl-intro">
           <div className="rlgl-intro-card">
             <div className="rlgl-intro-mark">🦊</div>
-            <p>2 MINUTES · 4 LEVELS</p>
+            <p>{Math.ceil(durationSeconds / 60)} MIN · 4 LEVELS</p>
             <h2>Red Light, Green Light</h2>
-            <span className="rlgl-intro-copy">
-              Hold the button to walk forward when the light is green 🟢.
-              Release the button immediately and stop when the light turns red 🔴!
-            </span>
+            <div className="rlgl-how-to-play">
+              <div><span><Target /></span><b>1. Watch</b><small>Look at the traffic light.</small></div>
+              <div><span><MousePointer2 /></span><b>2. Walk</b><small>Hold the button on GREEN.</small></div>
+              <div><span><Keyboard /></span><b>3. Freeze</b><small>Release immediately on RED.</small></div>
+            </div>
+            <span className="rlgl-intro-copy">Reach the finish line in all 4 levels. You can also hold the <kbd>Space</kbd> key.</span>
             <button type="button" onClick={handleStart}>
               <Play className="h-5 w-5 fill-current" /> Start Game
             </button>

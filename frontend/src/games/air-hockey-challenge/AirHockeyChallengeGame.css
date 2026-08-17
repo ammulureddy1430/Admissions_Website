@@ -1,0 +1,163 @@
+.air-hockey {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 20%, #1d7691, #071c3d);
+  touch-action: none;
+  user-select: none;
+}
+.ah-table {
+  position: absolute;
+  inset: 4% 12%;
+  overflow: hidden;
+  border: 9px solid #b9fff3;
+  border-radius: 60px;
+  background: linear-gradient(90deg, #123e69, #195b7d 50%, #123e69);
+  box-shadow:
+    inset 0 0 45px #06172b,
+    0 20px 60px #020b1faa;
+}
+.ah-table:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 9.8%,
+    #86dbe51c 10%
+  );
+}
+.ah-center {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 5px;
+  background: #9ee8e9aa;
+}
+.ah-circle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 150px;
+  height: 150px;
+  border: 5px solid #9ee8e988;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.ah-goal {
+  position: absolute;
+  z-index: 2;
+  left: 32%;
+  right: 32%;
+  height: 17px;
+  background: #ffd866;
+  box-shadow: 0 0 18px #ffd866;
+}
+.ah-goal.top {
+  top: 0;
+  border-radius: 0 0 20px 20px;
+}
+.ah-goal.bottom {
+  bottom: 0;
+  border-radius: 20px 20px 0 0;
+}
+.ah-table canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 3;
+  cursor: crosshair;
+}
+.ah-intro {
+  position: absolute;
+  z-index: 8;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #061a38b8;
+  backdrop-filter: blur(5px);
+}
+.ah-intro > div {
+  position: relative;
+  width: min(440px, 80vw);
+  height: 300px;
+  border: 6px solid #b9fff3;
+  border-radius: 48px;
+  background: #164f74;
+  box-shadow: 0 25px 65px #020b1f;
+}
+.ah-demo {
+  position: absolute;
+  left: 50%;
+  width: 70px;
+  height: 70px;
+  border: 6px solid #fff;
+  border-radius: 50%;
+  transform: translateX(-50%);
+}
+.ah-demo.red {
+  top: 34px;
+  background: #ff5d74;
+}
+.ah-demo.green {
+  bottom: 38px;
+  background: #35dfbd;
+  animation: ahMove 1.8s ease-in-out infinite alternate;
+}
+.ah-intro i {
+  position: absolute;
+  left: 58%;
+  top: 45%;
+  color: #111f31;
+  font-size: 45px;
+  font-style: normal;
+  animation: ahPuck 2s ease-in-out infinite alternate;
+}
+.ah-intro b {
+  position: absolute;
+  left: 45%;
+  bottom: 8px;
+  color: #fff;
+  font-size: 38px;
+}
+.ah-intro button {
+  position: absolute;
+  right: -30px;
+  bottom: -30px;
+  width: 88px;
+  height: 88px;
+  border: 7px solid #b9fff3;
+  border-radius: 50%;
+  background: #078b72;
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+.ah-intro button svg {
+  width: 38px;
+  height: 38px;
+}
+@keyframes ahMove {
+  to {
+    transform: translateX(70px);
+  }
+}
+@keyframes ahPuck {
+  to {
+    transform: translate(-120px, -95px);
+  }
+}
+@media (max-width: 700px) {
+  .ah-table {
+    inset: 3% 3%;
+    border-radius: 38px;
+  }
+  .ah-circle {
+    width: 105px;
+    height: 105px;
+  }
+}

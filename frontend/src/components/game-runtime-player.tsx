@@ -58,6 +58,10 @@ import MentalRotationGame from "@/games/mental-rotation/Game";
 import WaterJugsGame from "@/games/water-jugs/Game";
 import TangramBuilderGame from "@/games/tangram-builder/Game";
 import SokobanGame from "@/games/sokoban/Game";
+import ColorShiftGame from "@/games/color-shift/Game";
+import AirHockeyChallengeGame from "@/games/air-hockey-challenge/Game";
+import MemoryMarketGame from "@/games/memory-market/Game";
+import AirportControllerGame from "@/games/airport-controller/Game";
 
 const MAX_SECURITY_WARNINGS = 3;
 const SELF_CONTAINED_GAME_ENGINES = new Set([
@@ -80,6 +84,10 @@ const SELF_CONTAINED_GAME_ENGINES = new Set([
   "WATER_JUGS",
   "TANGRAM_BUILDER",
   "SOKOBAN",
+  "COLOR_SHIFT",
+  "AIR_HOCKEY_CHALLENGE",
+  "MEMORY_MARKET",
+  "AIRPORT_CONTROLLER",
 ]);
 type GameOption = { id?: string; optionKey?: string; optionText: string };
 type AnswerResult = {
@@ -487,7 +495,11 @@ export function GameRuntimePlayer({
           actionName === "MENTAL_ROTATION_COMPLETE" ||
           actionName === "WATER_JUGS_COMPLETE" ||
           actionName === "TANGRAM_BUILDER_COMPLETE" ||
-          actionName === "SOKOBAN_COMPLETE") &&
+          actionName === "SOKOBAN_COMPLETE" ||
+          actionName === "COLOR_SHIFT_COMPLETE" ||
+          actionName === "AIR_HOCKEY_CHALLENGE_COMPLETE" ||
+          actionName === "MEMORY_MARKET_COMPLETE" ||
+          actionName === "AIRPORT_CONTROLLER_COMPLETE") &&
         next.status === "COMPLETED"
       ) {
         setAssessmentCompleted(true);
@@ -641,6 +653,11 @@ export function GameRuntimePlayer({
   const isWaterJugs = state.engine?.engineKey === "WATER_JUGS";
   const isTangramBuilder = state.engine?.engineKey === "TANGRAM_BUILDER";
   const isSokoban = state.engine?.engineKey === "SOKOBAN";
+  const isColorShift = state.engine?.engineKey === "COLOR_SHIFT";
+  const isAirHockeyChallenge =
+    state.engine?.engineKey === "AIR_HOCKEY_CHALLENGE";
+  const isMemoryMarket = state.engine?.engineKey === "MEMORY_MARKET";
+  const isAirportController = state.engine?.engineKey === "AIRPORT_CONTROLLER";
   const isPracticeMode =
     state.mode === "PRACTICE" || state.configuration?.practiceMode === true;
   const showGameIntro =
@@ -935,6 +952,40 @@ export function GameRuntimePlayer({
               remainingSeconds={seconds}
               practiceOnly={isPracticeMode}
               onComplete={(metrics) => action("SOKOBAN_COMPLETE", metrics)}
+            />
+          ) : isColorShift ? (
+            <ColorShiftGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              onComplete={(metrics) => action("COLOR_SHIFT_COMPLETE", metrics)}
+            />
+          ) : isAirHockeyChallenge ? (
+            <AirHockeyChallengeGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              onComplete={(metrics) =>
+                action("AIR_HOCKEY_CHALLENGE_COMPLETE", metrics)
+              }
+            />
+          ) : isMemoryMarket ? (
+            <MemoryMarketGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              onComplete={(metrics) =>
+                action("MEMORY_MARKET_COMPLETE", metrics)
+              }
+            />
+          ) : isAirportController ? (
+            <AirportControllerGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              onComplete={(metrics) =>
+                action("AIRPORT_CONTROLLER_COMPLETE", metrics)
+              }
             />
           ) : q ? (
             state.engine?.engineKey === "BOARD_GAME" ? (

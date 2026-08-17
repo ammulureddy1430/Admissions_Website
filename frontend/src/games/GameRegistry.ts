@@ -143,6 +143,22 @@ registerGame({
   load: () => import("./sokoban/Game"),
 });
 registerGame({
+  componentName: "COLOR_SHIFT",
+  load: () => import("./color-shift/Game"),
+});
+registerGame({
+  componentName: "AIR_HOCKEY_CHALLENGE",
+  load: () => import("./air-hockey-challenge/Game"),
+});
+registerGame({
+  componentName: "MEMORY_MARKET",
+  load: () => import("./memory-market/Game"),
+});
+registerGame({
+  componentName: "AIRPORT_CONTROLLER",
+  load: () => import("./airport-controller/Game"),
+});
+registerGame({
   componentName: "NUMBER_BUILDER",
   load: () => import("./number-builder/Game"),
 });

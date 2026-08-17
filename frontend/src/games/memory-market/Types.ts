@@ -1,0 +1,94 @@
+export type ProductKind =
+  "apple" | "banana" | "milk" | "cheese" | "bread" | "pretzel";
+export type Product = {
+  id: string;
+  kind: ProductKind;
+  emoji: string;
+  x: number;
+  y: number;
+  available: boolean;
+  shelf: number;
+};
+export type Order = {
+  items: ProductKind[];
+  shownUntil: number;
+  createdAt: number;
+};
+export type Customer = {
+  id: string;
+  x: number;
+  y: number;
+  targetX: number;
+  priority: number;
+  order: Order;
+  state: "arriving" | "waiting" | "leaving";
+};
+export type Player = {
+  x: number;
+  y: number;
+  targetX: number;
+  targetY: number;
+  vx: number;
+  vy: number;
+  movementDistance: number;
+  directionChanges: number;
+  lastDirection: number;
+};
+export type Level = {
+  stage: number;
+  orderSize: number;
+  maxCustomers: number;
+  arrivalMs: number;
+  showMs: number;
+  relocation: boolean;
+  unavailableChance: number;
+};
+export type MarketEvent = {
+  kind: "pickup" | "delivery" | "incomplete" | "extra" | "relocation";
+  at: number;
+  customerId?: string;
+  product?: ProductKind;
+  correct: boolean;
+  responseTime: number;
+};
+export type MemoryMarketMetrics = {
+  sessionDuration: number;
+  customersArrived: number;
+  customersCompleted: number;
+  ordersPresented: number;
+  ordersCompleted: number;
+  itemsRequested: number;
+  itemsCollected: number;
+  correctItemsCollected: number;
+  incorrectItemsCollected: number;
+  incompleteDeliveries: number;
+  extraItemDeliveries: number;
+  orderRecallAccuracy: number;
+  averageOrderCompletionTime: number;
+  averagePickupDecisionTime: number;
+  playerMovementDistance: number;
+  routeEfficiency: number;
+  taskSwitches: number;
+  priorityDecisions: number;
+  multipleCustomerEvents: number;
+  shelfChanges: number;
+  productRelocations: number;
+  unavailableProductEvents: number;
+  adaptationEvents: number;
+  attentionConsistency: number;
+  beginningPerformance: number;
+  middlePerformance: number;
+  endingPerformance: number;
+  highestDifficulty: number;
+  workingMemoryScore: number;
+  planningScore: number;
+  cognitiveFlexibilityScore: number;
+  sequencingScore: number;
+  decisionMakingScore: number;
+  selectiveAttentionScore: number;
+  sustainedAttentionScore: number;
+  taskManagementScore: number;
+  problemSolvingScore: number;
+  overallScore: number;
+  completionStatus: string;
+};

@@ -62,6 +62,46 @@
   font-size: 18px;
 }
 
+.rlgl-timer > span {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+
+.rlgl-timer small {
+  margin-bottom: 4px;
+  font-size: 8px;
+  letter-spacing: 1px;
+}
+
+.rlgl-timer.warning {
+  animation: rlglTimerPulse 0.8s ease-in-out infinite alternate;
+  background: rgba(239, 68, 68, 0.35);
+}
+
+.rlgl-time-track {
+  position: absolute;
+  top: 98px;
+  z-index: 10;
+  width: min(860px, calc(100% - 64px));
+  height: 5px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.rlgl-time-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #34d399, #2dd4bf);
+  transition: width 1s linear;
+}
+
+@keyframes rlglTimerPulse {
+  to { transform: scale(1.05); box-shadow: 0 0 18px rgba(239, 68, 68, 0.35); }
+}
+
 /* Signal Light Display */
 .rlgl-signal-container {
   display: flex;
@@ -392,4 +432,85 @@
   font-size: 14px;
   color: #94a3b8;
   margin: 0;
+}
+
+.rlgl-mistakes span { color: #fbbf24; }
+
+.rlgl-feedback {
+  min-height: 20px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.rlgl-how-to-play {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 20px 0;
+  text-align: left;
+}
+
+.rlgl-how-to-play div {
+  display: flex;
+  min-height: 122px;
+  flex-direction: column;
+  gap: 7px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.rlgl-how-to-play div > span {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(52, 211, 153, 0.15);
+  color: #34d399;
+}
+
+.rlgl-how-to-play svg { width: 17px; height: 17px; }
+.rlgl-how-to-play b { font-size: 14px; color: #fff; }
+.rlgl-how-to-play small { color: #94a3b8; font-size: 11px; line-height: 1.4; }
+
+.rlgl-intro-copy kbd {
+  padding: 2px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-bottom-width: 3px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-family: inherit;
+  font-weight: 800;
+}
+
+@media (max-width: 640px), (max-height: 700px) {
+  .rlgl-container { padding: 14px; }
+  .rlgl-hud { padding: 10px 14px; border-radius: 18px; }
+  .rlgl-level b { font-size: 18px; }
+  .rlgl-level span { font-size: 8px; letter-spacing: 1px; }
+  .rlgl-timer { padding: 6px 10px; font-size: 14px; }
+  .rlgl-time-track { top: 76px; width: calc(100% - 40px); }
+  .rlgl-light-box { padding: 10px 24px; }
+  .rlgl-light-circle { width: 36px; height: 36px; }
+  .rlgl-track-lane { height: 90px; }
+  .rlgl-hold-btn { width: 108px; height: 108px; font-size: 14px; border-width: 4px; }
+  .rlgl-intro-card { max-height: 94vh; overflow-y: auto; padding: 22px; border-radius: 24px; }
+  .rlgl-intro-card h2 { font-size: 25px; }
+  .rlgl-intro-mark { margin-bottom: 8px; font-size: 40px; }
+  .rlgl-how-to-play { margin: 14px 0; }
+  .rlgl-how-to-play div { min-height: 100px; padding: 10px; }
+}
+
+@media (max-width: 480px) {
+  .rlgl-how-to-play { grid-template-columns: 1fr; }
+  .rlgl-how-to-play div { min-height: 0; display: grid; grid-template-columns: 32px 1fr; }
+  .rlgl-how-to-play small { grid-column: 2; }
+  .rlgl-hud { gap: 8px; }
 }

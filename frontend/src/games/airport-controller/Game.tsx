@@ -1,1 +1,2 @@
-export { SortingGame as default } from "@/components/sorting-game/SortingGame";
+export { default } from "./AirportControllerGame";
+export type { AirportMetrics } from "./Types";

@@ -38,6 +38,10 @@ import MentalRotationGame from "@/games/mental-rotation/Game";
 import WaterJugsGame from "@/games/water-jugs/Game";
 import TangramBuilderGame from "@/games/tangram-builder/Game";
 import SokobanGame from "@/games/sokoban/Game";
+import ColorShiftGame from "@/games/color-shift/Game";
+import AirHockeyChallengeGame from "@/games/air-hockey-challenge/Game";
+import MemoryMarketGame from "@/games/memory-market/Game";
+import AirportControllerGame from "@/games/airport-controller/Game";
 
 type Game = {
   id: string;
@@ -113,6 +117,9 @@ const AGE_GROUPS = [
   "13–16 Years",
 ];
 
+const isHiddenGame = (game: Game) =>
+  game.name.trim().toLowerCase().startsWith("traffic control");
+
 export default function GamesPage() {
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
@@ -160,7 +167,8 @@ export default function GamesPage() {
   const load = async () => {
     setLoading(true);
     try {
-      setGames(await request("games"));
+      const loadedGames: Game[] = await request("games");
+      setGames(loadedGames.filter((game) => !isHiddenGame(game)));
       setError("");
     } catch (reason) {
       setError(
@@ -1663,6 +1671,30 @@ export default function GamesPage() {
                 practiceOnly
                 onComplete={() => setPreviewing(null)}
               />
+            ) : previewing.componentName === "COLOR_SHIFT" ? (
+              <ColorShiftGame
+                remainingSeconds={previewing.durationSeconds}
+                practiceOnly
+                onComplete={() => setPreviewing(null)}
+              />
+            ) : previewing.componentName === "AIR_HOCKEY_CHALLENGE" ? (
+              <AirHockeyChallengeGame
+                remainingSeconds={previewing.durationSeconds}
+                practiceOnly
+                onComplete={() => setPreviewing(null)}
+              />
+            ) : previewing.componentName === "MEMORY_MARKET" ? (
+              <MemoryMarketGame
+                remainingSeconds={previewing.durationSeconds}
+                practiceOnly
+                onComplete={() => setPreviewing(null)}
+              />
+            ) : previewing.componentName === "AIRPORT_CONTROLLER" ? (
+              <AirportControllerGame
+                remainingSeconds={previewing.durationSeconds}
+                practiceOnly
+                onComplete={() => setPreviewing(null)}
+              />
             ) : (
               <div className="grid h-full place-items-center text-center text-white">
                 <div>
@@ -2091,6 +2123,58 @@ function GameArtwork({ componentName }: { componentName: string }) {
         />
       </div>
     );
+  if (componentName === "COLOR_SHIFT")
+    return (
+      <div
+        className={`${common} bg-gradient-to-br from-[#17245d] to-[#245982]`}
+        aria-hidden
+      >
+        <img
+          src="/games/color-shift.svg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  if (componentName === "AIR_HOCKEY_CHALLENGE")
+    return (
+      <div
+        className={`${common} bg-gradient-to-br from-[#102856] to-[#0e7187]`}
+        aria-hidden
+      >
+        <img
+          src="/games/air-hockey-challenge.svg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  if (componentName === "MEMORY_MARKET")
+    return (
+      <div
+        className={`${common} bg-gradient-to-br from-[#fff7cf] to-[#7fcfa8]`}
+        aria-hidden
+      >
+        <img
+          src="/games/memory-market.svg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  if (componentName === "AIRPORT_CONTROLLER")
+    return (
+      <div
+        className={`${common} bg-gradient-to-br from-[#bfe8f4] to-[#72b77a]`}
+        aria-hidden
+      >
+        <img
+          src="/games/airport-controller.svg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
   return (
     <div className={`${common} place-items-center`} aria-hidden>
       <Gamepad2 className="h-9 w-9 text-[#007f70]" />
@@ -2163,6 +2247,14 @@ function gameCardTheme(componentName: string) {
     return "from-[#176f86] via-[#218f89] to-[#65bca5]";
   if (componentName === "SOKOBAN")
     return "from-[#57418f] via-[#6868ad] to-[#32958e]";
+  if (componentName === "COLOR_SHIFT")
+    return "from-[#17245d] via-[#246686] to-[#35bda4]";
+  if (componentName === "AIR_HOCKEY_CHALLENGE")
+    return "from-[#102856] via-[#185b7e] to-[#0e8f91]";
+  if (componentName === "MEMORY_MARKET")
+    return "from-[#176f67] via-[#31a78e] to-[#8fca76]";
+  if (componentName === "AIRPORT_CONTROLLER")
+    return "from-[#23627d] via-[#3998aa] to-[#70b777]";
   return "from-[#0b6870] via-[#168e84] to-[#54baa5]";
 }
 

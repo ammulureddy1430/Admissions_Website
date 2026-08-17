@@ -1,0 +1,162 @@
+.memory-market {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: #dff3db;
+  touch-action: none;
+  user-select: none;
+}
+
+.memory-market canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.mm-timer {
+  position: absolute;
+  z-index: 4;
+  top: 20px;
+  left: 50%;
+  display: flex;
+  min-width: 118px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 11px 18px;
+  transform: translateX(-50%);
+  border: 3px solid #bff5e8;
+  border-radius: 18px;
+  background: #123e4ded;
+  color: white;
+  font: 800 21px/1 system-ui;
+  box-shadow: 0 8px 20px #174e4933;
+  pointer-events: none;
+}
+
+.mm-intro {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #123e4db8;
+  backdrop-filter: blur(5px);
+}
+
+.mm-how-to {
+  position: relative;
+  width: min(520px, 86vw);
+  padding: 34px 34px 54px;
+  border: 7px solid #caffef;
+  border-radius: 42px;
+  background: #fff9dc;
+  box-shadow: 0 24px 70px #052a30aa;
+}
+
+.mm-demo-order {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  font-size: 50px;
+}
+
+.mm-demo-order span {
+  padding: 12px 24px;
+  border: 4px solid #238b7d;
+  border-radius: 22px;
+  background: white;
+  animation: mmRemember 3s ease-in-out infinite;
+}
+
+.mm-demo-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 28px;
+  font-size: 38px;
+}
+
+.mm-demo-steps b {
+  color: #158778;
+  font-size: 28px;
+}
+
+.mm-instructions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.mm-instructions span {
+  padding: 10px 13px;
+  border-radius: 14px;
+  background: #e0f2df;
+  color: #16574f;
+  font: 700 14px system-ui;
+  white-space: nowrap;
+}
+
+.mm-instructions b {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  margin-right: 4px;
+  place-items: center;
+  border-radius: 50%;
+  background: #168d7d;
+  color: white;
+}
+
+.mm-how-to button {
+  position: absolute;
+  right: -28px;
+  bottom: -34px;
+  display: grid;
+  width: 88px;
+  height: 88px;
+  place-items: center;
+  border: 7px solid #caffef;
+  border-radius: 50%;
+  background: #138a76;
+  color: white;
+}
+
+.mm-how-to button svg {
+  width: 36px;
+  height: 36px;
+}
+
+@keyframes mmRemember {
+  0%,
+  55% {
+    opacity: 1;
+  }
+  70%,
+  100% {
+    opacity: 0.12;
+  }
+}
+
+@media (max-width: 640px) {
+  .mm-demo-steps {
+    font-size: 29px;
+    gap: 4px;
+  }
+  .mm-demo-order {
+    font-size: 40px;
+  }
+  .mm-instructions {
+    gap: 4px;
+  }
+  .mm-instructions span {
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+}

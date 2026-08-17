@@ -1,0 +1,199 @@
+.airport-controller {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: #bfe8f4;
+  touch-action: none;
+  user-select: none;
+}
+.airport-controller canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+.ac-timer {
+  position: absolute;
+  z-index: 4;
+  top: 20px;
+  left: 50%;
+  min-width: 112px;
+  padding: 11px 18px;
+  transform: translateX(-50%);
+  border: 3px solid #dffcff;
+  border-radius: 18px;
+  background: #173e55ec;
+  color: #fff;
+  text-align: center;
+  font: 800 21px/1 system-ui;
+  pointer-events: none;
+}
+.ac-controls {
+  position: absolute;
+  z-index: 4;
+  top: 76px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  min-width: 250px;
+  justify-content: center;
+  padding: 12px 18px;
+  transform: translateX(-50%);
+  border-radius: 18px;
+  background: #173e55e8;
+  color: #fff;
+  font: 750 16px system-ui;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.ac-controls span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.ac-controls strong {
+  font-weight: 850;
+}
+.ac-controls em {
+  font-size: 25px;
+  font-style: normal;
+}
+.ac-controls.selected {
+  border: 3px solid #ffd34f;
+}
+.ac-controls .ac-color-sample {
+  width: 27px;
+  height: 27px;
+  border: 4px solid #fff;
+  border-radius: 50%;
+}
+.ac-controls b {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  background: #ffd34f;
+  color: #173e55;
+}
+.ac-controls i {
+  color: #85f0d2;
+  font-size: 22px;
+  font-style: normal;
+}
+.ac-how {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 28px;
+}
+.ac-how span {
+  padding: 9px 11px;
+  border-radius: 13px;
+  background: #dff2f5;
+  color: #173e55;
+  font: 750 13px system-ui;
+  white-space: nowrap;
+}
+.ac-how b {
+  display: inline-grid;
+  width: 21px;
+  height: 21px;
+  margin-right: 4px;
+  place-items: center;
+  border-radius: 50%;
+  background: #173e55;
+  color: #fff;
+}
+.ac-how i {
+  color: #16917c;
+  font: 800 20px system-ui;
+  font-style: normal;
+}
+.ac-intro {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  background: #153e56c7;
+  backdrop-filter: blur(5px);
+}
+.ac-intro > div {
+  position: relative;
+  width: min(520px, 86vw);
+  padding: 42px 35px 55px;
+  border: 7px solid #dffcff;
+  border-radius: 42px;
+  background: #f7fbff;
+  box-shadow: 0 25px 70px #08283e;
+}
+.ac-demo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+.ac-demo span {
+  position: relative;
+  font-size: 58px;
+}
+.ac-demo span i {
+  position: absolute;
+  left: -7px;
+  top: -7px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #3c82f6;
+}
+.ac-demo b {
+  display: grid;
+  width: 31px;
+  height: 31px;
+  place-items: center;
+  border-radius: 50%;
+  background: #183e56;
+  color: #fff;
+  font: 800 16px system-ui;
+}
+.ac-demo em {
+  color: #16917c;
+  font: 700 45px system-ui;
+  font-style: normal;
+}
+.ac-demo .ac-gate {
+  display: grid;
+  width: 88px;
+  height: 67px;
+  place-items: center;
+  border: 7px solid #3c82f6;
+  border-radius: 22px;
+  color: #3c82f6;
+  font-size: 42px;
+}
+.ac-intro p {
+  text-align: center;
+  color: #173e55;
+  font: 800 22px system-ui;
+}
+.ac-intro button {
+  position: absolute;
+  right: -28px;
+  bottom: -34px;
+  display: grid;
+  width: 88px;
+  height: 88px;
+  place-items: center;
+  border: 7px solid #dffcff;
+  border-radius: 50%;
+  background: #138a76;
+  color: #fff;
+}
+.ac-intro button svg {
+  width: 37px;
+  height: 37px;
+}

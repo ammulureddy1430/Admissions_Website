@@ -66,6 +66,16 @@ const ENGINES = [
   ['NUMBER_BUILDER', 'Number Builder'],
   ['BALL_SORT', 'Ball Sort'],
   ['RED_LIGHT_GREEN_LIGHT', 'Red Light, Green Light'],
+  ['COLOR_SHIFT', 'Color Shift — Cognitive Flexibility Challenge'],
+  [
+    'AIR_HOCKEY_CHALLENGE',
+    'Air Hockey Challenge — Attention & Response Control',
+  ],
+  ['MEMORY_MARKET', 'Memory Market — Working Memory & Planning'],
+  [
+    'AIRPORT_CONTROLLER',
+    'Airport Controller — Planning, Divided Attention & Task Switching',
+  ],
 ] as const;
 
 // These catalog games generate their own rounds and cognitive metrics at
@@ -91,6 +101,10 @@ const SELF_CONTAINED_ENGINES = new Set([
   'NUMBER_BUILDER',
   'BALL_SORT',
   'RED_LIGHT_GREEN_LIGHT',
+  'COLOR_SHIFT',
+  'AIR_HOCKEY_CHALLENGE',
+  'MEMORY_MARKET',
+  'AIRPORT_CONTROLLER',
 ]);
 
 @Injectable()
@@ -617,6 +631,24 @@ export class GameRuntimeService {
       return this.sokobanComplete(session, dto.payload, schoolId, user);
     if (action === 'NUMBER_BUILDER_COMPLETE')
       return this.numberBuilderComplete(session, dto.payload, schoolId, user);
+    if (action === 'COLOR_SHIFT_COMPLETE')
+      return this.colorShiftComplete(session, dto.payload, schoolId, user);
+    if (action === 'AIR_HOCKEY_CHALLENGE_COMPLETE')
+      return this.airHockeyChallengeComplete(
+        session,
+        dto.payload,
+        schoolId,
+        user,
+      );
+    if (action === 'MEMORY_MARKET_COMPLETE')
+      return this.memoryMarketComplete(session, dto.payload, schoolId, user);
+    if (action === 'AIRPORT_CONTROLLER_COMPLETE')
+      return this.airportControllerComplete(
+        session,
+        dto.payload,
+        schoolId,
+        user,
+      );
     if (action === 'SECURITY_VIOLATION')
       return this.securityViolation(session, dto.payload, schoolId, user);
     if (action === 'RECORDING_STOPPED')
@@ -1916,6 +1948,365 @@ export class GameRuntimeService {
     await this.event(
       session.id,
       'CATCH_THE_TARGET_COMPLETED',
+      cognitiveAnalytics,
+    );
+    return { state: await this.state(session.id, schoolId, user) };
+  }
+
+  private async colorShiftComplete(
+    session: any,
+    payload: unknown,
+    schoolId: string,
+    user: { id: string; role: Role },
+  ) {
+    if (
+      session.engine.engineKey !== 'COLOR_SHIFT' ||
+      !['RUNNING', 'PAUSED'].includes(session.status)
+    )
+      throw new BadRequestException(
+        'Color Shift metrics require an active session.',
+      );
+    const input = (payload || {}) as Record<string, unknown>;
+    const number = (key: string, max = 100000) =>
+      Math.max(0, Math.min(max, Number(input[key]) || 0));
+    const cognitiveAnalytics = {
+      sessionDuration: number('sessionDuration', 1000),
+      objectsSpawned: number('objectsSpawned'),
+      objectsCollected: number('objectsCollected'),
+      distractorsTouched: number('distractorsTouched'),
+      validTargetsMissed: number('validTargetsMissed'),
+      ruleSwitches: number('ruleSwitches', 100),
+      postSwitchErrors: number('postSwitchErrors'),
+      postSwitchAdaptationTime: number('postSwitchAdaptationTime', 120000),
+      oldRuleResponsesAfterSwitch: number('oldRuleResponsesAfterSwitch'),
+      newRuleResponsesAfterSwitch: number('newRuleResponsesAfterSwitch'),
+      averageResponseTime: number('averageResponseTime', 120000),
+      responseConsistency: number('responseConsistency', 100),
+      highestDifficulty: number('highestDifficulty', 6),
+      cognitiveFlexibilityScore: number('cognitiveFlexibilityScore', 100),
+      inhibitoryControlScore: number('inhibitoryControlScore', 100),
+      selectiveAttentionScore: number('selectiveAttentionScore', 100),
+      sustainedAttentionScore: number('sustainedAttentionScore', 100),
+      workingMemoryScore: number('workingMemoryScore', 100),
+      visualDiscriminationScore: number('visualDiscriminationScore', 100),
+      decisionMakingScore: number('decisionMakingScore', 100),
+      processingSpeedScore: number('processingSpeedScore', 100),
+      overallScore: number('overallScore', 100),
+      completionStatus: String(input.completionStatus || 'COMPLETED').slice(
+        0,
+        50,
+      ),
+    };
+    await this.prisma.gameRuntimeSession.update({
+      where: { id: session.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        score: cognitiveAnalytics.overallScore,
+        elapsedSeconds: Math.max(
+          0,
+          Math.round(
+            (Date.now() - new Date(session.startedAt || Date.now()).getTime()) /
+              1000,
+          ),
+        ),
+        runtimeState: {
+          ...((session.runtimeState || {}) as Record<string, unknown>),
+          cognitiveAnalytics,
+        } as Prisma.InputJsonValue,
+      },
+    });
+    await this.event(session.id, 'COLOR_SHIFT_COMPLETED', cognitiveAnalytics);
+    return { state: await this.state(session.id, schoolId, user) };
+  }
+
+  private async airHockeyChallengeComplete(
+    session: any,
+    payload: unknown,
+    schoolId: string,
+    user: { id: string; role: Role },
+  ) {
+    if (
+      session.engine.engineKey !== 'AIR_HOCKEY_CHALLENGE' ||
+      !['RUNNING', 'PAUSED'].includes(session.status)
+    )
+      throw new BadRequestException(
+        'Air Hockey Challenge metrics require an active session.',
+      );
+    const input = (payload || {}) as Record<string, unknown>;
+    const number = (key: string, max = 100000) =>
+      Math.max(0, Math.min(max, Number(input[key]) || 0));
+    const keys = [
+      'sessionDuration',
+      'ralliesStarted',
+      'ralliesCompleted',
+      'puckReturns',
+      'successfulInterceptions',
+      'missedInterceptions',
+      'goalsConceded',
+      'opponentGoals',
+      'averageResponseTime',
+      'averageMovementInitiationTime',
+      'averageInterceptionDistance',
+      'paddleMovementDistance',
+      'paddleDirectionChanges',
+      'unnecessaryMovements',
+      'prematureMovements',
+      'correctiveMovements',
+      'overshoots',
+      'undershoots',
+      'trackingConsistency',
+      'adaptationEvents',
+      'adaptationTime',
+      'difficultyReached',
+      'attentionConsistency',
+      'beginningPerformance',
+      'middlePerformance',
+      'endingPerformance',
+      'sustainedAttentionScore',
+      'visualAttentionScore',
+      'responseControlScore',
+      'anticipationScore',
+      'decisionMakingScore',
+      'inhibitoryControlScore',
+      'handEyeCoordinationScore',
+      'adaptiveResponseScore',
+      'processingSpeedScore',
+      'overallScore',
+    ] as const;
+    const cognitiveAnalytics: Record<string, number | string> = {};
+    for (const key of keys)
+      cognitiveAnalytics[key] = number(
+        key,
+        key.endsWith('Score') ||
+          key.endsWith('Performance') ||
+          key.endsWith('Consistency')
+          ? 100
+          : key === 'difficultyReached'
+            ? 7
+            : 100000,
+      );
+    cognitiveAnalytics.completionStatus = String(
+      input.completionStatus || 'COMPLETED',
+    ).slice(0, 50);
+    await this.prisma.gameRuntimeSession.update({
+      where: { id: session.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        score: Number(cognitiveAnalytics.overallScore),
+        elapsedSeconds: Math.max(
+          0,
+          Math.round(
+            (Date.now() - new Date(session.startedAt || Date.now()).getTime()) /
+              1000,
+          ),
+        ),
+        runtimeState: {
+          ...((session.runtimeState || {}) as Record<string, unknown>),
+          cognitiveAnalytics,
+        } as Prisma.InputJsonValue,
+      },
+    });
+    await this.event(
+      session.id,
+      'AIR_HOCKEY_CHALLENGE_COMPLETED',
+      cognitiveAnalytics,
+    );
+    return { state: await this.state(session.id, schoolId, user) };
+  }
+
+  private async memoryMarketComplete(
+    session: any,
+    payload: unknown,
+    schoolId: string,
+    user: { id: string; role: Role },
+  ) {
+    if (
+      session.engine.engineKey !== 'MEMORY_MARKET' ||
+      !['RUNNING', 'PAUSED'].includes(session.status)
+    )
+      throw new BadRequestException(
+        'Memory Market metrics require an active session.',
+      );
+    const input = (payload || {}) as Record<string, unknown>;
+    const number = (key: string, max = 100000) =>
+      Math.max(0, Math.min(max, Number(input[key]) || 0));
+    const keys = [
+      'sessionDuration',
+      'customersArrived',
+      'customersCompleted',
+      'ordersPresented',
+      'ordersCompleted',
+      'itemsRequested',
+      'itemsCollected',
+      'correctItemsCollected',
+      'incorrectItemsCollected',
+      'incompleteDeliveries',
+      'extraItemDeliveries',
+      'orderRecallAccuracy',
+      'averageOrderCompletionTime',
+      'averagePickupDecisionTime',
+      'playerMovementDistance',
+      'routeEfficiency',
+      'taskSwitches',
+      'priorityDecisions',
+      'multipleCustomerEvents',
+      'shelfChanges',
+      'productRelocations',
+      'unavailableProductEvents',
+      'adaptationEvents',
+      'attentionConsistency',
+      'beginningPerformance',
+      'middlePerformance',
+      'endingPerformance',
+      'highestDifficulty',
+      'workingMemoryScore',
+      'planningScore',
+      'cognitiveFlexibilityScore',
+      'sequencingScore',
+      'decisionMakingScore',
+      'selectiveAttentionScore',
+      'sustainedAttentionScore',
+      'taskManagementScore',
+      'problemSolvingScore',
+      'overallScore',
+    ] as const;
+    const cognitiveAnalytics: Record<string, number | string> = {};
+    for (const key of keys)
+      cognitiveAnalytics[key] = number(
+        key,
+        key.endsWith('Score') ||
+          key.endsWith('Performance') ||
+          key.endsWith('Consistency') ||
+          key === 'orderRecallAccuracy' ||
+          key === 'routeEfficiency'
+          ? 100
+          : key === 'highestDifficulty'
+            ? 7
+            : 100000,
+      );
+    cognitiveAnalytics.completionStatus = String(
+      input.completionStatus || 'COMPLETED',
+    ).slice(0, 50);
+    await this.prisma.gameRuntimeSession.update({
+      where: { id: session.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        score: Number(cognitiveAnalytics.overallScore),
+        elapsedSeconds: Math.max(
+          0,
+          Math.round(
+            (Date.now() - new Date(session.startedAt || Date.now()).getTime()) /
+              1000,
+          ),
+        ),
+        runtimeState: {
+          ...((session.runtimeState || {}) as Record<string, unknown>),
+          cognitiveAnalytics,
+        } as Prisma.InputJsonValue,
+      },
+    });
+    await this.event(session.id, 'MEMORY_MARKET_COMPLETED', cognitiveAnalytics);
+    return { state: await this.state(session.id, schoolId, user) };
+  }
+
+  private async airportControllerComplete(
+    session: any,
+    payload: unknown,
+    schoolId: string,
+    user: { id: string; role: Role },
+  ) {
+    if (
+      session.engine.engineKey !== 'AIRPORT_CONTROLLER' ||
+      !['RUNNING', 'PAUSED'].includes(session.status)
+    )
+      throw new BadRequestException(
+        'Airport Controller metrics require an active session.',
+      );
+    const input = (payload || {}) as Record<string, unknown>;
+    const number = (key: string, max = 100000) =>
+      Math.max(0, Math.min(max, Number(input[key]) || 0));
+    const keys = [
+      'sessionDuration',
+      'planesSpawned',
+      'planesCompleted',
+      'planesRouted',
+      'planesMisrouted',
+      'planesRedirected',
+      'gatesUsed',
+      'gateConflicts',
+      'routeConflicts',
+      'priorityPlanes',
+      'priorityPlanesHandled',
+      'gateClosures',
+      'gateClosureAdaptations',
+      'taskSwitches',
+      'taskSwitchLatency',
+      'abandonedTasks',
+      'recoveredTasks',
+      'destinationMemoryErrors',
+      'averageRouteEfficiency',
+      'unnecessaryRouteChanges',
+      'averageDecisionTime',
+      'beginningPerformance',
+      'middlePerformance',
+      'endingPerformance',
+      'highestDifficulty',
+      'planningScore',
+      'dividedAttentionScore',
+      'taskSwitchingScore',
+      'decisionMakingScore',
+      'workingMemoryScore',
+      'prioritizationScore',
+      'cognitiveFlexibilityScore',
+      'problemSolvingScore',
+      'sustainedAttentionScore',
+      'overallScore',
+    ] as const;
+    const cognitiveAnalytics: Record<string, number | string | number[]> = {};
+    for (const key of keys)
+      cognitiveAnalytics[key] = number(
+        key,
+        key.endsWith('Score') ||
+          key.endsWith('Performance') ||
+          key === 'averageRouteEfficiency'
+          ? 100
+          : key === 'highestDifficulty'
+            ? 7
+            : 100000,
+      );
+    cognitiveAnalytics.decisionTimes = Array.isArray(input.decisionTimes)
+      ? input.decisionTimes
+          .slice(0, 200)
+          .map((value) => Math.max(0, Math.min(100000, Number(value) || 0)))
+      : [];
+    cognitiveAnalytics.completionStatus = String(
+      input.completionStatus || 'COMPLETED',
+    ).slice(0, 50);
+    await this.prisma.gameRuntimeSession.update({
+      where: { id: session.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        score: Number(cognitiveAnalytics.overallScore),
+        elapsedSeconds: Math.max(
+          0,
+          Math.round(
+            (Date.now() - new Date(session.startedAt || Date.now()).getTime()) /
+              1000,
+          ),
+        ),
+        runtimeState: {
+          ...((session.runtimeState || {}) as Record<string, unknown>),
+          cognitiveAnalytics,
+        } as Prisma.InputJsonValue,
+      },
+    });
+    await this.event(
+      session.id,
+      'AIRPORT_CONTROLLER_COMPLETED',
       cognitiveAnalytics,
     );
     return { state: await this.state(session.id, schoolId, user) };

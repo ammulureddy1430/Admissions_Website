@@ -1,0 +1,78 @@
+export type PuckState = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  speed: number;
+  active: boolean;
+};
+export type PaddleState = {
+  x: number;
+  y: number;
+  targetX: number;
+  targetY: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  movementDistance: number;
+  directionChanges: number;
+  lastDirection: number;
+};
+export type OpponentState = PaddleState & {
+  reactionDelay: number;
+  lastReaction: number;
+};
+export type Level = {
+  stage: number;
+  puckSpeed: number;
+  opponentSpeed: number;
+  reactionDelay: number;
+  variation: number;
+};
+export type RallyEvent = {
+  kind: "return" | "miss" | "goal";
+  at: number;
+  responseTime: number;
+  distance: number;
+  stage: number;
+};
+export type AirHockeyMetrics = {
+  sessionDuration: number;
+  ralliesStarted: number;
+  ralliesCompleted: number;
+  puckReturns: number;
+  successfulInterceptions: number;
+  missedInterceptions: number;
+  goalsConceded: number;
+  opponentGoals: number;
+  averageResponseTime: number;
+  averageMovementInitiationTime: number;
+  averageInterceptionDistance: number;
+  paddleMovementDistance: number;
+  paddleDirectionChanges: number;
+  unnecessaryMovements: number;
+  prematureMovements: number;
+  correctiveMovements: number;
+  overshoots: number;
+  undershoots: number;
+  trackingConsistency: number;
+  adaptationEvents: number;
+  adaptationTime: number;
+  difficultyReached: number;
+  attentionConsistency: number;
+  beginningPerformance: number;
+  middlePerformance: number;
+  endingPerformance: number;
+  sustainedAttentionScore: number;
+  visualAttentionScore: number;
+  responseControlScore: number;
+  anticipationScore: number;
+  decisionMakingScore: number;
+  inhibitoryControlScore: number;
+  handEyeCoordinationScore: number;
+  adaptiveResponseScore: number;
+  processingSpeedScore: number;
+  overallScore: number;
+  completionStatus: string;
+};
