@@ -54,6 +54,10 @@ import NumberBuilderGame from "@/games/number-builder/Game";
 import BallSortGame from "@/games/ball-sort/Game";
 import RedLightGreenLightGame from "@/games/red-light-green-light/Game";
 import CatchTheTargetGame from "@/games/catch-the-target/Game";
+import MentalRotationGame from "@/games/mental-rotation/Game";
+import WaterJugsGame from "@/games/water-jugs/Game";
+import TangramBuilderGame from "@/games/tangram-builder/Game";
+import SokobanGame from "@/games/sokoban/Game";
 
 const MAX_SECURITY_WARNINGS = 3;
 const SELF_CONTAINED_GAME_ENGINES = new Set([
@@ -72,6 +76,10 @@ const SELF_CONTAINED_GAME_ENGINES = new Set([
   "BALL_SORT",
   "RED_LIGHT_GREEN_LIGHT",
   "CATCH_THE_TARGET",
+  "MENTAL_ROTATION",
+  "WATER_JUGS",
+  "TANGRAM_BUILDER",
+  "SOKOBAN",
 ]);
 type GameOption = { id?: string; optionKey?: string; optionText: string };
 type AnswerResult = {
@@ -475,7 +483,11 @@ export function GameRuntimePlayer({
           actionName === "PARKING_ESCAPE_COMPLETE" ||
           actionName === "WATER_PIPELINE_COMPLETE" ||
           actionName === "PATTERN_MATRIX_COMPLETE" ||
-          actionName === "CATCH_THE_TARGET_COMPLETE") &&
+          actionName === "CATCH_THE_TARGET_COMPLETE" ||
+          actionName === "MENTAL_ROTATION_COMPLETE" ||
+          actionName === "WATER_JUGS_COMPLETE" ||
+          actionName === "TANGRAM_BUILDER_COMPLETE" ||
+          actionName === "SOKOBAN_COMPLETE") &&
         next.status === "COMPLETED"
       ) {
         setAssessmentCompleted(true);
@@ -587,7 +599,11 @@ export function GameRuntimePlayer({
       state.engine?.engineKey === "WATER_PIPELINE" ||
       state.engine?.engineKey === "PATTERN_MATRIX" ||
       state.engine?.engineKey === "NUMBER_BUILDER" ||
-      state.engine?.engineKey === "CATCH_THE_TARGET"
+      state.engine?.engineKey === "CATCH_THE_TARGET" ||
+      state.engine?.engineKey === "MENTAL_ROTATION" ||
+      state.engine?.engineKey === "WATER_JUGS" ||
+      state.engine?.engineKey === "TANGRAM_BUILDER" ||
+      state.engine?.engineKey === "SOKOBAN"
     )
       return;
     timeoutHandled.current = true;
@@ -618,8 +634,13 @@ export function GameRuntimePlayer({
   const isPatternMatrix = state.engine?.engineKey === "PATTERN_MATRIX";
   const isNumberBuilder = state.engine?.engineKey === "NUMBER_BUILDER";
   const isBallSort = state.engine?.engineKey === "BALL_SORT";
-  const isRedLightGreenLight = state.engine?.engineKey === "RED_LIGHT_GREEN_LIGHT";
+  const isRedLightGreenLight =
+    state.engine?.engineKey === "RED_LIGHT_GREEN_LIGHT";
   const isCatchTheTarget = state.engine?.engineKey === "CATCH_THE_TARGET";
+  const isMentalRotation = state.engine?.engineKey === "MENTAL_ROTATION";
+  const isWaterJugs = state.engine?.engineKey === "WATER_JUGS";
+  const isTangramBuilder = state.engine?.engineKey === "TANGRAM_BUILDER";
+  const isSokoban = state.engine?.engineKey === "SOKOBAN";
   const isPracticeMode =
     state.mode === "PRACTICE" || state.configuration?.practiceMode === true;
   const showGameIntro =
@@ -864,9 +885,7 @@ export function GameRuntimePlayer({
             <BallSortGame
               disabled={!isPracticeMode && state.status !== "RUNNING"}
               durationSeconds={120}
-              onComplete={(metrics) =>
-                action("BALL_SORT_COMPLETE", metrics)
-              }
+              onComplete={(metrics) => action("BALL_SORT_COMPLETE", metrics)}
             />
           ) : isRedLightGreenLight ? (
             <RedLightGreenLightGame
@@ -884,6 +903,38 @@ export function GameRuntimePlayer({
               onComplete={(metrics) =>
                 action("CATCH_THE_TARGET_COMPLETE", metrics)
               }
+            />
+          ) : isMentalRotation ? (
+            <MentalRotationGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              onComplete={(metrics) =>
+                action("MENTAL_ROTATION_COMPLETE", metrics)
+              }
+            />
+          ) : isWaterJugs ? (
+            <WaterJugsGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              onComplete={(metrics) => action("WATER_JUGS_COMPLETE", metrics)}
+            />
+          ) : isTangramBuilder ? (
+            <TangramBuilderGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              onComplete={(metrics) =>
+                action("TANGRAM_BUILDER_COMPLETE", metrics)
+              }
+            />
+          ) : isSokoban ? (
+            <SokobanGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              onComplete={(metrics) => action("SOKOBAN_COMPLETE", metrics)}
             />
           ) : q ? (
             state.engine?.engineKey === "BOARD_GAME" ? (
@@ -2028,6 +2079,10 @@ function ActualGameTutorialDemo({ preview }: { preview: any }) {
     "WATER_PIPELINE",
     "PATTERN_MATRIX",
     "CATCH_THE_TARGET",
+    "MENTAL_ROTATION",
+    "WATER_JUGS",
+    "TANGRAM_BUILDER",
+    "SOKOBAN",
   ];
   if (builtInPracticeEngines.includes(engineKey)) {
     return <BuiltInGamePractice key={mockAttempt} engineKey={engineKey} />;
@@ -2349,6 +2404,46 @@ function BuiltInGamePractice({ engineKey }: { engineKey: string }) {
   else if (engineKey === "CATCH_THE_TARGET")
     game = (
       <CatchTheTargetGame
+        key={attempt}
+        disabled={false}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        onComplete={finish}
+      />
+    );
+  else if (engineKey === "MENTAL_ROTATION")
+    game = (
+      <MentalRotationGame
+        key={attempt}
+        disabled={false}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        onComplete={finish}
+      />
+    );
+  else if (engineKey === "WATER_JUGS")
+    game = (
+      <WaterJugsGame
+        key={attempt}
+        disabled={false}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        onComplete={finish}
+      />
+    );
+  else if (engineKey === "TANGRAM_BUILDER")
+    game = (
+      <TangramBuilderGame
+        key={attempt}
+        disabled={false}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        onComplete={finish}
+      />
+    );
+  else if (engineKey === "SOKOBAN")
+    game = (
+      <SokobanGame
         key={attempt}
         disabled={false}
         remainingSeconds={mockDurationSeconds}

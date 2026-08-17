@@ -33,6 +33,10 @@ const SELF_CONTAINED_PRACTICE_ENGINES = new Set([
   'WATER_PIPELINE',
   'PATTERN_MATRIX',
   'CATCH_THE_TARGET',
+  'MENTAL_ROTATION',
+  'WATER_JUGS',
+  'TANGRAM_BUILDER',
+  'SOKOBAN',
   'NUMBER_BUILDER',
   'BALL_SORT',
   'RED_LIGHT_GREEN_LIGHT',
@@ -1273,7 +1277,33 @@ export class GamePlayService {
         ? runtime.cognitiveAnalytics
         : null;
     const catchTheTarget =
-      session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'CATCH_THE_TARGET'
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'CATCH_THE_TARGET'
+        ? runtime.cognitiveAnalytics
+        : null;
+    const mentalRotation =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'MENTAL_ROTATION'
+        ? runtime.cognitiveAnalytics
+        : null;
+    const waterJugs =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'WATER_JUGS'
+        ? runtime.cognitiveAnalytics
+        : null;
+    const tangramBuilder =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'TANGRAM_BUILDER'
+        ? runtime.cognitiveAnalytics
+        : null;
+    const sokoban =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'SOKOBAN'
         ? runtime.cognitiveAnalytics
         : null;
     const cognitive =
@@ -1291,7 +1321,11 @@ export class GamePlayService {
       numberBuilder ||
       ballSort ||
       redLightGreenLight ||
-      catchTheTarget;
+      catchTheTarget ||
+      mentalRotation ||
+      waterJugs ||
+      tangramBuilder ||
+      sokoban;
     const answered = followLights
       ? Number(followLights.correctTaps || 0) +
         Number(followLights.wrongTaps || 0)
@@ -1315,15 +1349,33 @@ export class GamePlayService {
                         ? Number(waterPipeline.levelsCompleted || 0)
                         : patternMatrix
                           ? Number(patternMatrix.roundsCompleted || 0)
-                        : numberBuilder
-                          ? Number(numberBuilder.roundsCompleted || 0)
-                        : ballSort
-                          ? Number(ballSort.levelsCompleted || 0)
-                        : redLightGreenLight
-                          ? Number(redLightGreenLight.difficultyReached || 1)
-                        : catchTheTarget
-                          ? Number(catchTheTarget.totalObjects || 0)
-                        : runtime?.answers?.length || 0;
+                          : numberBuilder
+                            ? Number(numberBuilder.roundsCompleted || 0)
+                            : ballSort
+                              ? Number(ballSort.levelsCompleted || 0)
+                              : redLightGreenLight
+                                ? Number(
+                                    redLightGreenLight.difficultyReached || 1,
+                                  )
+                                : catchTheTarget
+                                  ? Number(catchTheTarget.totalObjects || 0)
+                                  : mentalRotation
+                                    ? Number(
+                                        mentalRotation.completedChallenges || 0,
+                                      )
+                                    : waterJugs
+                                      ? Number(
+                                          waterJugs.challengesCompleted || 0,
+                                        )
+                                      : tangramBuilder
+                                        ? Number(
+                                            tangramBuilder.puzzlesCompleted || 0,
+                                          )
+                                        : sokoban
+                                          ? Number(
+                                              sokoban.puzzlesCompleted || 0,
+                                            )
+                                      : runtime?.answers?.length || 0;
     const total = cognitive
       ? Math.max(1, answered)
       : session.questionIds.length;
@@ -1349,17 +1401,29 @@ export class GamePlayService {
                         ? Number(waterPipeline.overallScore || 0)
                         : patternMatrix
                           ? Number(patternMatrix.overallScore || 0)
-                        : numberBuilder
-                          ? Number(numberBuilder.overallScore || 0)
-                        : ballSort
-                          ? Number(ballSort.overallScore || 0)
-                        : redLightGreenLight
-                          ? Number(redLightGreenLight.overallScore || 0)
-                        : catchTheTarget
-                          ? Number(catchTheTarget.overallScore || 0)
-                        : total
-                          ? (Number(runtime?.correct || 0) / total) * 100
-                          : 0;
+                          : numberBuilder
+                            ? Number(numberBuilder.overallScore || 0)
+                            : ballSort
+                              ? Number(ballSort.overallScore || 0)
+                              : redLightGreenLight
+                                ? Number(redLightGreenLight.overallScore || 0)
+                                : catchTheTarget
+                                  ? Number(catchTheTarget.overallScore || 0)
+                                  : mentalRotation
+                                    ? Number(mentalRotation.overallScore || 0)
+                                    : waterJugs
+                                      ? Number(waterJugs.overallScore || 0)
+                                      : tangramBuilder
+                                        ? Number(
+                                            tangramBuilder.overallScore || 0,
+                                          )
+                                        : sokoban
+                                          ? Number(sokoban.overallScore || 0)
+                                      : total
+                                      ? (Number(runtime?.correct || 0) /
+                                          total) *
+                                        100
+                                      : 0;
     const passed = percentage >= assignment.passingScore;
     const attempt = await this.prisma.gameAttempt.findFirst({
       where: { gameResultId: result.id, submittedAt: null },
@@ -1713,13 +1777,21 @@ export class GamePlayService {
           redLightEvents: Number(redLightGreenLight.redLightEvents || 0),
           correctStarts: Number(redLightGreenLight.correctStarts || 0),
           correctStops: Number(redLightGreenLight.correctStops || 0),
-          prematureMovements: Number(redLightGreenLight.prematureMovements || 0),
-          averageStartReactionTime: Number(redLightGreenLight.averageStartReactionTime || 0),
-          averageStopReactionTime: Number(redLightGreenLight.averageStopReactionTime || 0),
+          prematureMovements: Number(
+            redLightGreenLight.prematureMovements || 0,
+          ),
+          averageStartReactionTime: Number(
+            redLightGreenLight.averageStartReactionTime || 0,
+          ),
+          averageStopReactionTime: Number(
+            redLightGreenLight.averageStopReactionTime || 0,
+          ),
           progress: Number(redLightGreenLight.progress || 0),
           difficultyReached: Number(redLightGreenLight.difficultyReached || 1),
           overallScore: Number(redLightGreenLight.overallScore || 0),
-          completionStatus: String(redLightGreenLight.completionStatus || 'COMPLETED'),
+          completionStatus: String(
+            redLightGreenLight.completionStatus || 'COMPLETED',
+          ),
         };
         await tx.redLightGreenLightAnalytics.upsert({
           where: { gameResultId: result.id },
@@ -1788,13 +1860,21 @@ export class GamePlayService {
           processingSpeedScore: Number(patternMatrix.processingSpeedScore || 0),
           completionPercentage: Number(patternMatrix.completionPercentage || 0),
           overallScore: Number(patternMatrix.overallScore || 0),
-          completionStatus: String(patternMatrix.completionStatus || 'COMPLETED'),
+          completionStatus: String(
+            patternMatrix.completionStatus || 'COMPLETED',
+          ),
           startedAt: session.startedAt || new Date(),
           completedAt: session.completedAt || new Date(),
         };
         await tx.patternMatrixAnalytics.upsert({
           where: { gameResultId: result.id },
-          create: { ...data, gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId },
+          create: {
+            ...data,
+            gameResultId: result.id,
+            gameId: result.gameId,
+            studentId,
+            assessmentId: assignment.gameAssessmentId,
+          },
           update: data,
         });
       }
@@ -1804,7 +1884,9 @@ export class GamePlayService {
           roundsPresented: Number(numberBuilder.roundsPresented || 0),
           roundsCompleted: Number(numberBuilder.roundsCompleted || 0),
           correctInteractions: Number(numberBuilder.correctInteractions || 0),
-          incorrectInteractions: Number(numberBuilder.incorrectInteractions || 0),
+          incorrectInteractions: Number(
+            numberBuilder.incorrectInteractions || 0,
+          ),
           totalScore: Number(numberBuilder.totalScore || 0),
           accuracy: Number(numberBuilder.accuracy || 0),
           averageResponseTime: Number(numberBuilder.averageResponseTime || 0),
@@ -1814,18 +1896,28 @@ export class GamePlayService {
           numberSenseScore: Number(numberBuilder.numberSenseScore || 0),
           countingScore: Number(numberBuilder.countingScore || 0),
           sequencingScore: Number(numberBuilder.sequencingScore || 0),
-          quantityComparisonScore: Number(numberBuilder.quantityComparisonScore || 0),
+          quantityComparisonScore: Number(
+            numberBuilder.quantityComparisonScore || 0,
+          ),
           attentionScore: Number(numberBuilder.attentionScore || 0),
           processingSpeedScore: Number(numberBuilder.processingSpeedScore || 0),
           accuracyScore: Number(numberBuilder.accuracyScore || 0),
           overallScore: Number(numberBuilder.overallScore || 0),
-          completionStatus: String(numberBuilder.completionStatus || 'COMPLETED'),
+          completionStatus: String(
+            numberBuilder.completionStatus || 'COMPLETED',
+          ),
           startedAt: session.startedAt || new Date(),
           completedAt: session.completedAt || new Date(),
         };
         await tx.numberBuilderAnalytics.upsert({
           where: { gameResultId: result.id },
-          create: { ...data, gameResultId: result.id, gameId: result.gameId, studentId, assessmentId: assignment.gameAssessmentId },
+          create: {
+            ...data,
+            gameResultId: result.id,
+            gameId: result.gameId,
+            studentId,
+            assessmentId: assignment.gameAssessmentId,
+          },
           update: data,
         });
       }

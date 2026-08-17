@@ -1,0 +1,488 @@
+.water-jugs-game {
+  position: relative;
+  min-height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding: 26px;
+  background:
+    radial-gradient(circle at 18% 20%, #fff 0 4%, transparent 4.5%),
+    radial-gradient(circle at 82% 12%, #dff9ff 0 11%, transparent 11.5%),
+    linear-gradient(155deg, #eefcff, #dff5ef 58%, #e8efff);
+  color: #12304c;
+  touch-action: manipulation;
+  user-select: none;
+}
+.water-jugs-game:before {
+  content: "";
+  position: absolute;
+  inset: auto -10% -80px;
+  height: 190px;
+  background: linear-gradient(#9edbcf, #6bb9b1);
+  border-radius: 50% 50% 0 0;
+}
+.water-jugs-game__progress {
+  position: absolute;
+  top: 18px;
+  display: flex;
+  gap: 9px;
+}
+.water-jugs-game__progress i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #bfd8dc;
+}
+.water-jugs-game__progress i.is-active {
+  background: #168b88;
+}
+.water-jugs-game__timer {
+  position: absolute;
+  z-index: 3;
+  top: 14px;
+  left: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 82px;
+  padding: 9px 14px;
+  border: 3px solid #fff;
+  border-radius: 18px;
+  background: #246f7e;
+  color: #fff;
+  font-size: 21px;
+  font-weight: 900;
+  box-shadow: 0 5px 0 #174e5a;
+}
+.water-jugs-game__timer svg {
+  width: 22px;
+}
+.water-jugs-game__timer.is-low {
+  background: #c64848;
+  animation: wjTimerPulse 0.7s infinite alternate;
+}
+@keyframes wjTimerPulse {
+  to {
+    transform: scale(1.07);
+  }
+}
+.water-jugs-game__target {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 22px;
+  border: 3px dashed #ff9f66;
+  border-radius: 26px;
+  background: #ffffffc7;
+  box-shadow: 0 10px 30px #29636d19;
+}
+.water-jugs-game__target-icon {
+  font-size: 35px;
+  color: #ee7f50;
+}
+.water-jugs-game__target strong {
+  max-width: 190px;
+  font-size: clamp(16px, 2vw, 21px);
+  line-height: 1.25;
+}
+.water-jugs-game__target .water-jugs-game__vessel {
+  width: 86px;
+  max-height: 120px;
+}
+.water-jugs-game__jugs {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: clamp(18px, 5vw, 64px);
+  width: min(780px, 100%);
+}
+.water-jugs-game__jug-station {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 13px;
+}
+.water-jugs-game__jug {
+  border: 0;
+  background: transparent;
+  padding: 8px;
+  border-radius: 28px;
+  cursor: pointer;
+  transition:
+    transform 0.2s,
+    filter 0.2s;
+}
+.water-jugs-game__jug:hover,
+.water-jugs-game__jug:focus-visible {
+  transform: translateY(-5px);
+}
+.water-jugs-game__jug.is-selected {
+  filter: drop-shadow(0 0 12px #ffaf4d);
+  transform: translateY(-9px) rotate(-3deg);
+}
+.water-jugs-game__jug.is-destination {
+  filter: drop-shadow(0 0 12px #24aa9c);
+}
+.water-jugs-game__jug:disabled {
+  cursor: default;
+}
+.water-jugs-game__amount {
+  display: block;
+  margin-top: 10px;
+  padding: 5px 10px;
+  border-radius: 12px;
+  background: #246f7e;
+  color: #fff;
+  font-size: 17px;
+}
+.water-jugs-game__selection-label,
+.water-jugs-game__destination-label {
+  display: block;
+  margin-top: 7px;
+  color: #a64b1e;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+.water-jugs-game__destination-label {
+  color: #167d84;
+}
+.water-jugs-game__vessel {
+  position: relative;
+  display: block;
+  width: clamp(105px, 16vw, 145px);
+  overflow: hidden;
+  border: 6px solid #337b91;
+  border-top-width: 9px;
+  border-radius: 18px 18px 34px 34px;
+  background: linear-gradient(90deg, #fff8, #dffaff80);
+  box-shadow:
+    inset 0 -9px 16px #19566d16,
+    0 13px 20px #24577324;
+}
+.water-jugs-game__vessel:before {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  right: -28px;
+  top: 30%;
+  width: 46px;
+  height: 62px;
+  border: 7px solid #337b91;
+  border-left: 0;
+  border-radius: 0 28px 28px 0;
+}
+.water-jugs-game__liquid {
+  position: absolute;
+  inset: auto 0 0;
+  background: linear-gradient(180deg, #5de1e6, #1ba9d2 65%, #178dbf);
+  transition: height 0.48s cubic-bezier(0.2, 0.75, 0.3, 1);
+  min-height: 0;
+}
+.water-jugs-game__liquid:before {
+  content: "";
+  position: absolute;
+  left: -7%;
+  top: -8px;
+  width: 114%;
+  height: 16px;
+  border-radius: 50%;
+  background: #8ef0ec;
+}
+.water-jugs-game__liquid i {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border: 2px solid #fff9;
+  border-radius: 50%;
+  left: 25%;
+  bottom: 20%;
+  animation: wjBubble 2.4s infinite;
+}
+.water-jugs-game__liquid i + i {
+  left: 68%;
+  bottom: 48%;
+  animation-delay: 0.8s;
+}
+.water-jugs-game__shine {
+  position: absolute;
+  z-index: 2;
+  left: 13%;
+  top: 10%;
+  width: 11%;
+  height: 68%;
+  border-radius: 12px;
+  background: #fff8;
+}
+.water-jugs-game__target-line {
+  position: absolute;
+  z-index: 4;
+  left: -4px;
+  right: -4px;
+  border-top: 5px dashed #ff7e55;
+  transform: translateY(2px);
+}
+.water-jugs-game__vessel.is-ghost {
+  border-color: #7b98a1;
+  background: #f8ffffaa;
+}
+.water-jugs-game__vessel.is-ghost:before {
+  display: none;
+}
+.water-jugs-game__actions {
+  display: flex;
+  gap: 10px;
+}
+.water-jugs-game__actions button,
+.water-jugs-game__reset,
+.water-jugs-game__help,
+.water-jugs-game__next {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 58px;
+  min-height: 52px;
+  border: 3px solid #fff;
+  border-radius: 18px;
+  background: #fff;
+  color: #167d84;
+  font-size: 17px;
+  font-weight: 800;
+  box-shadow: 0 8px 18px #235d6725;
+  cursor: pointer;
+}
+.water-jugs-game__actions button:hover,
+.water-jugs-game__actions button:focus-visible,
+.water-jugs-game__reset:hover,
+.water-jugs-game__help:hover,
+.water-jugs-game__next:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 11px 22px #235d6735;
+}
+.water-jugs-game__actions button:disabled,
+.water-jugs-game__reset:disabled,
+.water-jugs-game__help:disabled,
+.water-jugs-game__next:disabled {
+  opacity: 0.55;
+}
+.water-jugs-game__reset {
+  position: absolute;
+  z-index: 2;
+  right: 22px;
+  bottom: 20px;
+  min-width: 52px;
+}
+.water-jugs-game__reset svg {
+  width: 24px;
+}
+.water-jugs-game__help {
+  position: absolute;
+  z-index: 2;
+  left: 22px;
+  bottom: 20px;
+  min-width: 52px;
+}
+.water-jugs-game__next {
+  position: absolute;
+  z-index: 2;
+  right: 90px;
+  bottom: 20px;
+  padding: 0 16px;
+}
+.water-jugs-game__next svg,
+.water-jugs-game__help svg {
+  width: 23px;
+}
+.water-jugs-game__pour-help {
+  position: relative;
+  z-index: 1;
+  margin: -8px 0 0;
+  padding: 8px 16px;
+  border-radius: 14px;
+  background: #ffffffd9;
+  color: #205f70;
+  font-size: clamp(14px, 1.8vw, 18px);
+  font-weight: 800;
+}
+.water-jugs-game__pour-help.is-ready {
+  background: #fff2c9;
+  color: #8a4b1e;
+  box-shadow: 0 0 0 4px #ffb85c66;
+}
+.water-jugs-game__how-to {
+  position: absolute;
+  z-index: 10;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: #234a5fc7;
+  backdrop-filter: blur(5px);
+}
+.water-jugs-game__how-to-card {
+  width: min(650px, 94vw);
+  padding: clamp(24px, 4vw, 42px);
+  border: 5px solid #fff;
+  border-radius: 30px;
+  background: #f8ffff;
+  color: #12304c;
+  text-align: center;
+  box-shadow: 0 20px 60px #17264066;
+}
+.water-jugs-game__how-to-card h2 {
+  margin: 0 0 24px;
+  font-size: clamp(25px, 4vw, 40px);
+}
+.water-jugs-game__how-to-card p {
+  max-width: 540px;
+  margin: 20px auto 0;
+  font-size: clamp(17px, 2.2vw, 22px);
+  font-weight: 700;
+  line-height: 1.45;
+}
+.water-jugs-game__demo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 2vw, 18px);
+  padding: 20px 14px;
+  border-radius: 20px;
+  background: #dff5ef;
+  color: #176b77;
+  font-size: clamp(14px, 2vw, 19px);
+  font-weight: 900;
+}
+.water-jugs-game__demo svg {
+  flex: 0 0 auto;
+  width: 25px;
+}
+.water-jugs-game__demo-result {
+  padding: 8px 11px;
+  border-radius: 12px;
+  background: #168b88;
+  color: #fff;
+}
+.water-jugs-game__steps {
+  max-width: 430px;
+  margin: 18px auto 0;
+  padding-left: 28px;
+  color: #205f70;
+  font-size: clamp(15px, 2vw, 19px);
+  font-weight: 800;
+  line-height: 1.55;
+  text-align: left;
+}
+.water-jugs-game__play {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 24px;
+  padding: 14px 34px;
+  border: 3px solid #fff;
+  border-radius: 18px;
+  background: linear-gradient(#27a8a5, #167d84);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 800;
+  box-shadow: 0 7px 0 #115a64;
+  cursor: pointer;
+}
+.water-jugs-game__play svg {
+  width: 25px;
+}
+.water-jugs-game__stream {
+  position: absolute;
+  z-index: 4;
+  top: 43%;
+  font-size: 38px;
+  opacity: 0;
+  transform: translateY(-15px);
+  transition: 0.25s;
+}
+.water-jugs-game__stream[data-visible="true"] {
+  opacity: 1;
+  transform: translateY(15px);
+}
+.water-jugs-game.is-animating .water-jugs-game__liquid:before {
+  animation: wjWave 0.45s ease-in-out infinite alternate;
+}
+@keyframes wjBubble {
+  0% {
+    transform: translateY(15px);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-70px);
+    opacity: 0;
+  }
+}
+@keyframes wjWave {
+  to {
+    transform: translateX(7px) scaleY(0.75);
+  }
+}
+@media (max-width: 620px) {
+  .water-jugs-game {
+    padding: 56px 10px 18px;
+    gap: 13px;
+  }
+  .water-jugs-game__jugs {
+    gap: 4px;
+  }
+  .water-jugs-game__vessel {
+    width: 88px;
+    transform: scale(0.88);
+    transform-origin: bottom;
+  }
+  .water-jugs-game__target {
+    padding: 6px 14px;
+  }
+  .water-jugs-game__actions button {
+    min-width: 46px;
+    min-height: 46px;
+  }
+  .water-jugs-game__reset {
+    right: 10px;
+    bottom: 10px;
+  }
+  .water-jugs-game__help {
+    left: 10px;
+    bottom: 10px;
+  }
+  .water-jugs-game__next {
+    right: 70px;
+    bottom: 10px;
+    padding: 0 11px;
+  }
+  .water-jugs-game__timer {
+    top: 8px;
+    left: 8px;
+    min-width: 70px;
+    padding: 7px 10px;
+    font-size: 18px;
+  }
+  .water-jugs-game__target strong {
+    max-width: 145px;
+  }
+  .water-jugs-game__amount {
+    margin-top: 2px;
+    font-size: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .water-jugs-game * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

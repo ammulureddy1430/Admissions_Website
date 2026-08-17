@@ -127,6 +127,22 @@ registerGame({
   load: () => import("./catch-the-target/Game"),
 });
 registerGame({
+  componentName: "MENTAL_ROTATION",
+  load: () => import("./mental-rotation/Game"),
+});
+registerGame({
+  componentName: "WATER_JUGS",
+  load: () => import("./water-jugs/Game"),
+});
+registerGame({
+  componentName: "TANGRAM_BUILDER",
+  load: () => import("./tangram-builder/Game"),
+});
+registerGame({
+  componentName: "SOKOBAN",
+  load: () => import("./sokoban/Game"),
+});
+registerGame({
   componentName: "NUMBER_BUILDER",
   load: () => import("./number-builder/Game"),
 });

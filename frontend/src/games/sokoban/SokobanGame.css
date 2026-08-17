@@ -1,0 +1,446 @@
+.sokoban-game {
+  position: relative;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  overflow: hidden;
+  padding: 50px 18px 18px;
+  background:
+    radial-gradient(circle at 15% 18%, #fff9 0 5%, transparent 5.5%),
+    linear-gradient(145deg, #eaf9ef, #dceef8 55%, #eee6fb);
+  touch-action: none;
+  user-select: none;
+}
+.sokoban-game:before {
+  content: "";
+  position: absolute;
+  inset: auto -5% -65px;
+  height: 190px;
+  border-radius: 50% 50% 0 0;
+  background: linear-gradient(#7fc9a3, #3d9b88);
+}
+.sokoban-game__progress {
+  position: absolute;
+  z-index: 3;
+  top: 17px;
+  display: flex;
+  gap: 9px;
+}
+.sokoban-game__progress i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #b8ced1;
+}
+.sokoban-game__progress i.is-active {
+  background: #7356b9;
+}
+.sokoban-game__timer {
+  position: absolute;
+  z-index: 3;
+  top: 14px;
+  left: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 82px;
+  padding: 9px 14px;
+  border: 3px solid #fff;
+  border-radius: 18px;
+  background: #34415f;
+  color: #fff;
+  font-size: 21px;
+  font-weight: 900;
+  box-shadow: 0 5px 0 #202a42;
+}
+.sokoban-game__timer svg {
+  width: 22px;
+}
+.sokoban-game__timer.is-low {
+  background: #c64848;
+  animation: sokoban-timer-pulse 0.7s infinite alternate;
+}
+@keyframes sokoban-timer-pulse {
+  to {
+    transform: scale(1.07);
+  }
+}
+.sokoban-game__board {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  width: min(72vh, 680px);
+  max-width: 92vw;
+  aspect-ratio: 1.35;
+  padding: 10px;
+  border: 8px solid #5e6682;
+  border-radius: 24px;
+  background: #a9cbd0;
+  box-shadow: 0 18px 42px #253a5740;
+}
+.sokoban-game__cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  border: 1px solid #ffffff2b;
+  background: linear-gradient(145deg, #e8e3c6, #cfc89f);
+}
+.sokoban-game__cell--wall {
+  z-index: 1;
+  border: 2px solid #66718a;
+  border-radius: 6px;
+  background: linear-gradient(145deg, #8f9bb3, #58647e);
+  box-shadow: inset 0 0 0 4px #ffffff18;
+}
+.sokoban-game__cell--wall:after {
+  content: "";
+  position: absolute;
+  inset: 45% 5% auto;
+  border-top: 3px solid #424b62;
+}
+.sokoban-game__goal,
+.sokoban-game__box,
+.sokoban-game__player {
+  position: absolute;
+  display: none;
+  font-style: normal;
+}
+.sokoban-game__cell--goal .sokoban-game__goal,
+.sokoban-game__cell--playerOnGoal .sokoban-game__goal,
+.sokoban-game__cell--boxOnGoal .sokoban-game__goal {
+  display: block;
+  color: #ffb52e;
+  font-size: clamp(22px, 5vh, 46px);
+  filter: drop-shadow(0 2px 1px #8a5a13);
+}
+.sokoban-game__cell--box .sokoban-game__box,
+.sokoban-game__cell--boxOnGoal .sokoban-game__box {
+  display: grid;
+  place-items: center;
+  width: 72%;
+  aspect-ratio: 1;
+  border: 4px solid #8c4c24;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #ffc85c, #df8331);
+  color: #fff7d1;
+  font-size: clamp(18px, 4vh, 38px);
+  box-shadow:
+    0 6px 0 #753b22,
+    0 9px 15px #41322248;
+  transition: transform 0.16s;
+}
+.sokoban-game__cell--boxOnGoal .sokoban-game__box {
+  background: linear-gradient(145deg, #f6c64f, #9b64d5);
+  border-color: #70449f;
+}
+.sokoban-game__cell--player .sokoban-game__player,
+.sokoban-game__cell--playerOnGoal .sokoban-game__player {
+  display: block;
+  width: 62%;
+  aspect-ratio: 0.8;
+  border-radius: 50% 50% 35% 35%;
+  background: linear-gradient(#ffd7ad 0 38%, #2c8b9b 39%);
+  box-shadow: 0 5px 0 #196675;
+  transition: transform 0.12s;
+}
+.sokoban-game__player:before {
+  content: "";
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: -7%;
+  height: 34%;
+  border-radius: 50% 50% 35% 35%;
+  background: #4d2f28;
+}
+.sokoban-game__player b:before,
+.sokoban-game__player b:after {
+  content: "";
+  position: absolute;
+  top: 25%;
+  width: 8%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #263348;
+}
+.sokoban-game__player b:before {
+  left: 31%;
+}
+.sokoban-game__player b:after {
+  right: 31%;
+}
+.sokoban-game__controls {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(3, 62px);
+  grid-template-rows: repeat(2, 58px);
+  gap: 7px;
+}
+.sokoban-game__controls button,
+.sokoban-game__reset,
+.sokoban-game__help,
+.sokoban-game__next {
+  display: grid;
+  place-items: center;
+  border: 3px solid #fff;
+  border-radius: 19px;
+  background: linear-gradient(#8870cb, #6447ab);
+  color: #fff;
+  box-shadow:
+    0 7px 0 #49327d,
+    0 10px 20px #26365340;
+  cursor: pointer;
+}
+.sokoban-game__controls button:active,
+.sokoban-game__reset:active,
+.sokoban-game__help:active,
+.sokoban-game__next:active {
+  transform: translateY(5px);
+  box-shadow: 0 2px 0 #49327d;
+}
+.sokoban-game__controls button:disabled,
+.sokoban-game__reset:disabled,
+.sokoban-game__help:disabled,
+.sokoban-game__next:disabled {
+  opacity: 0.5;
+}
+.sokoban-game__controls svg {
+  width: 30px;
+  height: 30px;
+}
+.sokoban-game__controls .up {
+  grid-column: 2;
+}
+.sokoban-game__controls .left {
+  grid-row: 2;
+  grid-column: 1;
+}
+.sokoban-game__controls .down {
+  grid-row: 2;
+  grid-column: 2;
+}
+.sokoban-game__controls .right {
+  grid-row: 2;
+  grid-column: 3;
+}
+.sokoban-game__reset {
+  position: absolute;
+  z-index: 3;
+  right: 22px;
+  bottom: 22px;
+  width: 56px;
+  height: 56px;
+}
+.sokoban-game__reset svg,
+.sokoban-game__help svg {
+  width: 25px;
+}
+.sokoban-game__help {
+  position: absolute;
+  z-index: 3;
+  left: 22px;
+  bottom: 22px;
+  width: 56px;
+  height: 56px;
+}
+.sokoban-game__next {
+  position: absolute;
+  z-index: 3;
+  right: 92px;
+  bottom: 22px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 56px;
+  padding: 0 18px;
+  font-size: 17px;
+  font-weight: 900;
+}
+.sokoban-game__next svg {
+  width: 23px;
+}
+.sokoban-game__how-to {
+  position: absolute;
+  z-index: 10;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: #34415fc7;
+  backdrop-filter: blur(5px);
+}
+.sokoban-game__how-to-card {
+  width: min(620px, 94vw);
+  padding: clamp(24px, 4vw, 42px);
+  border: 5px solid #fff;
+  border-radius: 30px;
+  background: #fffdf5;
+  color: #172640;
+  text-align: center;
+  box-shadow: 0 20px 60px #17264066;
+}
+.sokoban-game__how-to-card h2 {
+  margin: 0 0 24px;
+  font-size: clamp(25px, 4vw, 40px);
+}
+.sokoban-game__how-to-card p {
+  max-width: 520px;
+  margin: 18px auto 0;
+  font-size: clamp(16px, 2.2vw, 22px);
+  font-weight: 700;
+  line-height: 1.45;
+}
+.sokoban-game__how-to-card .sokoban-game__warning {
+  margin-top: 8px;
+  color: #8c4c24;
+  font-size: clamp(14px, 1.8vw, 18px);
+}
+.sokoban-game__demo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 2vw, 20px);
+  min-height: 105px;
+  padding: 16px;
+  border-radius: 20px;
+  background: linear-gradient(145deg, #e8e3c6, #cfc89f);
+}
+.sokoban-game__demo-player {
+  position: relative;
+  width: 58px;
+  aspect-ratio: 0.8;
+  border-radius: 50% 50% 35% 35%;
+  background: linear-gradient(#ffd7ad 0 38%, #2c8b9b 39%);
+  box-shadow: 0 5px 0 #196675;
+}
+.sokoban-game__demo-player:before {
+  content: "";
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: -7%;
+  height: 34%;
+  border-radius: 50% 50% 35% 35%;
+  background: #4d2f28;
+}
+.sokoban-game__demo-player b:before,
+.sokoban-game__demo-player b:after {
+  content: "";
+  position: absolute;
+  top: 25%;
+  width: 8%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #263348;
+}
+.sokoban-game__demo-player b:before {
+  left: 31%;
+}
+.sokoban-game__demo-player b:after {
+  right: 31%;
+}
+.sokoban-game__demo-arrow {
+  flex: 0 0 auto;
+  width: clamp(24px, 4vw, 38px);
+  color: #7356b9;
+}
+.sokoban-game__demo-box {
+  display: grid;
+  place-items: center;
+  width: 68px;
+  aspect-ratio: 1;
+  border: 4px solid #8c4c24;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #ffc85c, #df8331);
+  color: #fff7d1;
+  font-size: 34px;
+  box-shadow: 0 6px 0 #753b22;
+}
+.sokoban-game__demo-goal {
+  color: #ffb52e;
+  font-size: 62px;
+  filter: drop-shadow(0 2px 1px #8a5a13);
+}
+.sokoban-game__play {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 24px;
+  padding: 14px 34px;
+  border: 3px solid #fff;
+  border-radius: 18px;
+  background: linear-gradient(#8870cb, #6447ab);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 800;
+  box-shadow: 0 7px 0 #49327d;
+  cursor: pointer;
+}
+.sokoban-game__play svg {
+  width: 25px;
+}
+.sokoban-game.is-transitioning .sokoban-game__board {
+  opacity: 0.3;
+  transform: scale(0.97);
+  transition: 0.35s;
+}
+@media (max-width: 620px) {
+  .sokoban-game {
+    padding: 45px 8px 10px;
+    gap: 10px;
+  }
+  .sokoban-game__board {
+    width: 96vw;
+    padding: 5px;
+    border-width: 5px;
+  }
+  .sokoban-game__controls {
+    grid-template-columns: repeat(3, 54px);
+    grid-template-rows: repeat(2, 50px);
+  }
+  .sokoban-game__reset {
+    right: 10px;
+    bottom: 10px;
+    width: 48px;
+    height: 48px;
+  }
+  .sokoban-game__help {
+    left: 10px;
+    bottom: 10px;
+    width: 48px;
+    height: 48px;
+  }
+  .sokoban-game__next {
+    right: 68px;
+    bottom: 10px;
+    height: 48px;
+    padding: 0 12px;
+  }
+  .sokoban-game__timer {
+    top: 8px;
+    left: 8px;
+    min-width: 70px;
+    padding: 7px 10px;
+    font-size: 18px;
+  }
+  .sokoban-game__demo-player {
+    width: 44px;
+  }
+  .sokoban-game__demo-box {
+    width: 52px;
+    font-size: 26px;
+  }
+  .sokoban-game__demo-goal {
+    font-size: 48px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sokoban-game * {
+    transition: none !important;
+  }
+}

@@ -34,6 +34,10 @@ import NumberBuilderGame from "@/games/number-builder/Game";
 import BallSortGame from "@/games/ball-sort/Game";
 import RedLightGreenLightGame from "@/games/red-light-green-light/Game";
 import CatchTheTargetGame from "@/games/catch-the-target/Game";
+import MentalRotationGame from "@/games/mental-rotation/Game";
+import WaterJugsGame from "@/games/water-jugs/Game";
+import TangramBuilderGame from "@/games/tangram-builder/Game";
+import SokobanGame from "@/games/sokoban/Game";
 
 type Game = {
   id: string;
@@ -1636,6 +1640,29 @@ export default function GamesPage() {
                 durationSeconds={previewing.durationSeconds}
                 onComplete={() => setPreviewing(null)}
               />
+            ) : previewing.componentName === "MENTAL_ROTATION" ? (
+              <MentalRotationGame
+                remainingSeconds={previewing.durationSeconds}
+                onComplete={() => setPreviewing(null)}
+              />
+            ) : previewing.componentName === "WATER_JUGS" ? (
+              <WaterJugsGame
+                remainingSeconds={previewing.durationSeconds}
+                practiceOnly
+                onComplete={() => setPreviewing(null)}
+              />
+            ) : previewing.componentName === "TANGRAM_BUILDER" ? (
+              <TangramBuilderGame
+                remainingSeconds={previewing.durationSeconds}
+                practiceOnly
+                onComplete={() => setPreviewing(null)}
+              />
+            ) : previewing.componentName === "SOKOBAN" ? (
+              <SokobanGame
+                remainingSeconds={previewing.durationSeconds}
+                practiceOnly
+                onComplete={() => setPreviewing(null)}
+              />
             ) : (
               <div className="grid h-full place-items-center text-center text-white">
                 <div>
@@ -1972,8 +1999,15 @@ function GameArtwork({ componentName }: { componentName: string }) {
     );
   if (componentName === "PATTERN_MATRIX")
     return (
-      <div className={`${common} bg-gradient-to-br from-[#312e81] to-[#7e22ce]`} aria-hidden>
-        <img src="/games/pattern-matrix.svg" alt="" className="h-full w-full object-cover" />
+      <div
+        className={`${common} bg-gradient-to-br from-[#312e81] to-[#7e22ce]`}
+        aria-hidden
+      >
+        <img
+          src="/games/pattern-matrix.svg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
       </div>
     );
   if (componentName === "NUMBER_BUILDER")
@@ -1994,8 +2028,67 @@ function GameArtwork({ componentName }: { componentName: string }) {
     );
   if (componentName === "CATCH_THE_TARGET")
     return (
-      <div className={`${common} bg-gradient-to-br from-[#51a7c4] to-[#79ba69]`} aria-hidden>
-        <img src="/games/catch-the-target.svg" alt="" className="h-full w-full object-cover" />
+      <div
+        className={`${common} bg-gradient-to-br from-[#51a7c4] to-[#79ba69]`}
+        aria-hidden
+      >
+        <img
+          src="/games/catch-the-target.svg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  if (componentName === "MENTAL_ROTATION")
+    return (
+      <div
+        className={`${common} bg-gradient-to-br from-[#dff7ff] to-[#eee6ff]`}
+        aria-hidden
+      >
+        <img
+          src="/games/mental-rotation.svg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  if (componentName === "WATER_JUGS")
+    return (
+      <div
+        className={`${common} bg-gradient-to-br from-[#dffaff] to-[#dff5ef]`}
+        aria-hidden
+      >
+        <img
+          src="/games/water-jugs.svg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  if (componentName === "TANGRAM_BUILDER")
+    return (
+      <div
+        className={`${common} bg-gradient-to-br from-[#e7fbf7] to-[#dbeeff]`}
+        aria-hidden
+      >
+        <img
+          src="/games/tangram-builder.svg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  if (componentName === "SOKOBAN")
+    return (
+      <div
+        className={`${common} bg-gradient-to-br from-[#eee8ff] to-[#dff5ef]`}
+        aria-hidden
+      >
+        <img
+          src="/games/sokoban.svg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
       </div>
     );
   return (
@@ -2062,6 +2155,14 @@ function gameCardTheme(componentName: string) {
     return "from-[#312e81] via-[#5b21b6] to-[#9333ea]";
   if (componentName === "CATCH_THE_TARGET")
     return "from-[#257e9c] via-[#4ea8a0] to-[#79ba69]";
+  if (componentName === "MENTAL_ROTATION")
+    return "from-[#4772a8] via-[#7068b4] to-[#a984c8]";
+  if (componentName === "WATER_JUGS")
+    return "from-[#176f86] via-[#168f9a] to-[#39b69d]";
+  if (componentName === "TANGRAM_BUILDER")
+    return "from-[#176f86] via-[#218f89] to-[#65bca5]";
+  if (componentName === "SOKOBAN")
+    return "from-[#57418f] via-[#6868ad] to-[#32958e]";
   return "from-[#0b6870] via-[#168e84] to-[#54baa5]";
 }
 

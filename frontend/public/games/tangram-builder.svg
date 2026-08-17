@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-label="Tangram Builder">
+  <defs><linearGradient id="b" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e7fbf7"/><stop offset="1" stop-color="#dbeeff"/></linearGradient></defs>
+  <rect width="800" height="450" rx="40" fill="url(#b)"/>
+  <rect x="250" y="45" width="300" height="165" rx="24" fill="#fff" stroke="#ff9565" stroke-width="8" stroke-dasharray="15 10"/>
+  <path d="M400 72 492 187H308Z" fill="#17394b"/><path d="M308 187h184v20H308z" fill="#17394b"/>
+  <path d="m95 360 65-110 65 110Z" fill="#ff7b54"/><path d="M250 250h105v105H250z" fill="#ffd166"/><path d="m420 250 75 55-75 55-75-55Z" fill="#48cae4"/><path d="m555 250 125 0-35 105H520Z" fill="#7bd389"/>
+</svg>

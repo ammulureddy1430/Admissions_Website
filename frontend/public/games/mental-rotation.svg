@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-labelledby="title desc">
+  <title id="title">Mental Rotation</title>
+  <desc id="desc">Two original geometric objects shown at different orientations.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#dff7ff"/><stop offset="1" stop-color="#f2eaff"/></linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#314263" flood-opacity=".18"/></filter>
+  </defs>
+  <rect width="640" height="360" rx="34" fill="url(#bg)"/>
+  <path d="M320 42v276" stroke="#a9b4cd" stroke-width="4" stroke-dasharray="10 14"/>
+  <g filter="url(#shadow)"><rect x="72" y="64" width="210" height="210" rx="58" fill="#fff"/><rect x="358" y="64" width="210" height="210" rx="58" fill="#fff"/></g>
+  <path d="M110 148h70v-34l62 51-62 51v-34h-70z" fill="#5971a9" stroke="#33476f" stroke-width="8" stroke-linejoin="round"/>
+  <g transform="rotate(90 463 169)"><path d="M391 148h70v-34l62 51-62 51v-34h-70z" fill="#8a70bf" stroke="#4f3c7c" stroke-width="8" stroke-linejoin="round"/></g>
+  <path d="M410 310c28 18 78 18 106-4" fill="none" stroke="#516485" stroke-width="10" stroke-linecap="round"/>
+  <path d="m505 290 18 17-21 11" fill="none" stroke="#516485" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

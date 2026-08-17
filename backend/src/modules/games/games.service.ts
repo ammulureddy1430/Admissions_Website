@@ -35,7 +35,9 @@ export class GamesService implements OnModuleInit {
       result.numberBuilderAnalytics ||
       result.ballSortAnalytics ||
       result.redLightGreenLightAnalytics ||
-      (result.game?.componentName === 'CATCH_THE_TARGET'
+      (['CATCH_THE_TARGET', 'MENTAL_ROTATION', 'WATER_JUGS', 'TANGRAM_BUILDER', 'SOKOBAN'].includes(
+        result.game?.componentName,
+      )
         ? result.attempts?.[0]?.scores?.[0]?.details
         : null) ||
       null
@@ -957,13 +959,24 @@ export class GamesService implements OnModuleInit {
       const reports = await this.prisma.patternMatrixAnalytics.findMany({
         where: { gameId: id, gameResult: { assessment: { schoolId } } },
         select: {
-          id: true, studentId: true, assessmentId: true, createdAt: true,
-          roundsCompleted: true, correctCells: true, missedCells: true,
-          incorrectCells: true, averageResponseTime: true,
-          highestDifficulty: true, accuracy: true, visualMemoryScore: true,
-          attentionScore: true, spatialRecallScore: true,
-          processingSpeedScore: true, completionPercentage: true,
-          overallScore: true, completionStatus: true,
+          id: true,
+          studentId: true,
+          assessmentId: true,
+          createdAt: true,
+          roundsCompleted: true,
+          correctCells: true,
+          missedCells: true,
+          incorrectCells: true,
+          averageResponseTime: true,
+          highestDifficulty: true,
+          accuracy: true,
+          visualMemoryScore: true,
+          attentionScore: true,
+          spatialRecallScore: true,
+          processingSpeedScore: true,
+          completionPercentage: true,
+          overallScore: true,
+          completionStatus: true,
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -973,14 +986,27 @@ export class GamesService implements OnModuleInit {
       const reports = await this.prisma.numberBuilderAnalytics.findMany({
         where: { gameId: id, gameResult: { assessment: { schoolId } } },
         select: {
-          id: true, studentId: true, assessmentId: true, createdAt: true,
-          roundsCompleted: true, correctInteractions: true, incorrectInteractions: true,
-          averageResponseTime: true, numberRangeReached: true,
-          highestDifficulty: true, accuracy: true, earlyNumeracyScore: true,
-          numberSenseScore: true, countingScore: true, sequencingScore: true,
-          quantityComparisonScore: true, attentionScore: true,
-          processingSpeedScore: true, accuracyScore: true,
-          overallScore: true, completionStatus: true,
+          id: true,
+          studentId: true,
+          assessmentId: true,
+          createdAt: true,
+          roundsCompleted: true,
+          correctInteractions: true,
+          incorrectInteractions: true,
+          averageResponseTime: true,
+          numberRangeReached: true,
+          highestDifficulty: true,
+          accuracy: true,
+          earlyNumeracyScore: true,
+          numberSenseScore: true,
+          countingScore: true,
+          sequencingScore: true,
+          quantityComparisonScore: true,
+          attentionScore: true,
+          processingSpeedScore: true,
+          accuracyScore: true,
+          overallScore: true,
+          completionStatus: true,
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -1734,10 +1760,6 @@ export class GamesService implements OnModuleInit {
         gameId: id,
         assessment: { schoolId },
         status: 'COMPLETED',
-        OR: [
-          { reviewStatus: { in: ['REVIEWED', 'NEEDS_FOLLOW_UP'] } },
-          { reviewedAt: { not: null } },
-        ],
       },
       include: {
         gameAssignment: { include: { generatedGame: true } },
@@ -1784,7 +1806,12 @@ export class GamesService implements OnModuleInit {
         result.parkingEscapeAnalytics ||
         result.waterPipelineAnalytics ||
         result.patternMatrixAnalytics ||
-        result.numberBuilderAnalytics;
+        result.numberBuilderAnalytics ||
+        (['CATCH_THE_TARGET', 'MENTAL_ROTATION', 'WATER_JUGS', 'TANGRAM_BUILDER', 'SOKOBAN'].includes(
+          game.componentName,
+        )
+          ? result.attempts?.[0]?.scores?.[0]?.details
+          : null);
       const performanceMetrics = analytics
         ? Object.fromEntries(
             Object.entries(analytics).filter(
@@ -1797,6 +1824,7 @@ export class GamesService implements OnModuleInit {
                   'gameResultId',
                   'createdAt',
                   'updatedAt',
+                  'trials',
                 ].includes(key),
             ),
           )

@@ -1,0 +1,187 @@
+.tangram-game {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 560px;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  background: radial-gradient(circle at 50% 10%, #fff 0 8%, transparent 34%), linear-gradient(145deg, #e7fbf7, #deefff);
+  color: #16364a;
+}
+.tangram-game::before {
+  content: "";
+  position: absolute;
+  inset: auto -8% -12% -8%;
+  height: 31%;
+  border-radius: 50% 50% 0 0;
+  background: #9bdfcf;
+  opacity: .72;
+}
+.tangram-game__progress {
+  position: absolute;
+  z-index: 30;
+  top: 2.2%;
+  left: 50%;
+  display: flex;
+  gap: 10px;
+  transform: translateX(-50%);
+}
+.tangram-game__progress i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #bed4dc;
+  box-shadow: inset 0 0 0 2px #fff;
+}
+.tangram-game__progress i.is-active { background: #ff8a5b; }
+.tangram-game__timer {
+  position: absolute;
+  z-index: 35;
+  top: 7%;
+  left: max(3%, calc(50% - 710px));
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 16px;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  background: #287d90;
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(37,91,109,.18);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.tangram-game__timer svg { width: 22px; height: 22px; }
+.tangram-game__timer.is-low { background: #e85d4a; }
+.tangram-game__target {
+  position: absolute;
+  z-index: 2;
+  top: 4%;
+  left: 50%;
+  width: min(42vw, 440px);
+  height: clamp(165px, 25%, 230px);
+  transform: translateX(-50%);
+  border: 5px dashed #ff9a68;
+  border-radius: 28px;
+  background: rgba(255,255,255,.85);
+  box-shadow: 0 14px 35px rgba(37,91,109,.12);
+}
+.tangram-game__area-label {
+  position: absolute;
+  z-index: 5;
+  top: 12px;
+  left: 16px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #e5f5f7;
+  color: #246b7a;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+.tangram-game__target-piece,
+.tangram-game__piece {
+  position: absolute;
+  transform-origin: center;
+}
+.tangram-game__target-piece svg,
+.tangram-game__piece svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.tangram-game__board {
+  position: absolute;
+  z-index: 5;
+  top: 34%;
+  bottom: 3%;
+  left: 50%;
+  width: min(94%, 1500px);
+  transform: translateX(-50%);
+  border: 0;
+  background: transparent;
+  overflow: hidden;
+  touch-action: none;
+}
+.tangram-game__work-zone {
+  position: absolute;
+  inset: 3% 3% 31%;
+  background: transparent;
+}
+.tangram-game__work-zone span {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 7px 13px;
+  border-radius: 999px;
+  background: #fff;
+  color: #287d90;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+.tangram-game__piece {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  filter: drop-shadow(0 6px 4px rgba(17,62,78,.23));
+  transition: filter .15s ease, opacity .28s ease;
+  touch-action: none;
+}
+.tangram-game__piece::after {
+  position: absolute;
+  inset: -12px;
+  content: "";
+}
+.tangram-game__piece:active { cursor: grabbing; }
+.tangram-game__piece:focus,
+.tangram-game__piece:focus-visible { outline: none; }
+.tangram-game__piece.is-selected { filter: drop-shadow(0 0 8px #fff) drop-shadow(0 8px 5px rgba(17,62,78,.3)); }
+.tangram-game__piece:disabled { cursor: default; }
+.tangram-game__controls {
+  position: absolute;
+  z-index: 40;
+  top: 8%;
+  right: max(3%, calc(50% - 720px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px;
+  border: 3px solid rgba(255,255,255,.8);
+  border-radius: 999px;
+  background: rgba(255,255,255,.58);
+  box-shadow: 0 10px 24px rgba(37,91,109,.14);
+}
+.tangram-game__controls button {
+  display: grid;
+  width: clamp(50px, 5vw, 68px);
+  aspect-ratio: 1;
+  place-items: center;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: #237d91;
+  color: #fff;
+  box-shadow: 0 7px 15px rgba(23,77,94,.24);
+  cursor: pointer;
+}
+.tangram-game__controls button:first-child,
+.tangram-game__controls button:last-child { background: #ff8259; }
+.tangram-game__controls .tangram-game__next { background: #7357c8; }
+.tangram-game__controls button:disabled { opacity: .4; cursor: default; }
+.tangram-game__controls svg { width: 56%; height: 56%; stroke-width: 3; }
+.tangram-game.is-transitioning .tangram-game__board { animation: tangram-neutral-transition .55s ease; }
+@keyframes tangram-neutral-transition { 45% { opacity: .18; transform: translateX(-50%) scale(.985); } }
+@media (max-width: 720px) {
+  .tangram-game { min-height: 500px; }
+  .tangram-game__target { width: min(62vw, 330px); height: 155px; }
+  .tangram-game__board { top: 34%; bottom: 5%; width: 96%; }
+  .tangram-game__controls {
+    top: 22%;
+    right: 3%;
+    flex-direction: row;
+    padding: 7px;
+  }
+  .tangram-game__timer { top: 24%; left: 3%; padding: 8px 11px; font-size: 15px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tangram-game *, .tangram-game *::before, .tangram-game *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

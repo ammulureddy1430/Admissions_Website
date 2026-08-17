@@ -59,6 +59,10 @@ const ENGINES = [
   ['WATER_PIPELINE', 'Water Pipeline'],
   ['PATTERN_MATRIX', 'Pattern Matrix'],
   ['CATCH_THE_TARGET', 'Catch the Target'],
+  ['MENTAL_ROTATION', 'Mental Rotation'],
+  ['WATER_JUGS', 'Water Jugs'],
+  ['TANGRAM_BUILDER', 'Tangram Builder'],
+  ['SOKOBAN', 'Sokoban — Box Planning Challenge'],
   ['NUMBER_BUILDER', 'Number Builder'],
   ['BALL_SORT', 'Ball Sort'],
   ['RED_LIGHT_GREEN_LIGHT', 'Red Light, Green Light'],
@@ -80,6 +84,10 @@ const SELF_CONTAINED_ENGINES = new Set([
   'WATER_PIPELINE',
   'PATTERN_MATRIX',
   'CATCH_THE_TARGET',
+  'MENTAL_ROTATION',
+  'WATER_JUGS',
+  'TANGRAM_BUILDER',
+  'SOKOBAN',
   'NUMBER_BUILDER',
   'BALL_SORT',
   'RED_LIGHT_GREEN_LIGHT',
@@ -477,6 +485,27 @@ export class GameRuntimeService {
       throw new BadRequestException(
         'Catch the Target only accepts direct basket interactions.',
       );
+    if (
+      session.engine.engineKey === 'MENTAL_ROTATION' &&
+      ['PAUSE', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)
+    )
+      throw new BadRequestException(
+        'Mental Rotation only accepts direct rotation interactions.',
+      );
+    if (
+      session.engine.engineKey === 'WATER_JUGS' &&
+      ['PAUSE', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)
+    )
+      throw new BadRequestException(
+        'Water Jugs only accepts direct container interactions.',
+      );
+    if (
+      session.engine.engineKey === 'SOKOBAN' &&
+      ['PAUSE', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)
+    )
+      throw new BadRequestException(
+        'Sokoban only accepts direct movement interactions.',
+      );
     if (action === 'START')
       return this.transition(
         session.id,
@@ -568,13 +597,24 @@ export class GameRuntimeService {
     if (action === 'BALL_SORT_COMPLETE')
       return this.ballSortComplete(session, dto.payload, schoolId, user);
     if (action === 'RED_LIGHT_GREEN_LIGHT_COMPLETE')
-      return this.redLightGreenLightComplete(session, dto.payload, schoolId, user);
+      return this.redLightGreenLightComplete(
+        session,
+        dto.payload,
+        schoolId,
+        user,
+      );
     if (action === 'WATER_PIPELINE_COMPLETE')
       return this.waterPipelineComplete(session, dto.payload, schoolId, user);
     if (action === 'PATTERN_MATRIX_COMPLETE')
       return this.patternMatrixComplete(session, dto.payload, schoolId, user);
     if (action === 'CATCH_THE_TARGET_COMPLETE')
       return this.catchTheTargetComplete(session, dto.payload, schoolId, user);
+    if (action === 'MENTAL_ROTATION_COMPLETE')
+      return this.mentalRotationComplete(session, dto.payload, schoolId, user);
+    if (action === 'WATER_JUGS_COMPLETE')
+      return this.waterJugsComplete(session, dto.payload, schoolId, user);
+    if (action === 'SOKOBAN_COMPLETE')
+      return this.sokobanComplete(session, dto.payload, schoolId, user);
     if (action === 'NUMBER_BUILDER_COMPLETE')
       return this.numberBuilderComplete(session, dto.payload, schoolId, user);
     if (action === 'SECURITY_VIOLATION')
@@ -1499,23 +1539,38 @@ export class GameRuntimeService {
       Math.max(0, Math.min(100, Math.round(value * 10) / 10));
 
     const levelsStarted = number('levels_started', 100);
-    const levelsCompleted = Math.min(levelsStarted, number('levels_completed', 100));
+    const levelsCompleted = Math.min(
+      levelsStarted,
+      number('levels_completed', 100),
+    );
     const totalMoves = number('total_moves', 1000);
     const correctMoves = Math.min(totalMoves, number('correct_moves', 1000));
-    const incorrectMoves = Math.min(totalMoves, number('incorrect_moves', 1000));
+    const incorrectMoves = Math.min(
+      totalMoves,
+      number('incorrect_moves', 1000),
+    );
     const completionTime = number('completion_time', 120);
     const highestLevel = Math.min(5, Math.max(1, number('highest_level', 5)));
     const sortingAccuracy = clamp(number('sorting_accuracy', 100));
     const efficiency = number('efficiency', 1);
 
     const categorizationScore = sortingAccuracy;
-    const visualDiscriminationScore = clamp(sortingAccuracy * 0.8 + (totalMoves ? (correctMoves / totalMoves) * 20 : 0));
-    const cognitiveFlexibilityScore = clamp((highestLevel / 5) * 50 + (levelsCompleted / 5) * 50);
+    const visualDiscriminationScore = clamp(
+      sortingAccuracy * 0.8 +
+        (totalMoves ? (correctMoves / totalMoves) * 20 : 0),
+    );
+    const cognitiveFlexibilityScore = clamp(
+      (highestLevel / 5) * 50 + (levelsCompleted / 5) * 50,
+    );
     const planningScore = clamp(efficiency * 100);
     const problemSolvingScore = clamp((levelsCompleted / 5) * 100);
-    const decisionMakingScore = clamp(totalMoves ? (correctMoves / totalMoves) * 100 : 0);
+    const decisionMakingScore = clamp(
+      totalMoves ? (correctMoves / totalMoves) * 100 : 0,
+    );
     const attentionScore = clamp(100 - Math.min(50, incorrectMoves * 3));
-    const fineMotorCoordinationScore = clamp(100 - Math.min(30, incorrectMoves * 2));
+    const fineMotorCoordinationScore = clamp(
+      100 - Math.min(30, incorrectMoves * 2),
+    );
 
     const overallScore = clamp(
       (categorizationScore +
@@ -1592,13 +1647,19 @@ export class GameRuntimeService {
 
     const greenLightEvents = number('greenLightEvents', 200);
     const redLightEvents = number('redLightEvents', 200);
-    const correctStarts = Math.min(greenLightEvents, number('correctStarts', 200));
+    const correctStarts = Math.min(
+      greenLightEvents,
+      number('correctStarts', 200),
+    );
     const correctStops = Math.min(redLightEvents, number('correctStops', 200));
     const prematureMovements = number('prematureMovements', 200);
     const averageStartReactionTime = number('averageStartReactionTime', 5000);
     const averageStopReactionTime = number('averageStopReactionTime', 5000);
     const progress = clamp(number('progress', 100));
-    const difficultyReached = Math.min(4, Math.max(1, number('difficultyReached', 4)));
+    const difficultyReached = Math.min(
+      4,
+      Math.max(1, number('difficultyReached', 4)),
+    );
     const completionStatus = String(input.completionStatus || 'COMPLETED');
 
     const inhibitoryControlScore = clamp(
@@ -1606,10 +1667,14 @@ export class GameRuntimeService {
         (redLightEvents ? (correctStops / redLightEvents) * 40 : 40),
     );
     const selfRegulationScore = clamp(
-      ((correctStarts + correctStops) / Math.max(1, greenLightEvents + redLightEvents)) * 100,
+      ((correctStarts + correctStops) /
+        Math.max(1, greenLightEvents + redLightEvents)) *
+        100,
     );
     const attentionScore = clamp(
-      100 - Math.max(0, averageStartReactionTime - 400) / 10 - prematureMovements * 2,
+      100 -
+        Math.max(0, averageStartReactionTime - 400) / 10 -
+        prematureMovements * 2,
     );
     const responseControlScore = clamp(
       100 -
@@ -1671,7 +1736,11 @@ export class GameRuntimeService {
       },
     });
 
-    await this.event(session.id, 'RED_LIGHT_GREEN_LIGHT_COMPLETED', cognitiveAnalytics);
+    await this.event(
+      session.id,
+      'RED_LIGHT_GREEN_LIGHT_COMPLETED',
+      cognitiveAnalytics,
+    );
     return { state: await this.state(session.id, schoolId, user) };
   }
 
@@ -1769,33 +1838,340 @@ export class GameRuntimeService {
     schoolId: string,
     user: { id: string; role: Role },
   ) {
-    if (session.engine.engineKey !== 'CATCH_THE_TARGET' || !['RUNNING', 'PAUSED'].includes(session.status))
-      throw new BadRequestException('Catch the Target metrics require an active session.');
+    if (
+      session.engine.engineKey !== 'CATCH_THE_TARGET' ||
+      !['RUNNING', 'PAUSED'].includes(session.status)
+    )
+      throw new BadRequestException(
+        'Catch the Target metrics require an active session.',
+      );
     const input = (payload || {}) as Record<string, any>;
-    const number = (key: string, max = 100000) => Math.max(0, Math.min(max, Number(input[key]) || 0));
-    const numberValue = (value: unknown, max: number) => Math.max(0, Math.min(max, Number(value) || 0));
-    const events = Array.isArray(input.events) ? input.events.slice(0, 300).map((event: any) => ({
-      target: Boolean(event?.target), caught: Boolean(event?.caught), timestamp: Math.max(0, Number(event?.timestamp) || 0),
-      objectX: numberValue(event?.objectX, 10000), catcherX: numberValue(event?.catcherX, 10000), horizontalDistance: numberValue(event?.horizontalDistance, 10000),
-      difficulty: Math.min(5, Math.max(1, Number(event?.difficulty) || 1)), speed: numberValue(event?.speed, 1000),
-      symbol: String(event?.symbol || '').slice(0, 4), responseTime: numberValue(event?.responseTime, 10000),
-    })) : [];
+    const number = (key: string, max = 100000) =>
+      Math.max(0, Math.min(max, Number(input[key]) || 0));
+    const numberValue = (value: unknown, max: number) =>
+      Math.max(0, Math.min(max, Number(value) || 0));
+    const events = Array.isArray(input.events)
+      ? input.events.slice(0, 300).map((event: any) => ({
+          target: Boolean(event?.target),
+          caught: Boolean(event?.caught),
+          timestamp: Math.max(0, Number(event?.timestamp) || 0),
+          objectX: numberValue(event?.objectX, 10000),
+          catcherX: numberValue(event?.catcherX, 10000),
+          horizontalDistance: numberValue(event?.horizontalDistance, 10000),
+          difficulty: Math.min(5, Math.max(1, Number(event?.difficulty) || 1)),
+          speed: numberValue(event?.speed, 1000),
+          symbol: String(event?.symbol || '').slice(0, 4),
+          responseTime: numberValue(event?.responseTime, 10000),
+        }))
+      : [];
     const cognitiveAnalytics = {
-      totalObjects: number('totalObjects', 300), targetObjects: number('targetObjects', 300), targetsCaught: number('targetsCaught', 300), targetsMissed: number('targetsMissed', 300),
-      distractorsCaught: number('distractorsCaught', 300), distractorsAvoided: number('distractorsAvoided', 300), catchAccuracy: number('catchAccuracy', 100),
-      targetDiscriminationAccuracy: number('targetDiscriminationAccuracy', 100), movementDistance: number('movementDistance', 100000), movementEfficiency: number('movementEfficiency', 100),
-      responseTime: number('responseTime', 10000), highestDifficulty: number('highestDifficulty', 5), roundsCompleted: number('roundsCompleted', 100), performanceConsistency: number('performanceConsistency', 100),
-      visualTrackingScore: number('visualTrackingScore', 100), handEyeCoordinationScore: number('handEyeCoordinationScore', 100), selectiveAttentionScore: number('selectiveAttentionScore', 100),
-      sustainedAttentionScore: number('sustainedAttentionScore', 100), responseControlScore: number('responseControlScore', 100), processingSpeedScore: number('processingSpeedScore', 100),
-      visualDiscriminationScore: number('visualDiscriminationScore', 100), accuracyScore: number('accuracyScore', 100), overallScore: number('overallScore', 100),
-      completionStatus: String(input.completionStatus || 'COMPLETED').slice(0, 50), events,
+      totalObjects: number('totalObjects', 300),
+      targetObjects: number('targetObjects', 300),
+      targetsCaught: number('targetsCaught', 300),
+      targetsMissed: number('targetsMissed', 300),
+      distractorsCaught: number('distractorsCaught', 300),
+      distractorsAvoided: number('distractorsAvoided', 300),
+      catchAccuracy: number('catchAccuracy', 100),
+      targetDiscriminationAccuracy: number('targetDiscriminationAccuracy', 100),
+      movementDistance: number('movementDistance', 100000),
+      movementEfficiency: number('movementEfficiency', 100),
+      responseTime: number('responseTime', 10000),
+      highestDifficulty: number('highestDifficulty', 5),
+      roundsCompleted: number('roundsCompleted', 100),
+      performanceConsistency: number('performanceConsistency', 100),
+      visualTrackingScore: number('visualTrackingScore', 100),
+      handEyeCoordinationScore: number('handEyeCoordinationScore', 100),
+      selectiveAttentionScore: number('selectiveAttentionScore', 100),
+      sustainedAttentionScore: number('sustainedAttentionScore', 100),
+      responseControlScore: number('responseControlScore', 100),
+      processingSpeedScore: number('processingSpeedScore', 100),
+      visualDiscriminationScore: number('visualDiscriminationScore', 100),
+      accuracyScore: number('accuracyScore', 100),
+      overallScore: number('overallScore', 100),
+      completionStatus: String(input.completionStatus || 'COMPLETED').slice(
+        0,
+        50,
+      ),
+      events,
     };
-    await this.prisma.gameRuntimeSession.update({ where: { id: session.id }, data: {
-      status: 'COMPLETED', completedAt: new Date(), score: cognitiveAnalytics.overallScore,
-      elapsedSeconds: Math.max(0, Math.round((Date.now() - new Date(session.startedAt || Date.now()).getTime()) / 1000)),
-      runtimeState: { ...((session.runtimeState || {}) as Record<string, unknown>), cognitiveAnalytics } as Prisma.InputJsonValue,
-    }});
-    await this.event(session.id, 'CATCH_THE_TARGET_COMPLETED', cognitiveAnalytics);
+    await this.prisma.gameRuntimeSession.update({
+      where: { id: session.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        score: cognitiveAnalytics.overallScore,
+        elapsedSeconds: Math.max(
+          0,
+          Math.round(
+            (Date.now() - new Date(session.startedAt || Date.now()).getTime()) /
+              1000,
+          ),
+        ),
+        runtimeState: {
+          ...((session.runtimeState || {}) as Record<string, unknown>),
+          cognitiveAnalytics,
+        } as Prisma.InputJsonValue,
+      },
+    });
+    await this.event(
+      session.id,
+      'CATCH_THE_TARGET_COMPLETED',
+      cognitiveAnalytics,
+    );
+    return { state: await this.state(session.id, schoolId, user) };
+  }
+
+  private async sokobanComplete(
+    session: any,
+    payload: unknown,
+    schoolId: string,
+    user: { id: string; role: Role },
+  ) {
+    if (
+      session.engine.engineKey !== 'SOKOBAN' ||
+      !['RUNNING', 'PAUSED'].includes(session.status)
+    )
+      throw new BadRequestException(
+        'Sokoban metrics require an active session.',
+      );
+    const input = (payload || {}) as Record<string, any>;
+    const number = (key: string, max = 100000) =>
+      Math.max(0, Math.min(max, Number(input[key]) || 0));
+    const numberFrom = (value: unknown, max: number) =>
+      Math.max(0, Math.min(max, Number(value) || 0));
+    const attempts = Array.isArray(input.attempts)
+      ? input.attempts.slice(0, 100).map((attempt: any) => ({
+          levelId: numberFrom(attempt?.levelId, 100),
+          difficulty: numberFrom(attempt?.difficulty, 10),
+          completed: Boolean(attempt?.completed),
+          moves: numberFrom(attempt?.moves, 10000),
+          pushes: numberFrom(attempt?.pushes, 10000),
+          unnecessaryMoves: numberFrom(attempt?.unnecessaryMoves, 10000),
+          unnecessaryPushes: numberFrom(attempt?.unnecessaryPushes, 10000),
+          deadlocks: numberFrom(attempt?.deadlocks, 1000),
+          resets: numberFrom(attempt?.resets, 1000),
+          optimalMoves: numberFrom(attempt?.optimalMoves, 1000),
+          completionTime: numberFrom(attempt?.completionTime, 120000),
+        }))
+      : [];
+    const cognitiveAnalytics = {
+      puzzlesAttempted: number('puzzlesAttempted', 100),
+      puzzlesCompleted: number('puzzlesCompleted', 100),
+      totalMoves: number('totalMoves', 100000),
+      totalPushes: number('totalPushes', 100000),
+      unnecessaryMoves: number('unnecessaryMoves', 100000),
+      unnecessaryPushes: number('unnecessaryPushes', 100000),
+      deadlocks: number('deadlocks', 10000),
+      resets: number('resets', 10000),
+      completionTime: number('completionTime', 1200000),
+      highestDifficulty: number('highestDifficulty', 10),
+      solutionEfficiency: number('solutionEfficiency', 100),
+      planningEfficiency: number('planningEfficiency', 100),
+      consistency: number('consistency', 100),
+      planningScore: number('planningScore', 100),
+      problemSolvingScore: number('problemSolvingScore', 100),
+      spatialReasoningScore: number('spatialReasoningScore', 100),
+      workingMemoryScore: number('workingMemoryScore', 100),
+      sequencingScore: number('sequencingScore', 100),
+      cognitiveFlexibilityScore: number('cognitiveFlexibilityScore', 100),
+      decisionMakingScore: number('decisionMakingScore', 100),
+      ruleFollowingScore: number('ruleFollowingScore', 100),
+      visualSpatialAttentionScore: number('visualSpatialAttentionScore', 100),
+      overallScore: number('overallScore', 100),
+      completionStatus: String(input.completionStatus || 'COMPLETED').slice(
+        0,
+        50,
+      ),
+      attempts,
+    };
+    await this.prisma.gameRuntimeSession.update({
+      where: { id: session.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        score: cognitiveAnalytics.overallScore,
+        elapsedSeconds: Math.max(
+          0,
+          Math.round(
+            (Date.now() - new Date(session.startedAt || Date.now()).getTime()) /
+              1000,
+          ),
+        ),
+        runtimeState: {
+          ...((session.runtimeState || {}) as Record<string, unknown>),
+          cognitiveAnalytics,
+        } as Prisma.InputJsonValue,
+      },
+    });
+    await this.event(session.id, 'SOKOBAN_COMPLETED', cognitiveAnalytics);
+    return { state: await this.state(session.id, schoolId, user) };
+  }
+
+  private async waterJugsComplete(
+    session: any,
+    payload: unknown,
+    schoolId: string,
+    user: { id: string; role: Role },
+  ) {
+    if (
+      session.engine.engineKey !== 'WATER_JUGS' ||
+      !['RUNNING', 'PAUSED'].includes(session.status)
+    )
+      throw new BadRequestException(
+        'Water Jugs metrics require an active session.',
+      );
+    const input = (payload || {}) as Record<string, any>;
+    const number = (key: string, max = 100000) =>
+      Math.max(0, Math.min(max, Number(input[key]) || 0));
+    const numberFrom = (value: unknown, max: number) =>
+      Math.max(0, Math.min(max, Number(value) || 0));
+    const attempts = Array.isArray(input.attempts)
+      ? input.attempts.slice(0, 100).map((attempt: any) => ({
+          challengeId: numberFrom(attempt?.challengeId, 100),
+          level: Math.min(10, Math.max(1, Number(attempt?.level) || 1)),
+          targetReached: Boolean(attempt?.targetReached),
+          actions: numberFrom(attempt?.actions, 1000),
+          unnecessaryActions: numberFrom(attempt?.unnecessaryActions, 1000),
+          resets: numberFrom(attempt?.resets, 1000),
+          optimalActions: numberFrom(attempt?.optimalActions, 100),
+          completionTime: numberFrom(attempt?.completionTime, 120000),
+        }))
+      : [];
+    const cognitiveAnalytics = {
+      challengesAttempted: number('challengesAttempted', 100),
+      challengesCompleted: number('challengesCompleted', 100),
+      targetsReached: number('targetsReached', 100),
+      targetsMissed: number('targetsMissed', 100),
+      totalActions: number('totalActions', 10000),
+      unnecessaryActions: number('unnecessaryActions', 10000),
+      solutionEfficiency: number('solutionEfficiency', 100),
+      planningEfficiency: number('planningEfficiency', 100),
+      completionTime: number('completionTime', 1200000),
+      highestDifficulty: number('highestDifficulty', 10),
+      failedAttempts: number('failedAttempts', 100),
+      resetActions: number('resetActions', 1000),
+      consistency: number('consistency', 100),
+      logicalReasoningScore: number('logicalReasoningScore', 100),
+      problemSolvingScore: number('problemSolvingScore', 100),
+      planningScore: number('planningScore', 100),
+      workingMemoryScore: number('workingMemoryScore', 100),
+      cognitiveFlexibilityScore: number('cognitiveFlexibilityScore', 100),
+      sequentialThinkingScore: number('sequentialThinkingScore', 100),
+      decisionMakingScore: number('decisionMakingScore', 100),
+      visualSpatialReasoningScore: number('visualSpatialReasoningScore', 100),
+      overallScore: number('overallScore', 100),
+      completionStatus: String(input.completionStatus || 'COMPLETED').slice(
+        0,
+        50,
+      ),
+      attempts,
+    };
+    await this.prisma.gameRuntimeSession.update({
+      where: { id: session.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        score: cognitiveAnalytics.overallScore,
+        elapsedSeconds: Math.max(
+          0,
+          Math.round(
+            (Date.now() - new Date(session.startedAt || Date.now()).getTime()) /
+              1000,
+          ),
+        ),
+        runtimeState: {
+          ...((session.runtimeState || {}) as Record<string, unknown>),
+          cognitiveAnalytics,
+        } as Prisma.InputJsonValue,
+      },
+    });
+    await this.event(session.id, 'WATER_JUGS_COMPLETED', cognitiveAnalytics);
+    return { state: await this.state(session.id, schoolId, user) };
+  }
+
+  private async mentalRotationComplete(
+    session: any,
+    payload: unknown,
+    schoolId: string,
+    user: { id: string; role: Role },
+  ) {
+    if (
+      session.engine.engineKey !== 'MENTAL_ROTATION' ||
+      !['RUNNING', 'PAUSED'].includes(session.status)
+    )
+      throw new BadRequestException(
+        'Mental Rotation metrics require an active session.',
+      );
+    const input = (payload || {}) as Record<string, any>;
+    const number = (key: string, max = 100000) =>
+      Math.max(0, Math.min(max, Number(input[key]) || 0));
+    const numberFrom = (value: unknown, max: number) =>
+      Math.max(0, Math.min(max, Number(value) || 0));
+    const attempts = Array.isArray(input.attempts)
+      ? input.attempts.slice(0, 100).map((attempt: any) => ({
+          challengeId: Math.max(0, Number(attempt?.challengeId) || 0),
+          level: Math.min(5, Math.max(1, Number(attempt?.level) || 1)),
+          matched: Boolean(attempt?.matched),
+          targetRotation: numberFrom(attempt?.targetRotation, 360),
+          finalRotation: numberFrom(attempt?.finalRotation, 360),
+          angularDifference: numberFrom(attempt?.angularDifference, 180),
+          rotationAmount: numberFrom(attempt?.rotationAmount, 10000),
+          rotationActions: numberFrom(attempt?.rotationActions, 1000),
+          extraRotations: numberFrom(attempt?.extraRotations, 1000),
+          completionTime: numberFrom(attempt?.completionTime, 120000),
+        }))
+      : [];
+    const cognitiveAnalytics = {
+      totalChallenges: number('totalChallenges', 100),
+      completedChallenges: number('completedChallenges', 100),
+      orientationMatches: number('orientationMatches', 100),
+      orientationMismatches: number('orientationMismatches', 1000),
+      rotationAmount: number('rotationAmount', 100000),
+      rotationActions: number('rotationActions', 10000),
+      extraRotations: number('extraRotations', 10000),
+      averageCompletionTime: number('averageCompletionTime', 120000),
+      rotationEfficiency: number('rotationEfficiency', 100),
+      highestDifficulty: number('highestDifficulty', 5),
+      consistency: number('consistency', 100),
+      interactionEfficiency: number('interactionEfficiency', 100),
+      spatialVisualizationScore: number('spatialVisualizationScore', 100),
+      mentalRotationScore: number('mentalRotationScore', 100),
+      spatialReasoningScore: number('spatialReasoningScore', 100),
+      visualDiscriminationScore: number('visualDiscriminationScore', 100),
+      visualMotorCoordinationScore: number('visualMotorCoordinationScore', 100),
+      cognitiveFlexibilityScore: number('cognitiveFlexibilityScore', 100),
+      attentionScore: number('attentionScore', 100),
+      overallScore: number('overallScore', 100),
+      completionStatus: String(input.completionStatus || 'COMPLETED').slice(
+        0,
+        50,
+      ),
+      attempts,
+    };
+    await this.prisma.gameRuntimeSession.update({
+      where: { id: session.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        score: cognitiveAnalytics.overallScore,
+        elapsedSeconds: Math.max(
+          0,
+          Math.round(
+            (Date.now() - new Date(session.startedAt || Date.now()).getTime()) /
+              1000,
+          ),
+        ),
+        runtimeState: {
+          ...((session.runtimeState || {}) as Record<string, unknown>),
+          cognitiveAnalytics,
+        } as Prisma.InputJsonValue,
+      },
+    });
+    await this.event(
+      session.id,
+      'MENTAL_ROTATION_COMPLETED',
+      cognitiveAnalytics,
+    );
     return { state: await this.state(session.id, schoolId, user) };
   }
 
@@ -1841,7 +2217,10 @@ export class GameRuntimeService {
         score: cognitiveAnalytics.overallScore,
         elapsedSeconds: Math.max(
           0,
-          Math.round((Date.now() - new Date(session.startedAt || Date.now()).getTime()) / 1000),
+          Math.round(
+            (Date.now() - new Date(session.startedAt || Date.now()).getTime()) /
+              1000,
+          ),
         ),
         runtimeState: {
           ...((session.runtimeState || {}) as Record<string, unknown>),
@@ -1849,7 +2228,11 @@ export class GameRuntimeService {
         } as Prisma.InputJsonValue,
       },
     });
-    await this.event(session.id, 'PATTERN_MATRIX_COMPLETED', cognitiveAnalytics);
+    await this.event(
+      session.id,
+      'PATTERN_MATRIX_COMPLETED',
+      cognitiveAnalytics,
+    );
     return { state: await this.state(session.id, schoolId, user) };
   }
 
@@ -1898,7 +2281,10 @@ export class GameRuntimeService {
         score: cognitiveAnalytics.overallScore,
         elapsedSeconds: Math.max(
           0,
-          Math.round((Date.now() - new Date(session.startedAt || Date.now()).getTime()) / 1000),
+          Math.round(
+            (Date.now() - new Date(session.startedAt || Date.now()).getTime()) /
+              1000,
+          ),
         ),
         runtimeState: {
           ...((session.runtimeState || {}) as Record<string, unknown>),
@@ -1906,7 +2292,11 @@ export class GameRuntimeService {
         } as Prisma.InputJsonValue,
       },
     });
-    await this.event(session.id, 'NUMBER_BUILDER_COMPLETED', cognitiveAnalytics);
+    await this.event(
+      session.id,
+      'NUMBER_BUILDER_COMPLETED',
+      cognitiveAnalytics,
+    );
     return { state: await this.state(session.id, schoolId, user) };
   }
 
@@ -2492,14 +2882,12 @@ export class GameRuntimeService {
       }));
     const switches =
       type === 'LOGIC'
-        ? available
-            .slice(count + 2, count + 5)
-            .map((cell, index) => ({
-              id: `switch-${index + 1}`,
-              row: cell.row,
-              col: cell.col,
-              order: index + 1,
-            }))
+        ? available.slice(count + 2, count + 5).map((cell, index) => ({
+            id: `switch-${index + 1}`,
+            row: cell.row,
+            col: cell.col,
+            order: index + 1,
+          }))
         : [];
     const obstacles = available
       .slice(count + 6, count + 6 + Math.min(8, Math.floor(normalizedSize / 2)))

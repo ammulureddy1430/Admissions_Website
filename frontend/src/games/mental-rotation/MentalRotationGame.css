@@ -1,0 +1,248 @@
+.mental-rotation-game {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 6px 1fr;
+  grid-template-rows: auto 1fr auto;
+  width: 100%;
+  height: 100%;
+  min-height: 520px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 35%, #fff 0 8%, transparent 30%),
+    linear-gradient(145deg, #e7f7ff, #f5edff 52%, #fff8df);
+  color: #243553;
+  touch-action: none;
+  user-select: none;
+}
+.mental-rotation-game__progress {
+  position: absolute;
+  z-index: 5;
+  left: 5%;
+  right: 5%;
+  top: 22px;
+  height: 9px;
+  overflow: hidden;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: #d7dced;
+  box-shadow: 0 4px 12px #34446422;
+}
+.mental-rotation-game__progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #5dc9be, #7d6ed1);
+  transition: width 0.5s ease;
+}
+.mental-rotation-game__target,
+.mental-rotation-game__work {
+  display: grid;
+  place-items: center;
+  position: relative;
+  grid-row: 2;
+}
+.mental-rotation-game__target {
+  grid-column: 1;
+}
+.mental-rotation-game__target-frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(30vw, 260px);
+  aspect-ratio: 1;
+  border: 8px solid #fff;
+  border-radius: 34px;
+  background: linear-gradient(145deg, #f4fffd, #dcefea);
+  box-shadow:
+    0 22px 55px #34446424,
+    inset 0 -18px 30px #7fc4b51c;
+  transition: opacity 0.3s ease;
+}
+.mental-rotation-game__target-frame::after,
+.mental-rotation-game__object::after {
+  content: "";
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: 10%;
+  height: 8%;
+  border-radius: 50%;
+  background: #34446422;
+  filter: blur(7px);
+}
+.mental-rotation-game__target-marker {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #c9d5ed;
+  color: #71809e;
+  font-size: 18px;
+}
+.mental-rotation-game__target-shape,
+.mental-rotation-game__object-shape {
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 72%;
+  aspect-ratio: 1;
+  transition: transform 0.18s ease;
+}
+.mental-rotation-game svg {
+  width: 58%;
+  height: 58%;
+  overflow: visible;
+  fill: #5870a8;
+  stroke: #33476f;
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+.mental-rotation-game__divider {
+  grid-column: 2;
+  grid-row: 2;
+  display: grid;
+  place-items: center;
+}
+.mental-rotation-game__divider i {
+  width: 2px;
+  height: 65%;
+  border-radius: 99px;
+  background: repeating-linear-gradient(
+    to bottom,
+    #9eabc7 0 8px,
+    transparent 8px 18px
+  );
+}
+.mental-rotation-game__work {
+  grid-column: 3;
+}
+.mental-rotation-game__work::before {
+  content: "";
+  position: absolute;
+  width: min(42vw, 390px);
+  height: 23%;
+  bottom: 12%;
+  border-radius: 50%;
+  background: linear-gradient(#ccb7e9, #9880c4);
+  box-shadow: 0 18px 30px #453d7430;
+  opacity: 0.42;
+}
+.mental-rotation-game__orbit {
+  position: absolute;
+  width: min(35vw, 310px);
+  aspect-ratio: 1;
+  border: 4px dashed #b8b1d8;
+  border-radius: 50%;
+  opacity: 0.65;
+}
+.mental-rotation-game__object {
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: min(28vw, 235px);
+  aspect-ratio: 1;
+  border: 7px solid #fff;
+  border-radius: 34%;
+  background: #f0ebff;
+  box-shadow: 0 20px 50px #453d7430;
+  cursor: grab;
+  transition: opacity 0.3s ease;
+}
+.mental-rotation-game__object:active {
+  cursor: grabbing;
+}
+.mental-rotation-game__object:active .mental-rotation-game__object-shape {
+  transition: none;
+}
+.mental-rotation-game__object svg {
+  fill: #8a70bf;
+  stroke: #4f3c7c;
+}
+.mental-rotation-game__controls {
+  grid-column: 1/-1;
+  grid-row: 3;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  padding: 14px 20px 24px;
+}
+.mental-rotation-game__controls button {
+  display: grid;
+  place-items: center;
+  width: 82px;
+  height: 68px;
+  border: 5px solid #fff;
+  border-radius: 23px;
+  background: #344b70;
+  color: #fff;
+  box-shadow: 0 9px 18px #34446430;
+  font: 900 42px/1 system-ui;
+  cursor: pointer;
+}
+.mental-rotation-game__controls button:active {
+  transform: scale(0.95);
+}
+.mental-rotation-game__controls button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.mental-rotation-game__controls span {
+  color: #7786a6;
+  font-size: 30px;
+}
+.mental-rotation-game.is-transitioning .mental-rotation-game__target-frame,
+.mental-rotation-game.is-transitioning .mental-rotation-game__object {
+  opacity: 0;
+}
+@media (max-width: 760px) {
+  .mental-rotation-game {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 2px 1fr auto;
+    min-height: 560px;
+  }
+  .mental-rotation-game__target {
+    grid-column: 1;
+    grid-row: 1;
+    padding-top: 38px;
+  }
+  .mental-rotation-game__target-frame {
+    width: min(38vw, 170px);
+  }
+  .mental-rotation-game__divider {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .mental-rotation-game__divider i {
+    width: 65%;
+    height: 2px;
+    background: repeating-linear-gradient(
+      to right,
+      #9eabc7 0 8px,
+      transparent 8px 18px
+    );
+  }
+  .mental-rotation-game__work {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .mental-rotation-game__object {
+    width: min(36vw, 160px);
+  }
+  .mental-rotation-game__orbit {
+    width: min(43vw, 190px);
+  }
+  .mental-rotation-game__controls {
+    grid-row: 4;
+  }
+  .mental-rotation-game__controls button {
+    width: 74px;
+    height: 60px;
+  }
+}

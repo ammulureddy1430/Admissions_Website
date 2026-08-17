@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 320" role="img" aria-labelledby="title">
+  <title id="title">Water Jugs</title>
+  <defs><linearGradient id="bg" x1="0" x2="1"><stop stop-color="#176f86"/><stop offset="1" stop-color="#39b69d"/></linearGradient><linearGradient id="water" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#7df0ee"/><stop offset="1" stop-color="#1ba9d2"/></linearGradient></defs>
+  <rect width="1000" height="320" rx="30" fill="url(#bg)"/><circle cx="900" cy="30" r="140" fill="#fff" opacity=".12"/><circle cx="60" cy="300" r="120" fill="#fff" opacity=".08"/>
+  <g transform="translate(75 45)" stroke="#eaffff" stroke-width="10" fill="#fff" fill-opacity=".12"><path d="M25 25h120v190c0 18-14 32-32 32H57c-18 0-32-14-32-32Z"/><path d="M145 75h24c30 0 30 80 0 80h-24"/><path d="M25 145h120v70c0 18-14 32-32 32H57c-18 0-32-14-32-32Z" fill="url(#water)"/><path d="M225 70h92v145c0 18-14 32-32 32h-28c-18 0-32-14-32-32Z"/><path d="M225 170h92v45c0 18-14 32-32 32h-28c-18 0-32-14-32-32Z" fill="url(#water)"/></g>
+  <g fill="#fff" font-family="Arial,sans-serif"><text x="455" y="135" font-size="24" font-weight="800" letter-spacing="5">LOGICAL REASONING</text><text x="455" y="195" font-size="45" font-weight="900">Water Jugs</text><text x="455" y="238" font-size="20" font-weight="700" opacity=".85">FILL • POUR • PLAN</text></g>
+</svg>

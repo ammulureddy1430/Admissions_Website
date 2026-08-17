@@ -10,51 +10,600 @@ type TutorialCopy = {
 };
 
 export const GAME_TUTORIALS: Record<string, TutorialCopy> = {
-  TRAIN_TRACK_BUILDER: { category: 'Logical Thinking', icon: '🚂', objective: 'Turn the railway pieces until the train has a connected path to the station.', skills: ['Logical Thinking', 'Cause & Effect'], steps: ['Look at how the rails meet.', 'Tap a track to turn it.', 'Connect the train to the station.', 'Press the green start button.'], controls: { desktop: ['Click a track to rotate', 'Click START'], touch: ['Tap a track to rotate', 'Tap START'] }, avoid: ['Starting before the rails meet'], strategy: 'Follow the rails from the train toward the station.' },
-  COLOR_PATH: { category: 'Visual Recognition', icon: '🎨', objective: 'Guide the character along the path by tapping the stepping stone that matches the target color.', skills: ['Visual Recognition', 'Observation'], steps: ['Look at the large target color.', 'Find the stepping stone with the same color.', 'Tap that stone once.', 'Keep matching colors until time ends.'], controls: { desktop: ['Click one stepping stone'], touch: ['Tap one stepping stone'] }, avoid: ['Selecting a different color', 'Tapping more than once'], strategy: 'Look at the target, then compare every stone before choosing.' },
-  MAGIC_PAINT: { category: 'Creativity & Cause-and-Effect Assessment', icon: '🎨', objective: 'Bring each black-and-white object to life with freely chosen colors.', skills: ['Creativity', 'Cause & Effect Understanding'], steps: ['Choose any color.', 'Tap one white part of the object.', 'Color every part.', 'Watch the completed object come alive.'], controls: { desktop: ['Click a color, then an object part'], touch: ['Tap a color, then an object part'] }, avoid: ['Leaving the object unfinished'], strategy: 'Explore different colors and paint every available part.' },
-  ADVENTURE_GAME: { category: 'Adventure', icon: '🗺️', objective: 'Travel through each checkpoint by solving the challenge that unlocks the next part of the journey.', skills: ['Recall', 'Decision making', 'Problem solving'], steps: ['Read the mission shown at the checkpoint.', 'Inspect every available route or answer.', 'Choose the answer that advances the explorer.', 'Continue until the final destination is reached.'], controls: { desktop: ['Mouse click to choose a route'], touch: ['Tap to choose a route'] }, avoid: ['Choosing a route before reading the mission', 'Leaving the journey before the final checkpoint'], strategy: 'Read the complete mission first, then eliminate routes that do not match.' },
-  BALLOON_POP: { category: 'Action', icon: '🎈', objective: 'Pop only the balloon carrying the correct answer before the round timer expires.', skills: ['Visual scanning', 'Accuracy', 'Quick recall'], steps: ['Read the question above the balloons.', 'Scan the moving answer balloons.', 'Pop the balloon with the correct answer.', 'Repeat for every new balloon round.'], controls: { desktop: ['Mouse click to pop'], touch: ['Tap to pop'] }, avoid: ['Popping the first balloon without checking', 'Selecting a balloon with an incorrect answer'], strategy: 'Find the answer first, then track its balloon before tapping.' },
-  BOARD_GAME: { category: 'Board game', icon: '🎲', objective: 'Move across the board by answering each square challenge correctly and reach the finish.', skills: ['Planning', 'Knowledge recall', 'Progress tracking'], steps: ['Review the challenge for the current board square.', 'Choose the correct answer.', 'Watch your token advance.', 'Clear all remaining squares to reach the finish.'], controls: { desktop: ['Mouse click to select an answer'], touch: ['Tap to select an answer'] }, avoid: ['Rushing a board-square question', 'Closing the game before reaching the finish'], strategy: 'Treat every square as a separate checkpoint and verify your answer.' },
-  BUILDING_GAME: { category: 'Building', icon: '🏗️', objective: 'Construct the structure one correct block at a time by solving each challenge.', skills: ['Sequencing', 'Spatial reasoning', 'Accuracy'], steps: ['Read the construction challenge.', 'Choose the block or answer that fits.', 'Place the correct piece into the build area.', 'Complete every level of the structure.'], controls: { desktop: ['Mouse click', 'Drag and drop blocks'], touch: ['Tap', 'Drag blocks'] }, avoid: ['Placing an unverified block', 'Dropping a block outside the build area'], strategy: 'Check the target position and question before moving a block.' },
-  DRAG_DROP: { category: 'Drag and drop', icon: '🧩', objective: 'Move the correct answer object into its matching target zone.', skills: ['Classification', 'Matching', 'Fine motor control'], steps: ['Read the prompt and inspect the target.', 'Select the matching answer object.', 'Drag it to the highlighted drop zone.', 'Release it and continue to the next prompt.'], controls: { desktop: ['Mouse drag and release', 'Click then click the drop zone'], touch: ['Touch drag and release', 'Tap then tap the drop zone'] }, avoid: ['Dropping an object in the wrong zone', 'Releasing before reaching the target'], strategy: 'Match the meaning first; drag only after you are confident.' },
-  FISHING_GAME: { category: 'Fishing', icon: '🎣', objective: 'Catch the fish carrying the correct answer while leaving incorrect fish in the water.', skills: ['Attention', 'Answer recognition', 'Timing'], steps: ['Read the question on the dock.', 'Locate the fish with the correct answer.', 'Aim at that fish.', 'Cast and catch it to complete the round.'], controls: { desktop: ['Mouse click to cast'], touch: ['Tap to cast'] }, avoid: ['Casting at the wrong fish', 'Acting before the correct fish is in range'], strategy: 'Identify the answer before timing the cast.' },
-  LOGIC_GAME: { category: 'Logical thinking', icon: '🧠', objective: 'Complete the logic mission by identifying the rule and selecting the valid solution.', skills: ['Deduction', 'Pattern recognition', 'Reasoning'], steps: ['Study the mission statement.', 'Compare the available clues or patterns.', 'Rule out choices that break the logic.', 'Submit the only valid solution.'], controls: { desktop: ['Mouse click to inspect and select'], touch: ['Tap to inspect and select'] }, avoid: ['Guessing from one clue', 'Ignoring sequence or pattern changes'], strategy: 'Test every option against all clues, not only the first one.' },
-  MAZE: { category: 'Maze', icon: '🧭', objective: 'Navigate to every challenge point, solve it, and reach the maze exit.', skills: ['Navigation', 'Planning', 'Problem solving'], steps: ['Locate your explorer and the next challenge marker.', 'Move through open maze paths.', 'Answer the challenge at the marker.', 'Reach the exit after completing all challenge points.'], controls: { desktop: ['Arrow keys or WASD to move', 'Mouse click to answer'], touch: ['Swipe or on-screen arrows to move', 'Tap to answer'] }, avoid: ['Walking into walls', 'Passing a challenge marker without solving it'], strategy: 'Look ahead for open corridors and remember dead ends.' },
-  MEMORY_MATCH: { category: 'Memory', icon: '🃏', objective: 'Reveal and match all related card pairs using as few turns as possible.', skills: ['Working memory', 'Concentration', 'Matching'], steps: ['Flip one card to reveal its content.', 'Flip a second card that you think matches.', 'Matched cards remain open; unmatched cards turn back.', 'Continue until every pair is matched.'], controls: { desktop: ['Mouse click to flip cards'], touch: ['Tap to flip cards'] }, avoid: ['Repeatedly flipping without remembering positions', 'Selecting the same card twice'], strategy: 'Say each card and its position to yourself when it appears.' },
-  RACING_GAME: { category: 'Racing', icon: '🏎️', objective: 'Power your racer to the finish by answering each track challenge correctly.', skills: ['Speed with accuracy', 'Recall', 'Focus'], steps: ['Read the challenge displayed on the track.', 'Choose the correct answer lane.', 'A correct response moves your racer forward.', 'Complete all track sections to cross the finish line.'], controls: { desktop: ['Mouse click to choose a lane'], touch: ['Tap to choose a lane'] }, avoid: ['Choosing a lane based only on its position', 'Trading accuracy for speed'], strategy: 'Accuracy moves you faster than guessing.' },
-  SORTING_GAME: { category: 'Sorting', icon: '🗂️', objective: 'Place each item into the correct category or answer bin.', skills: ['Classification', 'Comparison', 'Organization'], steps: ['Read the item and category prompt.', 'Compare the available bins.', 'Select or drag the item to its correct bin.', 'Sort every item to complete the set.'], controls: { desktop: ['Mouse click', 'Drag and drop'], touch: ['Tap', 'Drag and release'] }, avoid: ['Sorting by appearance instead of meaning', 'Dropping between bins'], strategy: 'State the rule for each bin before placing the item.' },
-  TREASURE_HUNT: { category: 'Treasure hunt', icon: '🧰', objective: 'Solve clues to open the correct treasure locations and collect every required reward.', skills: ['Inference', 'Exploration', 'Problem solving'], steps: ['Read the clue for the current location.', 'Inspect the possible treasure spots.', 'Choose the spot or answer that satisfies the clue.', 'Collect all treasures to finish the hunt.'], controls: { desktop: ['Mouse click to inspect and choose'], touch: ['Tap to inspect and choose'] }, avoid: ['Opening a location before solving its clue', 'Ignoring clue details'], strategy: 'Underline the key idea in each clue before exploring.' },
-  PACKAGE_SORTER: { category: 'Organization', icon: '📦', objective: 'Sort the moving packages on the conveyor belt to their matching color and icon delivery trucks.', skills: ['Organization', 'Decision Making'], steps: ['Watch packages move along the conveyor.', 'Wait for the package to pass the red laser scanner to unlock it.', 'Identify the package color and icon.', 'Tap the matching delivery truck.', 'Sort all packages before time runs out.'], controls: { desktop: ['Click the correct delivery truck'], touch: ['Tap the correct delivery truck'] }, avoid: ['Trying to sort packages before they are scanned', 'Letting packages reach the end of the conveyor', 'Selecting the wrong delivery truck'], strategy: 'Wait until the package passes the red laser scanner, then quickly tap the matching truck!' },
-  RESCUE_MISSION: { category: 'Problem Solving & Cognitive Flexibility', icon: '🐾', objective: 'Use the rescue tools inside each scene to help the friendly character.', skills: ['Problem Solving', 'Cognitive Flexibility'], steps: ['Look at the friendly scene.', 'Tap a tool to see what it does.', 'Change tools when the situation needs a different approach.', 'Continue helping new characters until time ends.'], controls: { desktop: ['Click a rescue tool'], touch: ['Tap a rescue tool'] }, avoid: ['Using the same tool for every scene'], strategy: 'Look at what blocks the character, then choose a tool whose shape can help.' },
-  PARKING_ESCAPE: { category: 'Strategic Planning & Spatial Reasoning', icon: '🚗', objective: 'Create an open route so the highlighted car can leave through the exit.', skills: ['Strategic Planning', 'Spatial Reasoning'], steps: ['Find the highlighted car and exit.', 'Inspect the available parking spaces.', 'Drag vehicles only along their parking direction.', 'Continue until the highlighted car can leave.'], controls: { desktop: ['Drag a vehicle along its lane'], touch: ['Touch and drag along the lane'] }, avoid: ['Moving vehicles without checking the space they need'], strategy: 'Study the whole parking area and plan several moves before dragging.' },
-  WATER_PIPELINE: { category: 'Logical Reasoning & Problem Solving', icon: '💧', objective: 'Turn the pipe pieces until water has one connected route from the tank to the garden.', skills: ['Logical Reasoning', 'Problem Solving'], steps: ['Find the water tank and garden.', 'Look at every pipe opening.', 'Tap pipes to rotate them.', 'Continue adjusting until water reaches the garden.'], controls: { desktop: ['Click a pipe to rotate it'], touch: ['Tap a pipe to rotate it'] }, avoid: ['Rotating without following the connected route'], strategy: 'Trace the route from the water tank one pipe at a time.' },
-  PATTERN_MATRIX: { category: 'Visual Memory & Pattern Recognition', icon: '🟦', objective: 'Remember the glowing tiles and select the same positions after they hide.', skills: ['Visual Memory', 'Attention', 'Spatial Recall', 'Processing Speed'], steps: ['Watch the glowing tiles carefully.', 'Wait for the tiles to hide.', 'Tap every position you remember.', 'Select Continue to move to the next challenge.'], controls: { desktop: ['Click tiles to select or clear them'], touch: ['Tap tiles to select or clear them'] }, avoid: ['Looking away while the pattern is visible'], strategy: 'Notice the shape and position of the whole pattern.' },
-  CATCH_THE_TARGET: { category: 'Visual Tracking & Hand-Eye Coordination', icon: '🧺', objective: 'Move the basket to catch the shape shown at the top and let other shapes pass.', skills: ['Visual Tracking', 'Hand-Eye Coordination', 'Selective Attention', 'Sustained Attention', 'Response Control', 'Processing Speed', 'Visual Discrimination', 'Accuracy'], steps: ['Look at the shape shown at the top.', 'Track that shape as objects fall.', 'Drag the basket under the matching shape.', 'Let the other shapes pass.'], controls: { desktop: ['Move or drag the basket with the mouse'], touch: ['Drag the basket with a finger'] }, avoid: ['Catching every falling shape'], strategy: 'Keep watching the target shape and move smoothly.' },
+  TRAIN_TRACK_BUILDER: {
+    category: 'Logical Thinking',
+    icon: '🚂',
+    objective:
+      'Turn the railway pieces until the train has a connected path to the station.',
+    skills: ['Logical Thinking', 'Cause & Effect'],
+    steps: [
+      'Look at how the rails meet.',
+      'Tap a track to turn it.',
+      'Connect the train to the station.',
+      'Press the green start button.',
+    ],
+    controls: {
+      desktop: ['Click a track to rotate', 'Click START'],
+      touch: ['Tap a track to rotate', 'Tap START'],
+    },
+    avoid: ['Starting before the rails meet'],
+    strategy: 'Follow the rails from the train toward the station.',
+  },
+  COLOR_PATH: {
+    category: 'Visual Recognition',
+    icon: '🎨',
+    objective:
+      'Guide the character along the path by tapping the stepping stone that matches the target color.',
+    skills: ['Visual Recognition', 'Observation'],
+    steps: [
+      'Look at the large target color.',
+      'Find the stepping stone with the same color.',
+      'Tap that stone once.',
+      'Keep matching colors until time ends.',
+    ],
+    controls: {
+      desktop: ['Click one stepping stone'],
+      touch: ['Tap one stepping stone'],
+    },
+    avoid: ['Selecting a different color', 'Tapping more than once'],
+    strategy: 'Look at the target, then compare every stone before choosing.',
+  },
+  MAGIC_PAINT: {
+    category: 'Creativity & Cause-and-Effect Assessment',
+    icon: '🎨',
+    objective:
+      'Bring each black-and-white object to life with freely chosen colors.',
+    skills: ['Creativity', 'Cause & Effect Understanding'],
+    steps: [
+      'Choose any color.',
+      'Tap one white part of the object.',
+      'Color every part.',
+      'Watch the completed object come alive.',
+    ],
+    controls: {
+      desktop: ['Click a color, then an object part'],
+      touch: ['Tap a color, then an object part'],
+    },
+    avoid: ['Leaving the object unfinished'],
+    strategy: 'Explore different colors and paint every available part.',
+  },
+  ADVENTURE_GAME: {
+    category: 'Adventure',
+    icon: '🗺️',
+    objective:
+      'Travel through each checkpoint by solving the challenge that unlocks the next part of the journey.',
+    skills: ['Recall', 'Decision making', 'Problem solving'],
+    steps: [
+      'Read the mission shown at the checkpoint.',
+      'Inspect every available route or answer.',
+      'Choose the answer that advances the explorer.',
+      'Continue until the final destination is reached.',
+    ],
+    controls: {
+      desktop: ['Mouse click to choose a route'],
+      touch: ['Tap to choose a route'],
+    },
+    avoid: [
+      'Choosing a route before reading the mission',
+      'Leaving the journey before the final checkpoint',
+    ],
+    strategy:
+      'Read the complete mission first, then eliminate routes that do not match.',
+  },
+  BALLOON_POP: {
+    category: 'Action',
+    icon: '🎈',
+    objective:
+      'Pop only the balloon carrying the correct answer before the round timer expires.',
+    skills: ['Visual scanning', 'Accuracy', 'Quick recall'],
+    steps: [
+      'Read the question above the balloons.',
+      'Scan the moving answer balloons.',
+      'Pop the balloon with the correct answer.',
+      'Repeat for every new balloon round.',
+    ],
+    controls: { desktop: ['Mouse click to pop'], touch: ['Tap to pop'] },
+    avoid: [
+      'Popping the first balloon without checking',
+      'Selecting a balloon with an incorrect answer',
+    ],
+    strategy: 'Find the answer first, then track its balloon before tapping.',
+  },
+  BOARD_GAME: {
+    category: 'Board game',
+    icon: '🎲',
+    objective:
+      'Move across the board by answering each square challenge correctly and reach the finish.',
+    skills: ['Planning', 'Knowledge recall', 'Progress tracking'],
+    steps: [
+      'Review the challenge for the current board square.',
+      'Choose the correct answer.',
+      'Watch your token advance.',
+      'Clear all remaining squares to reach the finish.',
+    ],
+    controls: {
+      desktop: ['Mouse click to select an answer'],
+      touch: ['Tap to select an answer'],
+    },
+    avoid: [
+      'Rushing a board-square question',
+      'Closing the game before reaching the finish',
+    ],
+    strategy:
+      'Treat every square as a separate checkpoint and verify your answer.',
+  },
+  BUILDING_GAME: {
+    category: 'Building',
+    icon: '🏗️',
+    objective:
+      'Construct the structure one correct block at a time by solving each challenge.',
+    skills: ['Sequencing', 'Spatial reasoning', 'Accuracy'],
+    steps: [
+      'Read the construction challenge.',
+      'Choose the block or answer that fits.',
+      'Place the correct piece into the build area.',
+      'Complete every level of the structure.',
+    ],
+    controls: {
+      desktop: ['Mouse click', 'Drag and drop blocks'],
+      touch: ['Tap', 'Drag blocks'],
+    },
+    avoid: [
+      'Placing an unverified block',
+      'Dropping a block outside the build area',
+    ],
+    strategy: 'Check the target position and question before moving a block.',
+  },
+  DRAG_DROP: {
+    category: 'Drag and drop',
+    icon: '🧩',
+    objective: 'Move the correct answer object into its matching target zone.',
+    skills: ['Classification', 'Matching', 'Fine motor control'],
+    steps: [
+      'Read the prompt and inspect the target.',
+      'Select the matching answer object.',
+      'Drag it to the highlighted drop zone.',
+      'Release it and continue to the next prompt.',
+    ],
+    controls: {
+      desktop: ['Mouse drag and release', 'Click then click the drop zone'],
+      touch: ['Touch drag and release', 'Tap then tap the drop zone'],
+    },
+    avoid: [
+      'Dropping an object in the wrong zone',
+      'Releasing before reaching the target',
+    ],
+    strategy: 'Match the meaning first; drag only after you are confident.',
+  },
+  FISHING_GAME: {
+    category: 'Fishing',
+    icon: '🎣',
+    objective:
+      'Catch the fish carrying the correct answer while leaving incorrect fish in the water.',
+    skills: ['Attention', 'Answer recognition', 'Timing'],
+    steps: [
+      'Read the question on the dock.',
+      'Locate the fish with the correct answer.',
+      'Aim at that fish.',
+      'Cast and catch it to complete the round.',
+    ],
+    controls: { desktop: ['Mouse click to cast'], touch: ['Tap to cast'] },
+    avoid: [
+      'Casting at the wrong fish',
+      'Acting before the correct fish is in range',
+    ],
+    strategy: 'Identify the answer before timing the cast.',
+  },
+  LOGIC_GAME: {
+    category: 'Logical thinking',
+    icon: '🧠',
+    objective:
+      'Complete the logic mission by identifying the rule and selecting the valid solution.',
+    skills: ['Deduction', 'Pattern recognition', 'Reasoning'],
+    steps: [
+      'Study the mission statement.',
+      'Compare the available clues or patterns.',
+      'Rule out choices that break the logic.',
+      'Submit the only valid solution.',
+    ],
+    controls: {
+      desktop: ['Mouse click to inspect and select'],
+      touch: ['Tap to inspect and select'],
+    },
+    avoid: ['Guessing from one clue', 'Ignoring sequence or pattern changes'],
+    strategy: 'Test every option against all clues, not only the first one.',
+  },
+  MAZE: {
+    category: 'Maze',
+    icon: '🧭',
+    objective:
+      'Navigate to every challenge point, solve it, and reach the maze exit.',
+    skills: ['Navigation', 'Planning', 'Problem solving'],
+    steps: [
+      'Locate your explorer and the next challenge marker.',
+      'Move through open maze paths.',
+      'Answer the challenge at the marker.',
+      'Reach the exit after completing all challenge points.',
+    ],
+    controls: {
+      desktop: ['Arrow keys or WASD to move', 'Mouse click to answer'],
+      touch: ['Swipe or on-screen arrows to move', 'Tap to answer'],
+    },
+    avoid: [
+      'Walking into walls',
+      'Passing a challenge marker without solving it',
+    ],
+    strategy: 'Look ahead for open corridors and remember dead ends.',
+  },
+  MEMORY_MATCH: {
+    category: 'Memory',
+    icon: '🃏',
+    objective:
+      'Reveal and match all related card pairs using as few turns as possible.',
+    skills: ['Working memory', 'Concentration', 'Matching'],
+    steps: [
+      'Flip one card to reveal its content.',
+      'Flip a second card that you think matches.',
+      'Matched cards remain open; unmatched cards turn back.',
+      'Continue until every pair is matched.',
+    ],
+    controls: {
+      desktop: ['Mouse click to flip cards'],
+      touch: ['Tap to flip cards'],
+    },
+    avoid: [
+      'Repeatedly flipping without remembering positions',
+      'Selecting the same card twice',
+    ],
+    strategy: 'Say each card and its position to yourself when it appears.',
+  },
+  RACING_GAME: {
+    category: 'Racing',
+    icon: '🏎️',
+    objective:
+      'Power your racer to the finish by answering each track challenge correctly.',
+    skills: ['Speed with accuracy', 'Recall', 'Focus'],
+    steps: [
+      'Read the challenge displayed on the track.',
+      'Choose the correct answer lane.',
+      'A correct response moves your racer forward.',
+      'Complete all track sections to cross the finish line.',
+    ],
+    controls: {
+      desktop: ['Mouse click to choose a lane'],
+      touch: ['Tap to choose a lane'],
+    },
+    avoid: [
+      'Choosing a lane based only on its position',
+      'Trading accuracy for speed',
+    ],
+    strategy: 'Accuracy moves you faster than guessing.',
+  },
+  SORTING_GAME: {
+    category: 'Sorting',
+    icon: '🗂️',
+    objective: 'Place each item into the correct category or answer bin.',
+    skills: ['Classification', 'Comparison', 'Organization'],
+    steps: [
+      'Read the item and category prompt.',
+      'Compare the available bins.',
+      'Select or drag the item to its correct bin.',
+      'Sort every item to complete the set.',
+    ],
+    controls: {
+      desktop: ['Mouse click', 'Drag and drop'],
+      touch: ['Tap', 'Drag and release'],
+    },
+    avoid: [
+      'Sorting by appearance instead of meaning',
+      'Dropping between bins',
+    ],
+    strategy: 'State the rule for each bin before placing the item.',
+  },
+  TREASURE_HUNT: {
+    category: 'Treasure hunt',
+    icon: '🧰',
+    objective:
+      'Solve clues to open the correct treasure locations and collect every required reward.',
+    skills: ['Inference', 'Exploration', 'Problem solving'],
+    steps: [
+      'Read the clue for the current location.',
+      'Inspect the possible treasure spots.',
+      'Choose the spot or answer that satisfies the clue.',
+      'Collect all treasures to finish the hunt.',
+    ],
+    controls: {
+      desktop: ['Mouse click to inspect and choose'],
+      touch: ['Tap to inspect and choose'],
+    },
+    avoid: [
+      'Opening a location before solving its clue',
+      'Ignoring clue details',
+    ],
+    strategy: 'Underline the key idea in each clue before exploring.',
+  },
+  PACKAGE_SORTER: {
+    category: 'Organization',
+    icon: '📦',
+    objective:
+      'Sort the moving packages on the conveyor belt to their matching color and icon delivery trucks.',
+    skills: ['Organization', 'Decision Making'],
+    steps: [
+      'Watch packages move along the conveyor.',
+      'Wait for the package to pass the red laser scanner to unlock it.',
+      'Identify the package color and icon.',
+      'Tap the matching delivery truck.',
+      'Sort all packages before time runs out.',
+    ],
+    controls: {
+      desktop: ['Click the correct delivery truck'],
+      touch: ['Tap the correct delivery truck'],
+    },
+    avoid: [
+      'Trying to sort packages before they are scanned',
+      'Letting packages reach the end of the conveyor',
+      'Selecting the wrong delivery truck',
+    ],
+    strategy:
+      'Wait until the package passes the red laser scanner, then quickly tap the matching truck!',
+  },
+  RESCUE_MISSION: {
+    category: 'Problem Solving & Cognitive Flexibility',
+    icon: '🐾',
+    objective:
+      'Use the rescue tools inside each scene to help the friendly character.',
+    skills: ['Problem Solving', 'Cognitive Flexibility'],
+    steps: [
+      'Look at the friendly scene.',
+      'Tap a tool to see what it does.',
+      'Change tools when the situation needs a different approach.',
+      'Continue helping new characters until time ends.',
+    ],
+    controls: {
+      desktop: ['Click a rescue tool'],
+      touch: ['Tap a rescue tool'],
+    },
+    avoid: ['Using the same tool for every scene'],
+    strategy:
+      'Look at what blocks the character, then choose a tool whose shape can help.',
+  },
+  PARKING_ESCAPE: {
+    category: 'Strategic Planning & Spatial Reasoning',
+    icon: '🚗',
+    objective:
+      'Create an open route so the highlighted car can leave through the exit.',
+    skills: ['Strategic Planning', 'Spatial Reasoning'],
+    steps: [
+      'Find the highlighted car and exit.',
+      'Inspect the available parking spaces.',
+      'Drag vehicles only along their parking direction.',
+      'Continue until the highlighted car can leave.',
+    ],
+    controls: {
+      desktop: ['Drag a vehicle along its lane'],
+      touch: ['Touch and drag along the lane'],
+    },
+    avoid: ['Moving vehicles without checking the space they need'],
+    strategy:
+      'Study the whole parking area and plan several moves before dragging.',
+  },
+  WATER_PIPELINE: {
+    category: 'Logical Reasoning & Problem Solving',
+    icon: '💧',
+    objective:
+      'Turn the pipe pieces until water has one connected route from the tank to the garden.',
+    skills: ['Logical Reasoning', 'Problem Solving'],
+    steps: [
+      'Find the water tank and garden.',
+      'Look at every pipe opening.',
+      'Tap pipes to rotate them.',
+      'Continue adjusting until water reaches the garden.',
+    ],
+    controls: {
+      desktop: ['Click a pipe to rotate it'],
+      touch: ['Tap a pipe to rotate it'],
+    },
+    avoid: ['Rotating without following the connected route'],
+    strategy: 'Trace the route from the water tank one pipe at a time.',
+  },
+  PATTERN_MATRIX: {
+    category: 'Visual Memory & Pattern Recognition',
+    icon: '🟦',
+    objective:
+      'Remember the glowing tiles and select the same positions after they hide.',
+    skills: [
+      'Visual Memory',
+      'Attention',
+      'Spatial Recall',
+      'Processing Speed',
+    ],
+    steps: [
+      'Watch the glowing tiles carefully.',
+      'Wait for the tiles to hide.',
+      'Tap every position you remember.',
+      'Select Continue to move to the next challenge.',
+    ],
+    controls: {
+      desktop: ['Click tiles to select or clear them'],
+      touch: ['Tap tiles to select or clear them'],
+    },
+    avoid: ['Looking away while the pattern is visible'],
+    strategy: 'Notice the shape and position of the whole pattern.',
+  },
+  CATCH_THE_TARGET: {
+    category: 'Visual Tracking & Hand-Eye Coordination',
+    icon: '🧺',
+    objective:
+      'Move the basket to catch the shape shown at the top and let other shapes pass.',
+    skills: [
+      'Visual Tracking',
+      'Hand-Eye Coordination',
+      'Selective Attention',
+      'Sustained Attention',
+      'Response Control',
+      'Processing Speed',
+      'Visual Discrimination',
+      'Accuracy',
+    ],
+    steps: [
+      'Look at the shape shown at the top.',
+      'Track that shape as objects fall.',
+      'Drag the basket under the matching shape.',
+      'Let the other shapes pass.',
+    ],
+    controls: {
+      desktop: ['Move or drag the basket with the mouse'],
+      touch: ['Drag the basket with a finger'],
+    },
+    avoid: ['Catching every falling shape'],
+    strategy: 'Keep watching the target shape and move smoothly.',
+  },
+  MENTAL_ROTATION: {
+    category: 'Spatial Visualization',
+    icon: '🔄',
+    objective: 'Turn the lower object until it looks like the target.',
+    skills: [
+      'Spatial Visualization',
+      'Mental Rotation',
+      'Spatial Reasoning',
+      'Visual Discrimination',
+      'Visual-Motor Coordination',
+      'Cognitive Flexibility',
+      'Attention',
+      'Problem Solving',
+    ],
+    steps: [
+      'Look at the target object.',
+      'Touch and turn the lower object.',
+      'Stop when both orientations match.',
+    ],
+    controls: {
+      desktop: ['Drag around the object or use the large turn buttons'],
+      touch: ['Touch and drag around the object or tap a turn button'],
+    },
+    avoid: ['Random repeated turning'],
+    strategy: 'Picture how the object will look after it turns.',
+  },
+  WATER_JUGS: {
+    category: 'Logical Reasoning & Problem Solving',
+    icon: '💧',
+    objective: 'Match the pictured water level.',
+    skills: [
+      'Logical Reasoning',
+      'Problem Solving',
+      'Planning',
+      'Working Memory',
+      'Cognitive Flexibility',
+      'Sequential Thinking',
+      'Decision Making',
+      'Visual-Spatial Reasoning',
+    ],
+    steps: ['🚰 ↓ 🫗', '🫗 → 🫗', '🫗 ≋ ◎'],
+    controls: {
+      desktop: ['Tap a jug, then another jug'],
+      touch: ['Tap a jug, then another jug'],
+    },
+    avoid: [],
+    strategy: '',
+  },
+  TANGRAM_BUILDER: {
+    category: 'Spatial Reasoning',
+    icon: '🔷',
+    objective: 'Build the dark shape with the colorful pieces.',
+    skills: [
+      'Spatial Reasoning',
+      'Visual-Spatial Perception',
+      'Mental Manipulation',
+      'Problem Solving',
+      'Planning',
+      'Visual Discrimination',
+      'Cognitive Flexibility',
+      'Working Memory',
+      'Visual-Motor Coordination',
+      'Attention',
+    ],
+    steps: ['🔷 👆', '🔷 ↔️', '🔷 ↻', '🔶 + 🔺 → ◼️'],
+    controls: {
+      desktop: ['Drag pieces and use the turn buttons'],
+      touch: ['Drag pieces with a finger and tap a turn button'],
+    },
+    avoid: [],
+    strategy: '',
+  },
+  SOKOBAN: {
+    category: 'Planning & Problem Solving',
+    icon: '📦',
+    objective: 'Move every treasure box onto a star.',
+    skills: [
+      'Planning',
+      'Problem Solving',
+      'Spatial Reasoning',
+      'Working Memory',
+      'Sequencing',
+      'Cognitive Flexibility',
+      'Decision Making',
+      'Rule Following',
+      'Visual-Spatial Attention',
+    ],
+    steps: ['🧒 → 📦', '📦 → ⭐', '📦⭐ 📦⭐'],
+    controls: {
+      desktop: ['Arrow keys or the direction pad'],
+      touch: ['Tap the direction pad or swipe'],
+    },
+    avoid: [],
+    strategy: '',
+  },
   NUMBER_BUILDER: {
     category: 'Early Numeracy',
     icon: '🔢',
-    objective: 'Interact directly with numbers and objects to build quantities, sequences, and comparisons.',
-    skills: ['Early Numeracy', 'Number Sense', 'Counting', 'Sequencing', 'Quantity Comparison', 'Attention', 'Processing Speed', 'Accuracy'],
+    objective:
+      'Interact directly with numbers and objects to build quantities, sequences, and comparisons.',
+    skills: [
+      'Early Numeracy',
+      'Number Sense',
+      'Counting',
+      'Sequencing',
+      'Quantity Comparison',
+      'Attention',
+      'Processing Speed',
+      'Accuracy',
+    ],
     steps: [
       'Read the visual instruction at the top.',
       'Interact with the objects or numbers directly (drag-and-drop or select).',
       'Make sure the quantity, sequence, or comparison is correct.',
-      'Complete as many challenges as you can before the time runs out.'
+      'Complete as many challenges as you can before the time runs out.',
     ],
     controls: {
       desktop: ['Click and drag objects, or click numbers to place them'],
-      touch: ['Touch and drag objects, or tap numbers to place them']
+      touch: ['Touch and drag objects, or tap numbers to place them'],
     },
     avoid: ['Rushing without counting the visual items'],
-    strategy: 'Count the visual objects carefully before matching or submitting.'
+    strategy:
+      'Count the visual objects carefully before matching or submitting.',
   },
 };
 
 export function tutorialFor(engineKey: string): TutorialCopy {
-  return GAME_TUTORIALS[engineKey] || {
-    category: 'Educational game', icon: '🎮', objective: 'Complete every challenge accurately before the available time ends.',
-    skills: ['Knowledge recall', 'Accuracy', 'Focus'], steps: ['Read the challenge.', 'Review every choice.', 'Select the best answer.', 'Complete all remaining challenges.'],
-    controls: { desktop: ['Mouse click or keyboard Enter'], touch: ['Tap to select'] }, avoid: ['Submitting before reading all choices'], strategy: 'Work carefully and verify each answer before submitting.',
-  };
+  return (
+    GAME_TUTORIALS[engineKey] || {
+      category: 'Educational game',
+      icon: '🎮',
+      objective:
+        'Complete every challenge accurately before the available time ends.',
+      skills: ['Knowledge recall', 'Accuracy', 'Focus'],
+      steps: [
+        'Read the challenge.',
+        'Review every choice.',
+        'Select the best answer.',
+        'Complete all remaining challenges.',
+      ],
+      controls: {
+        desktop: ['Mouse click or keyboard Enter'],
+        touch: ['Tap to select'],
+      },
+      avoid: ['Submitting before reading all choices'],
+      strategy: 'Work carefully and verify each answer before submitting.',
+    }
+  );
 }
