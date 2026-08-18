@@ -63,6 +63,7 @@ import AirHockeyChallengeGame from "@/games/air-hockey-challenge/Game";
 import MemoryMarketGame from "@/games/memory-market/Game";
 import AirportControllerGame from "@/games/airport-controller/Game";
 import RuleShiftChallengeGame from "@/games/rule-shift-challenge/Game";
+import MiniGolfGame from "@/games/mini-golf/Game";
 
 const MAX_SECURITY_WARNINGS = 3;
 const SELF_CONTAINED_GAME_ENGINES = new Set([
@@ -91,6 +92,7 @@ const SELF_CONTAINED_GAME_ENGINES = new Set([
   "MEMORY_MARKET",
   "AIRPORT_CONTROLLER",
   "RULE_SHIFT_CHALLENGE",
+  "MINI_GOLF_CHALLENGE",
 ]);
 
 type GameOption = { id?: string; optionKey?: string; optionText: string };
@@ -504,7 +506,8 @@ export function GameRuntimePlayer({
           actionName === "AIR_HOCKEY_CHALLENGE_COMPLETE" ||
           actionName === "MEMORY_MARKET_COMPLETE" ||
           actionName === "AIRPORT_CONTROLLER_COMPLETE" ||
-          actionName === "RULE_SHIFT_CHALLENGE_COMPLETE") &&
+          actionName === "RULE_SHIFT_CHALLENGE_COMPLETE" ||
+          actionName === "MINI_GOLF_CHALLENGE_COMPLETE") &&
         next.status === "COMPLETED"
 
       ) {
@@ -665,6 +668,7 @@ export function GameRuntimePlayer({
   const isMemoryMarket = state.engine?.engineKey === "MEMORY_MARKET";
   const isAirportController = state.engine?.engineKey === "AIRPORT_CONTROLLER";
   const isRuleShiftChallenge = state.engine?.engineKey === "RULE_SHIFT_CHALLENGE";
+  const isMiniGolf = state.engine?.engineKey === "MINI_GOLF_CHALLENGE";
   const isPracticeMode =
 
     state.mode === "PRACTICE" || state.configuration?.practiceMode === true;
@@ -1006,6 +1010,8 @@ export function GameRuntimePlayer({
                 action("RULE_SHIFT_CHALLENGE_COMPLETE", metrics)
               }
             />
+          ) : isMiniGolf ? (
+            <MiniGolfGame disabled={!isPracticeMode && state.status !== "RUNNING"} remainingSeconds={seconds} practiceOnly={isPracticeMode} onComplete={(metrics) => action("MINI_GOLF_CHALLENGE_COMPLETE", metrics)} />
           ) : q ? (
 
             state.engine?.engineKey === "BOARD_GAME" ? (

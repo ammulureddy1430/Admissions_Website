@@ -582,6 +582,16 @@ export const GAME_TUTORIALS: Record<string, TutorialCopy> = {
     strategy:
       'Count the visual objects carefully before matching or submitting.',
   },
+  MINI_GOLF_CHALLENGE: {
+    category: 'Motor & visual-motor skills',
+    icon: '⛳',
+    objective: 'Aim the golf ball, control each putt, and navigate the course before time ends.',
+    skills: ['Hand-eye coordination', 'Motor planning', 'Visual-motor integration', 'Spatial judgment', 'Force control'],
+    steps: ['Press or touch directly on the golf ball.', 'Pull away from the direction you want the ball to travel.', 'Use drag length to control force.', 'Release, observe the ball, then adjust the next putt.'],
+    controls: { desktop: ['Click, drag, and release the ball'], touch: ['Touch, drag, and release the ball'] },
+    avoid: ['Trying to move the ball while it is still rolling'],
+    strategy: 'Observe where each putt finishes and independently adjust direction and force.',
+  },
 };
 
 export function tutorialFor(engineKey: string): TutorialCopy {

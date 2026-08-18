@@ -45,6 +45,7 @@ const SELF_CONTAINED_PRACTICE_ENGINES = new Set([
   'MEMORY_MARKET',
   'AIRPORT_CONTROLLER',
   'RULE_SHIFT_CHALLENGE',
+  'MINI_GOLF_CHALLENGE',
 ]);
 
 
@@ -1312,6 +1313,7 @@ export class GamePlayService {
       assignment.generatedGame?.engineKey === 'SOKOBAN'
         ? runtime.cognitiveAnalytics
         : null;
+    const miniGolf = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'MINI_GOLF_CHALLENGE' ? runtime.cognitiveAnalytics : null;
     const cognitive =
       followLights ||
       ballStack ||
@@ -1331,8 +1333,8 @@ export class GamePlayService {
       mentalRotation ||
       waterJugs ||
       tangramBuilder ||
-      sokoban;
-    const answered = followLights
+      sokoban || miniGolf;
+    const answered = miniGolf ? Number(miniGolf.shotsTaken || 0) : followLights
       ? Number(followLights.correctTaps || 0) +
         Number(followLights.wrongTaps || 0)
       : ballStack
@@ -1386,7 +1388,7 @@ export class GamePlayService {
     const total = cognitive
       ? Math.max(1, answered)
       : session.questionIds.length;
-    const percentage = followLights
+    const percentage = miniGolf ? Number(miniGolf.overallScore || 0) : followLights
       ? Number(followLights.overallScore || 0)
       : ballStack
         ? Number(ballStack.overallCognitiveScore || 0)

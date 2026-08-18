@@ -80,6 +80,7 @@ const ENGINES = [
     'RULE_SHIFT_CHALLENGE',
     'Rule Shift Challenge — Cognitive Flexibility & Inhibitory Control',
   ],
+  ['MINI_GOLF_CHALLENGE','Mini Golf Challenge — Hand-Eye Coordination & Motor Planning'],
 ] as const;
 
 // These catalog games generate their own rounds and cognitive metrics at
@@ -110,6 +111,7 @@ const SELF_CONTAINED_ENGINES = new Set([
   'MEMORY_MARKET',
   'AIRPORT_CONTROLLER',
   'RULE_SHIFT_CHALLENGE',
+  'MINI_GOLF_CHALLENGE',
 ]);
 
 
@@ -662,6 +664,8 @@ export class GameRuntimeService {
         schoolId,
         user,
       );
+    if (action === 'MINI_GOLF_CHALLENGE_COMPLETE')
+      return this.miniGolfComplete(session, dto.payload, schoolId, user);
 
     if (action === 'SECURITY_VIOLATION')
       return this.securityViolation(session, dto.payload, schoolId, user);
@@ -2324,6 +2328,14 @@ export class GameRuntimeService {
       cognitiveAnalytics,
     );
     return { state: await this.state(session.id, schoolId, user) };
+  }
+
+  private async miniGolfComplete(session:any,payload:unknown,schoolId:string,user:{id:string;role:Role}) {
+    if(session.engine.engineKey!=='MINI_GOLF_CHALLENGE'||!['RUNNING','PAUSED'].includes(session.status))throw new BadRequestException('Mini Golf metrics require an active session.');
+    const input=(payload||{}) as Record<string,unknown>,scores=new Set(['overallScore','handEyeCoordinationScore','motorPlanningScore','visualMotorIntegrationScore','spatialJudgmentScore','precisionScore','forceControlScore','directionalControlScore','adaptiveMotorControlScore','visualTrackingScore','responseConsistencyScore','beginningPerformance','middlePerformance','endingPerformance']);
+    const keys=['sessionDuration','coursesStarted','coursesCompleted','shotsTaken','holesCompleted','ballsStopped','averageShotsPerCourse','initialShotAngle','initialShotPower','angleAdjustments','powerAdjustments','directionAdjustments','successfulShots','unsuccessfulShots','overshootCount','undershootCount','wallCollisionCount','obstacleCollisionCount','bounceShots','movingObstacleShots','successfulBounceShots','adaptiveAdjustments','successfulAdaptiveAdjustments','averageDecisionTime','ballTravelDistance','targetDistance','trajectoryDeviation','angleDeviation','powerDeviation','shotConsistency','courseDifficulty','highestDifficulty','beginningPerformance','middlePerformance','endingPerformance','handEyeCoordinationScore','motorPlanningScore','visualMotorIntegrationScore','spatialJudgmentScore','precisionScore','forceControlScore','directionalControlScore','adaptiveMotorControlScore','visualTrackingScore','responseConsistencyScore','overallScore'];
+    const analytics:Record<string,unknown>={};for(const key of keys)analytics[key]=Math.max(0,Math.min(scores.has(key)?100:100000,Number(input[key])||0));for(const key of ['decisionTimes','shotsPerCourse'])analytics[key]=Array.isArray(input[key])?(input[key] as unknown[]).slice(0,300).map(v=>Math.max(0,Math.min(100000,Number(v)||0))):[];analytics.completionStatus=String(input.completionStatus||'COMPLETED').slice(0,50);
+    await this.prisma.gameRuntimeSession.update({where:{id:session.id},data:{status:'COMPLETED',completedAt:new Date(),score:Number(analytics.overallScore),elapsedSeconds:Math.max(0,Math.round((Date.now()-new Date(session.startedAt||Date.now()).getTime())/1000)),runtimeState:{...((session.runtimeState||{}) as Record<string,unknown>),cognitiveAnalytics:analytics} as Prisma.InputJsonValue}});await this.event(session.id,'MINI_GOLF_CHALLENGE_COMPLETED',analytics);return{state:await this.state(session.id,schoolId,user)};
   }
 
   private async ruleShiftChallengeComplete(

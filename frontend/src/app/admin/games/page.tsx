@@ -43,6 +43,7 @@ import AirHockeyChallengeGame from "@/games/air-hockey-challenge/Game";
 import MemoryMarketGame from "@/games/memory-market/Game";
 import AirportControllerGame from "@/games/airport-controller/Game";
 import RuleShiftChallengeGame from "@/games/rule-shift-challenge/Game";
+import MiniGolfGame from "@/games/mini-golf/Game";
 
 type Game = {
 
@@ -1703,6 +1704,8 @@ export default function GamesPage() {
                 practiceOnly
                 onComplete={() => setPreviewing(null)}
               />
+            ) : previewing.componentName === "MINI_GOLF_CHALLENGE" ? (
+              <MiniGolfGame remainingSeconds={previewing.durationSeconds} practiceOnly onComplete={() => setPreviewing(null)} />
             ) : (
 
               <div className="grid h-full place-items-center text-center text-white">
@@ -2197,6 +2200,7 @@ function GameArtwork({ componentName }: { componentName: string }) {
         />
       </div>
     );
+  if (componentName === "MINI_GOLF_CHALLENGE") return <div className={`${common} bg-gradient-to-br from-[#16484d] to-[#61bd72]`} aria-hidden><img src="/games/mini-golf-challenge.svg" alt="" className="h-full w-full object-cover" /></div>;
 
   return (
     <div className={`${common} place-items-center`} aria-hidden>
@@ -2280,6 +2284,7 @@ function gameCardTheme(componentName: string) {
     return "from-[#23627d] via-[#3998aa] to-[#70b777]";
   if (componentName === "RULE_SHIFT_CHALLENGE")
     return "from-[#ff9f1c] via-[#ffbf69] to-[#ffcad4]";
+  if (componentName === "MINI_GOLF_CHALLENGE") return "from-[#16484d] via-[#287a63] to-[#61bd72]";
 
   return "from-[#0b6870] via-[#168e84] to-[#54baa5]";
 }

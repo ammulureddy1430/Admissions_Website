@@ -1,0 +1,115 @@
+.mg-game {
+  height: 100%;
+  min-height: 520px;
+  display: grid;
+  grid-template-rows: 68px 1fr 42px;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #173b38;
+  color: white;
+  user-select: none;
+  touch-action: none;
+}
+.mg-game header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 22px;
+  background: linear-gradient(90deg, #143f42, #237863);
+  box-shadow: 0 5px 18px #163a3855;
+  z-index: 2;
+}
+.mg-game h2 {
+  margin: 1px 0;
+  font-size: 22px;
+}
+.mg-game header small {
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: #aee8cb;
+}
+.mg-round {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mg-round span {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  color: #aee8cb;
+}
+.mg-round b {
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #fff2;
+  font-size: 11px;
+}
+.mg-game time {
+  min-width: 70px;
+  padding: 9px 12px;
+  border-radius: 13px;
+  background: #0a2f32;
+  color: #ffe277;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.mg-game svg {
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  background: linear-gradient(#b6e8ed, #88d1bd);
+}
+.mg-game svg:active {
+  cursor: grabbing;
+}
+.mg-rock {
+  transition: filter 0.2s;
+}
+.mg-motion {
+  stroke: #eaffff;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  opacity: 0.65;
+  stroke-dasharray: 2 2;
+  animation: mg-dash 0.35s linear infinite;
+}
+.mg-game svg > rect:first-of-type {
+  filter: drop-shadow(0 7px 9px #16483d40);
+}
+.mg-game footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: #143f42;
+  color: #d5efe5;
+  font-size: 11px;
+  font-weight: 800;
+}
+.mg-game footer i {
+  color: #f5ce64;
+}
+@media (max-width: 650px) {
+  .mg-game {
+    min-height: 450px;
+  }
+  .mg-round b {
+    display: none;
+  }
+  .mg-game time {
+    min-width: 58px;
+    font-size: 14px;
+  }
+  .mg-game h2 {
+    font-size: 18px;
+  }
+}
+@keyframes mg-dash {
+  to {
+    stroke-dashoffset: -4;
+  }
+}

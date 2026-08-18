@@ -162,6 +162,7 @@ registerGame({
   componentName: "RULE_SHIFT_CHALLENGE",
   load: () => import("./rule-shift-challenge/Game"),
 });
+registerGame({ componentName: "MINI_GOLF_CHALLENGE", load: () => import("./mini-golf/Game") });
 
 registerGame({
   componentName: "NUMBER_BUILDER",

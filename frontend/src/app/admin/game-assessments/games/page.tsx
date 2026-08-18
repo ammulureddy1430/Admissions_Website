@@ -381,6 +381,7 @@ export default function TeacherGameStudio() {
                     "SPIN_WHEEL",
                     "BASKETBALL_CHALLENGE",
                     "FOOTBALL_GOAL_QUIZ",
+                    "MINI_GOLF_CHALLENGE",
                   ].map((x) => (
                     <option key={x} value={x}>
                       {title(x)}
