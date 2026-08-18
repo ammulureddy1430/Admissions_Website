@@ -76,6 +76,10 @@ const ENGINES = [
     'AIRPORT_CONTROLLER',
     'Airport Controller — Planning, Divided Attention & Task Switching',
   ],
+  [
+    'RULE_SHIFT_CHALLENGE',
+    'Rule Shift Challenge — Cognitive Flexibility & Inhibitory Control',
+  ],
 ] as const;
 
 // These catalog games generate their own rounds and cognitive metrics at
@@ -105,7 +109,9 @@ const SELF_CONTAINED_ENGINES = new Set([
   'AIR_HOCKEY_CHALLENGE',
   'MEMORY_MARKET',
   'AIRPORT_CONTROLLER',
+  'RULE_SHIFT_CHALLENGE',
 ]);
+
 
 @Injectable()
 export class GameRuntimeService {
@@ -649,6 +655,14 @@ export class GameRuntimeService {
         schoolId,
         user,
       );
+    if (action === 'RULE_SHIFT_CHALLENGE_COMPLETE')
+      return this.ruleShiftChallengeComplete(
+        session,
+        dto.payload,
+        schoolId,
+        user,
+      );
+
     if (action === 'SECURITY_VIOLATION')
       return this.securityViolation(session, dto.payload, schoolId, user);
     if (action === 'RECORDING_STOPPED')
@@ -2311,6 +2325,116 @@ export class GameRuntimeService {
     );
     return { state: await this.state(session.id, schoolId, user) };
   }
+
+  private async ruleShiftChallengeComplete(
+    session: any,
+    payload: unknown,
+    schoolId: string,
+    user: { id: string; role: Role },
+  ) {
+    if (
+      session.engine.engineKey !== 'RULE_SHIFT_CHALLENGE' ||
+      !['RUNNING', 'PAUSED'].includes(session.status)
+    )
+      throw new BadRequestException(
+        'Rule Shift Challenge metrics require an active session.',
+      );
+    const input = (payload || {}) as Record<string, unknown>;
+    const number = (key: string, max = 100000) =>
+      Math.max(0, Math.min(max, Number(input[key]) || 0));
+    const keys = [
+      'sessionDuration',
+      'totalTrials',
+      'validTrials',
+      'correctResponses',
+      'incorrectResponses',
+      'missedResponses',
+      'averageResponseTime',
+      'medianResponseTime',
+      'fastestResponseTime',
+      'slowestResponseTime',
+      'ruleChanges',
+      'ruleChangeTrials',
+      'ruleSwitchErrors',
+      'perseverativeErrors',
+      'postSwitchErrors',
+      'adaptationTrials',
+      'adaptationTime',
+      'switchCost',
+      'ruleRetentionErrors',
+      'shapeRuleErrors',
+      'colorRuleErrors',
+      'reverseRuleErrors',
+      'combinationRuleErrors',
+      'distractorErrors',
+      'taskSwitches',
+      'successfulTaskSwitches',
+      'failedTaskSwitches',
+      'beginningAccuracy',
+      'middleAccuracy',
+      'endingAccuracy',
+      'beginningResponseTime',
+      'middleResponseTime',
+      'endingResponseTime',
+      'highestDifficulty',
+      'cognitiveFlexibilityScore',
+      'inhibitoryControlScore',
+      'selectiveAttentionScore',
+      'workingMemoryScore',
+      'taskSwitchingScore',
+      'processingSpeedScore',
+      'sustainedAttentionScore',
+      'ruleLearningScore',
+      'adaptationScore',
+      'overallScore',
+    ] as const;
+    const cognitiveAnalytics: Record<string, number | string | number[]> = {};
+    for (const key of keys)
+      cognitiveAnalytics[key] = number(
+        key,
+        key.endsWith('Score') ||
+          key.endsWith('Accuracy') ||
+          key.endsWith('Performance')
+          ? 100
+          : key === 'highestDifficulty'
+            ? 7
+            : 100000,
+      );
+    cognitiveAnalytics.responseTimes = Array.isArray(input.responseTimes)
+      ? input.responseTimes
+          .slice(0, 200)
+          .map((value) => Math.max(0, Math.min(100000, Number(value) || 0)))
+      : [];
+    cognitiveAnalytics.completionStatus = String(
+      input.completionStatus || 'COMPLETED',
+    ).slice(0, 50);
+    await this.prisma.gameRuntimeSession.update({
+      where: { id: session.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        score: Number(cognitiveAnalytics.overallScore),
+        elapsedSeconds: Math.max(
+          0,
+          Math.round(
+            (Date.now() - new Date(session.startedAt || Date.now()).getTime()) /
+              1000,
+          ),
+        ),
+        runtimeState: {
+          ...((session.runtimeState || {}) as Record<string, unknown>),
+          cognitiveAnalytics,
+        } as Prisma.InputJsonValue,
+      },
+    });
+    await this.event(
+      session.id,
+      'RULE_SHIFT_CHALLENGE_COMPLETED',
+      cognitiveAnalytics,
+    );
+    return { state: await this.state(session.id, schoolId, user) };
+  }
+
 
   private async sokobanComplete(
     session: any,

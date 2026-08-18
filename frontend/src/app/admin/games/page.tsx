@@ -42,8 +42,10 @@ import ColorShiftGame from "@/games/color-shift/Game";
 import AirHockeyChallengeGame from "@/games/air-hockey-challenge/Game";
 import MemoryMarketGame from "@/games/memory-market/Game";
 import AirportControllerGame from "@/games/airport-controller/Game";
+import RuleShiftChallengeGame from "@/games/rule-shift-challenge/Game";
 
 type Game = {
+
   id: string;
   name: string;
   slug: string;
@@ -1695,7 +1697,14 @@ export default function GamesPage() {
                 practiceOnly
                 onComplete={() => setPreviewing(null)}
               />
+            ) : previewing.componentName === "RULE_SHIFT_CHALLENGE" ? (
+              <RuleShiftChallengeGame
+                remainingSeconds={previewing.durationSeconds}
+                practiceOnly
+                onComplete={() => setPreviewing(null)}
+              />
             ) : (
+
               <div className="grid h-full place-items-center text-center text-white">
                 <div>
                   <Gamepad2 className="mx-auto h-10 w-10" />
@@ -2175,6 +2184,20 @@ function GameArtwork({ componentName }: { componentName: string }) {
         />
       </div>
     );
+  if (componentName === "RULE_SHIFT_CHALLENGE")
+    return (
+      <div
+        className={`${common} bg-gradient-to-br from-[#ffe5d9] to-[#ffcad4]`}
+        aria-hidden
+      >
+        <img
+          src="/games/rule-shift-challenge.svg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+
   return (
     <div className={`${common} place-items-center`} aria-hidden>
       <Gamepad2 className="h-9 w-9 text-[#007f70]" />
@@ -2255,6 +2278,9 @@ function gameCardTheme(componentName: string) {
     return "from-[#176f67] via-[#31a78e] to-[#8fca76]";
   if (componentName === "AIRPORT_CONTROLLER")
     return "from-[#23627d] via-[#3998aa] to-[#70b777]";
+  if (componentName === "RULE_SHIFT_CHALLENGE")
+    return "from-[#ff9f1c] via-[#ffbf69] to-[#ffcad4]";
+
   return "from-[#0b6870] via-[#168e84] to-[#54baa5]";
 }
 

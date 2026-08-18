@@ -44,7 +44,9 @@ const SELF_CONTAINED_PRACTICE_ENGINES = new Set([
   'AIR_HOCKEY_CHALLENGE',
   'MEMORY_MARKET',
   'AIRPORT_CONTROLLER',
+  'RULE_SHIFT_CHALLENGE',
 ]);
+
 
 @Injectable()
 export class GamePlayService {

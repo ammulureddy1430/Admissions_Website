@@ -159,6 +159,11 @@ registerGame({
   load: () => import("./airport-controller/Game"),
 });
 registerGame({
+  componentName: "RULE_SHIFT_CHALLENGE",
+  load: () => import("./rule-shift-challenge/Game"),
+});
+
+registerGame({
   componentName: "NUMBER_BUILDER",
   load: () => import("./number-builder/Game"),
 });

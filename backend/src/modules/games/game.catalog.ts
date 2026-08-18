@@ -504,4 +504,20 @@ export const GAME_CATALOG: RegisteredGame[] = [
     templateCode: 'GT-MEMORY-MARKET',
     cognitiveSkill: 'Working Memory',
   },
+  {
+    name: 'Rule Shift Challenge — Cognitive Flexibility & Inhibitory Control',
+    slug: 'rule-shift-challenge',
+    description:
+      'A real-time sorting game measuring cognitive flexibility and inhibitory control where children sort moving objects based on rules that change unpredictably.',
+    category: 'Executive Function',
+    ageGroup: '9–11 Years',
+    difficulty: 'PROGRESSIVE',
+    durationSeconds: 120,
+    thumbnail: '/games/rule-shift-challenge.svg',
+    componentName: 'RULE_SHIFT_CHALLENGE',
+    gameType: 'REAL_TIME',
+    templateCode: 'GT-RULE-SHIFT',
+    cognitiveSkill: 'Cognitive Flexibility',
+  },
 ];
+

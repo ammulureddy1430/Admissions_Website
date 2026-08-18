@@ -62,9 +62,11 @@ import ColorShiftGame from "@/games/color-shift/Game";
 import AirHockeyChallengeGame from "@/games/air-hockey-challenge/Game";
 import MemoryMarketGame from "@/games/memory-market/Game";
 import AirportControllerGame from "@/games/airport-controller/Game";
+import RuleShiftChallengeGame from "@/games/rule-shift-challenge/Game";
 
 const MAX_SECURITY_WARNINGS = 3;
 const SELF_CONTAINED_GAME_ENGINES = new Set([
+
   "FOLLOW_THE_LIGHTS",
   "BALL_STACK",
   "SOUND_DETECTIVE",
@@ -88,7 +90,9 @@ const SELF_CONTAINED_GAME_ENGINES = new Set([
   "AIR_HOCKEY_CHALLENGE",
   "MEMORY_MARKET",
   "AIRPORT_CONTROLLER",
+  "RULE_SHIFT_CHALLENGE",
 ]);
+
 type GameOption = { id?: string; optionKey?: string; optionText: string };
 type AnswerResult = {
   correct?: boolean;
@@ -499,8 +503,10 @@ export function GameRuntimePlayer({
           actionName === "COLOR_SHIFT_COMPLETE" ||
           actionName === "AIR_HOCKEY_CHALLENGE_COMPLETE" ||
           actionName === "MEMORY_MARKET_COMPLETE" ||
-          actionName === "AIRPORT_CONTROLLER_COMPLETE") &&
+          actionName === "AIRPORT_CONTROLLER_COMPLETE" ||
+          actionName === "RULE_SHIFT_CHALLENGE_COMPLETE") &&
         next.status === "COMPLETED"
+
       ) {
         setAssessmentCompleted(true);
         void finishGameplayRecording().finally(() =>
@@ -658,7 +664,9 @@ export function GameRuntimePlayer({
     state.engine?.engineKey === "AIR_HOCKEY_CHALLENGE";
   const isMemoryMarket = state.engine?.engineKey === "MEMORY_MARKET";
   const isAirportController = state.engine?.engineKey === "AIRPORT_CONTROLLER";
+  const isRuleShiftChallenge = state.engine?.engineKey === "RULE_SHIFT_CHALLENGE";
   const isPracticeMode =
+
     state.mode === "PRACTICE" || state.configuration?.practiceMode === true;
   const showGameIntro =
     !isPracticeMode && (introVisible || state.status === "READY");
@@ -698,8 +706,10 @@ export function GameRuntimePlayer({
     isPatternMatrix ||
     isNumberBuilder ||
     isBallSort ||
-    isRedLightGreenLight;
+    isRedLightGreenLight ||
+    isRuleShiftChallenge;
   const player = (
+
     <div
       ref={playerRef}
       data-engine={state.engine?.engineKey || "QUIZ_CHALLENGE"}
@@ -987,7 +997,17 @@ export function GameRuntimePlayer({
                 action("AIRPORT_CONTROLLER_COMPLETE", metrics)
               }
             />
+          ) : isRuleShiftChallenge ? (
+            <RuleShiftChallengeGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              onComplete={(metrics) =>
+                action("RULE_SHIFT_CHALLENGE_COMPLETE", metrics)
+              }
+            />
           ) : q ? (
+
             state.engine?.engineKey === "BOARD_GAME" ? (
               <BoardGame
                 key={q.id}
