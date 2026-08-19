@@ -167,6 +167,14 @@ registerGame({
   componentName: "RACING_STRATEGIST",
   load: () => import("./racing-strategist/Game"),
 });
+registerGame({
+  componentName: "PLAYMAKER",
+  load: () => import("./playmaker/Game"),
+});
+registerGame({
+  componentName: "CLIMBING_CHALLENGE",
+  load: () => import("./climbing-challenge/Game"),
+});
 
 registerGame({
   componentName: "NUMBER_BUILDER",

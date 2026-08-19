@@ -65,6 +65,8 @@ import AirportControllerGame from "@/games/airport-controller/Game";
 import RuleShiftChallengeGame from "@/games/rule-shift-challenge/Game";
 import MiniGolfGame from "@/games/mini-golf/Game";
 import RacingStrategistGame from "@/games/racing-strategist/Game";
+import PlaymakerGame from "@/games/playmaker/Game";
+import ClimbingChallengeGame from "@/games/climbing-challenge/Game";
 
 const MAX_SECURITY_WARNINGS = 3;
 const SELF_CONTAINED_GAME_ENGINES = new Set([
@@ -95,6 +97,8 @@ const SELF_CONTAINED_GAME_ENGINES = new Set([
   "RULE_SHIFT_CHALLENGE",
   "MINI_GOLF_CHALLENGE",
   "RACING_STRATEGIST",
+  "PLAYMAKER",
+  "CLIMBING_CHALLENGE",
 ]);
 
 type GameOption = { id?: string; optionKey?: string; optionText: string };
@@ -673,6 +677,8 @@ export function GameRuntimePlayer({
   const isRuleShiftChallenge = state.engine?.engineKey === "RULE_SHIFT_CHALLENGE";
   const isMiniGolf = state.engine?.engineKey === "MINI_GOLF_CHALLENGE";
   const isRacingStrategist = state.engine?.engineKey === "RACING_STRATEGIST";
+  const isPlaymaker = state.engine?.engineKey === "PLAYMAKER";
+  const isClimbingChallenge = state.engine?.engineKey === "CLIMBING_CHALLENGE";
   const isPracticeMode =
 
     state.mode === "PRACTICE" || state.configuration?.practiceMode === true;
@@ -716,7 +722,9 @@ export function GameRuntimePlayer({
     isBallSort ||
     isRedLightGreenLight ||
     isRuleShiftChallenge ||
-    isRacingStrategist;
+    isRacingStrategist ||
+    isPlaymaker ||
+    isClimbingChallenge;
   const player = (
 
     <div
@@ -1026,6 +1034,24 @@ export function GameRuntimePlayer({
                 action("RACING_STRATEGIST_COMPLETE", metrics)
               }
               onBack={closePlayer}
+            />
+          ) : isPlaymaker ? (
+            <PlaymakerGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              onComplete={(metrics) =>
+                action("PLAYMAKER_COMPLETE", metrics)
+              }
+              onBack={closePlayer}
+            />
+          ) : isClimbingChallenge ? (
+            <ClimbingChallengeGame
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              onComplete={(score, metrics) =>
+                action("CLIMBING_CHALLENGE_COMPLETE", metrics)
+              }
             />
           ) : q ? (
 

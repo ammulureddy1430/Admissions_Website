@@ -47,6 +47,8 @@ const SELF_CONTAINED_PRACTICE_ENGINES = new Set([
   'RULE_SHIFT_CHALLENGE',
   'MINI_GOLF_CHALLENGE',
   'RACING_STRATEGIST',
+  'PLAYMAKER',
+  'CLIMBING_CHALLENGE',
 ]);
 
 
@@ -1321,6 +1323,18 @@ export class GamePlayService {
       assignment.generatedGame?.engineKey === 'RACING_STRATEGIST'
         ? runtime.cognitiveAnalytics
         : null;
+    const playmaker =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'PLAYMAKER'
+        ? runtime.cognitiveAnalytics
+        : null;
+    const climbingChallenge =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'CLIMBING_CHALLENGE'
+        ? runtime.cognitiveAnalytics
+        : null;
     const cognitive =
       followLights ||
       ballStack ||
@@ -1340,7 +1354,7 @@ export class GamePlayService {
       mentalRotation ||
       waterJugs ||
       tangramBuilder ||
-      sokoban || miniGolf || racingStrategist;
+      sokoban || miniGolf || racingStrategist || playmaker || climbingChallenge;
     const answered = miniGolf ? Number(miniGolf.shotsTaken || 0) : followLights
       ? Number(followLights.correctTaps || 0) +
         Number(followLights.wrongTaps || 0)
@@ -1396,7 +1410,17 @@ export class GamePlayService {
                                                 racingStrategist.decisionEvents ||
                                                   0,
                                               )
-                                            : runtime?.answers?.length || 0;
+                                            : playmaker
+                                              ? Number(
+                                                  playmaker.passesAttempted ||
+                                                    0,
+                                                )
+                                              : climbingChallenge
+                                                ? Number(
+                                                    climbingChallenge.movementAttempts ||
+                                                      0,
+                                                  )
+                                                : runtime?.answers?.length || 0;
     const total = cognitive
       ? Math.max(1, answered)
       : session.questionIds.length;
@@ -1445,11 +1469,19 @@ export class GamePlayService {
                                                 racingStrategist.overallScore ||
                                                   0,
                                               )
-                                            : total
-                                              ? (Number(runtime?.correct || 0) /
-                                                  total) *
-                                                100
-                                              : 0;
+                                            : playmaker
+                                              ? Number(
+                                                  playmaker.overallScore || 0,
+                                                )
+                                              : climbingChallenge
+                                                ? Number(
+                                                    climbingChallenge.overallScore || 0,
+                                                  )
+                                                : total
+                                                ? (Number(runtime?.correct || 0) /
+                                                    total) *
+                                                  100
+                                                : 0;
     const passed = percentage >= assignment.passingScore;
     const attempt = await this.prisma.gameAttempt.findFirst({
       where: { gameResultId: result.id, submittedAt: null },

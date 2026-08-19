@@ -82,6 +82,8 @@ const ENGINES = [
   ],
   ['MINI_GOLF_CHALLENGE','Mini Golf Challenge — Hand-Eye Coordination & Motor Planning'],
   ['RACING_STRATEGIST', 'Racing Strategist — Strategic Decision Making'],
+  ['PLAYMAKER', 'Playmaker — Anticipation & Decision Making'],
+  ['CLIMBING_CHALLENGE', 'Climbing Challenge — Motor Planning & Spatial-Motor Coordination'],
 ] as const;
 
 // These catalog games generate their own rounds and cognitive metrics at
@@ -114,6 +116,8 @@ const SELF_CONTAINED_ENGINES = new Set([
   'RULE_SHIFT_CHALLENGE',
   'MINI_GOLF_CHALLENGE',
   'RACING_STRATEGIST',
+  'PLAYMAKER',
+  'CLIMBING_CHALLENGE',
 ]);
 
 
@@ -670,6 +674,20 @@ export class GameRuntimeService {
       return this.miniGolfComplete(session, dto.payload, schoolId, user);
     if (action === 'RACING_STRATEGIST_COMPLETE')
       return this.racingStrategistComplete(
+        session,
+        dto.payload,
+        schoolId,
+        user,
+      );
+    if (action === 'PLAYMAKER_COMPLETE')
+      return this.playmakerComplete(
+        session,
+        dto.payload,
+        schoolId,
+        user,
+      );
+    if (action === 'CLIMBING_CHALLENGE_COMPLETE')
+      return this.climbingChallengeComplete(
         session,
         dto.payload,
         schoolId,
@@ -3957,6 +3975,246 @@ export class GameRuntimeService {
         );
     }
     return session;
+  }
+
+  private async playmakerComplete(
+    session: any,
+    payload: unknown,
+    schoolId: string,
+    user: { id: string; role: Role },
+  ) {
+    if (
+      session.engine.engineKey !== 'PLAYMAKER' ||
+      !['RUNNING', 'PAUSED'].includes(session.status)
+    )
+      throw new BadRequestException(
+        'Playmaker metrics require an active session.',
+      );
+    const input = (payload || {}) as Record<string, unknown>;
+    const scores = new Set([
+      'overallScore',
+      'anticipationScore',
+      'decisionMakingScore',
+      'spatialPredictionScore',
+      'situationalAwarenessScore',
+      'selectiveAttentionScore',
+      'timingScore',
+      'responseControlScore',
+      'adaptabilityScore',
+      'passingStrategyScore',
+      'decisionConsistencyScore',
+      'beginningPerformance',
+      'middlePerformance',
+      'endingPerformance',
+    ]);
+    const keys = [
+      'sessionDuration',
+      'playsStarted',
+      'playsCompleted',
+      'passesAttempted',
+      'passesCompleted',
+      'passesIntercepted',
+      'passesOutOfBounds',
+      'passTargetSelections',
+      'appropriateTargetSelections',
+      'poorTargetSelections',
+      'leadPassAttempts',
+      'leadPassSuccesses',
+      'receiverMovementTracked',
+      'receiverPredictionAccuracy',
+      'defenderPredictionAccuracy',
+      'passingLaneRecognitions',
+      'passingLaneErrors',
+      'earlyPasses',
+      'latePasses',
+      'wellTimedPasses',
+      'decisionEvents',
+      'averageDecisionTime',
+      'riskPasses',
+      'safePasses',
+      'strategyChanges',
+      'successfulStrategyChanges',
+      'failedStrategyChanges',
+      'repeatedStrategyCount',
+      'repeatedFailedStrategyCount',
+      'adaptiveResponses',
+      'defensiveAdaptationsDetected',
+      'defensiveAdaptationsMissed',
+      'situationalAwarenessEvents',
+      'selectiveAttentionEvents',
+      'distractorResponses',
+      'beginningPerformance',
+      'middlePerformance',
+      'endingPerformance',
+      'highestDifficulty',
+      'overallScore',
+      'anticipationScore',
+      'decisionMakingScore',
+      'spatialPredictionScore',
+      'situationalAwarenessScore',
+      'selectiveAttentionScore',
+      'timingScore',
+      'responseControlScore',
+      'adaptabilityScore',
+      'passingStrategyScore',
+      'decisionConsistencyScore',
+    ];
+    const analytics: Record<string, unknown> = {};
+    for (const key of keys) {
+      analytics[key] = Math.max(
+        0,
+        Math.min(
+          scores.has(key) ? 100 : 100000,
+          Number(input[key]) || 0,
+        ),
+      );
+    }
+    for (const arrayKey of ['decisionTimes', 'riskOutcomes']) {
+      analytics[arrayKey] = Array.isArray(input[arrayKey])
+        ? (input[arrayKey] as unknown[]).slice(0, 300)
+        : [];
+    }
+    analytics.completionStatus = String(
+      input.completionStatus || 'COMPLETED',
+    ).slice(0, 50);
+
+    await this.prisma.gameRuntimeSession.update({
+      where: { id: session.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        score: Number(analytics.overallScore),
+        elapsedSeconds: Math.max(
+          0,
+          Math.round(
+            (Date.now() - new Date(session.startedAt || Date.now()).getTime()) /
+              1000,
+          ),
+        ),
+        runtimeState: {
+          ...((session.runtimeState || {}) as Record<string, unknown>),
+          cognitiveAnalytics: analytics,
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    await this.event(session.id, 'PLAYMAKER_COMPLETED', analytics);
+    return { state: await this.state(session.id, schoolId, user) };
+  }
+
+  private async climbingChallengeComplete(
+    session: any,
+    payload: unknown,
+    schoolId: string,
+    user: { id: string; role: Role },
+  ) {
+    if (
+      session.engine.engineKey !== 'CLIMBING_CHALLENGE' ||
+      !['RUNNING', 'PAUSED'].includes(session.status)
+    )
+      throw new BadRequestException(
+        'Climbing Challenge metrics require an active session.',
+      );
+    const input = (payload || {}) as Record<string, unknown>;
+    const scores = new Set([
+      'overallScore',
+      'motorPlanningScore',
+      'spatialMotorCoordinationScore',
+      'visualSpatialReasoningScore',
+      'movementSequencingScore',
+      'bodyPositionAwarenessScore',
+      'reachPlanningScore',
+      'precisionScore',
+      'visualTrackingScore',
+      'adaptiveMotorControlScore',
+      'decisionMakingScore',
+      'responseControlScore',
+      'beginningPerformance',
+      'middlePerformance',
+      'endingPerformance',
+    ]);
+    const keys = [
+      'sessionDuration',
+      'climbsStarted',
+      'climbsCompleted',
+      'holdsReached',
+      'holdsMissed',
+      'reachAttempts',
+      'successfulReaches',
+      'failedReaches',
+      'movementAttempts',
+      'successfulMovements',
+      'movementCorrections',
+      'unnecessaryMovements',
+      'routeChoices',
+      'routeChanges',
+      'multiStepSequences',
+      'sequenceSuccesses',
+      'sequenceErrors',
+      'bodyRepositioningEvents',
+      'successfulRepositioning',
+      'balanceEvents',
+      'recoveryEvents',
+      'reachAccuracy',
+      'movementAccuracy',
+      'adaptiveEvents',
+      'successfulAdaptations',
+      'failedAdaptations',
+      'averageDecisionTime',
+      'climbingSpeed',
+      'highestDifficulty',
+      'overallScore',
+      'motorPlanningScore',
+      'spatialMotorCoordinationScore',
+      'visualSpatialReasoningScore',
+      'movementSequencingScore',
+      'bodyPositionAwarenessScore',
+      'reachPlanningScore',
+      'precisionScore',
+      'visualTrackingScore',
+      'adaptiveMotorControlScore',
+      'decisionMakingScore',
+      'responseControlScore',
+      'beginningPerformance',
+      'middlePerformance',
+      'endingPerformance',
+    ];
+    const analytics: Record<string, unknown> = {};
+    for (const key of keys) {
+      analytics[key] = Math.max(
+        0,
+        Math.min(
+          scores.has(key) ? 100 : 100000,
+          Number(input[key]) || 0,
+        ),
+      );
+    }
+    analytics.completionStatus = String(
+      input.completionStatus || 'COMPLETED',
+    ).slice(0, 50);
+
+    await this.prisma.gameRuntimeSession.update({
+      where: { id: session.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        score: Number(analytics.overallScore),
+        elapsedSeconds: Math.max(
+          0,
+          Math.round(
+            (Date.now() - new Date(session.startedAt || Date.now()).getTime()) /
+              1000,
+          ),
+        ),
+        runtimeState: {
+          ...((session.runtimeState || {}) as Record<string, unknown>),
+          cognitiveAnalytics: analytics,
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    await this.event(session.id, 'CLIMBING_CHALLENGE_COMPLETED', analytics);
+    return { state: await this.state(session.id, schoolId, user) };
   }
 
   private async event(sessionId: string, eventType: string, payload?: unknown) {

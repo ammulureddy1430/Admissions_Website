@@ -45,6 +45,8 @@ import AirportControllerGame from "@/games/airport-controller/Game";
 import RuleShiftChallengeGame from "@/games/rule-shift-challenge/Game";
 import MiniGolfGame from "@/games/mini-golf/Game";
 import RacingStrategistGame from "@/games/racing-strategist/Game";
+import PlaymakerGame from "@/games/playmaker/Game";
+import ClimbingChallengeGame from "@/games/climbing-challenge/Game";
 
 type Game = {
 
@@ -1711,6 +1713,18 @@ export default function GamesPage() {
                 practiceOnly
                 onComplete={() => setPreviewing(null)}
               />
+            ) : previewing.componentName === "PLAYMAKER" ? (
+              <PlaymakerGame
+                remainingSeconds={previewing.durationSeconds}
+                practiceOnly
+                onComplete={() => setPreviewing(null)}
+              />
+            ) : previewing.componentName === "CLIMBING_CHALLENGE" ? (
+              <ClimbingChallengeGame
+                remainingSeconds={previewing.durationSeconds}
+                practiceOnly
+                onComplete={() => setPreviewing(null)}
+              />
             ) : previewing.componentName === "MINI_GOLF_CHALLENGE" ? (
               <MiniGolfGame remainingSeconds={previewing.durationSeconds} practiceOnly onComplete={() => setPreviewing(null)} />
             ) : (
@@ -2209,6 +2223,8 @@ function GameArtwork({ componentName }: { componentName: string }) {
     );
   if (componentName === "MINI_GOLF_CHALLENGE") return <div className={`${common} bg-gradient-to-br from-[#16484d] to-[#61bd72]`} aria-hidden><img src="/games/mini-golf-challenge.svg" alt="" className="h-full w-full object-cover" /></div>;
   if (componentName === "RACING_STRATEGIST") return <div className={`${common} bg-gradient-to-br from-[#dc2626] to-[#071633]`} aria-hidden><img src="/games/racing-strategist.svg" alt="" className="h-full w-full object-cover" /></div>;
+  if (componentName === "PLAYMAKER") return <div className={`${common} bg-gradient-to-br from-[#fb923c] to-[#451a03]`} aria-hidden><img src="/games/playmaker.svg" alt="" className="h-full w-full object-cover" /></div>;
+  if (componentName === "CLIMBING_CHALLENGE") return <div className={`${common} bg-gradient-to-br from-[#06b6d4] to-[#083344]`} aria-hidden><img src="/games/climbing-challenge.svg" alt="" className="h-full w-full object-cover" /></div>;
 
   return (
     <div className={`${common} place-items-center`} aria-hidden>
@@ -2294,6 +2310,8 @@ function gameCardTheme(componentName: string) {
     return "from-[#ff9f1c] via-[#ffbf69] to-[#ffcad4]";
   if (componentName === "MINI_GOLF_CHALLENGE") return "from-[#16484d] via-[#287a63] to-[#61bd72]";
   if (componentName === "RACING_STRATEGIST") return "from-[#dc2626] via-[#ea580c] to-[#071633]";
+  if (componentName === "PLAYMAKER") return "from-[#fb923c] via-[#ea580c] to-[#451a03]";
+  if (componentName === "CLIMBING_CHALLENGE") return "from-[#06b6d4] via-[#0891b2] to-[#083344]";
 
   return "from-[#0b6870] via-[#168e84] to-[#54baa5]";
 }
