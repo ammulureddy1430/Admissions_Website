@@ -1,0 +1,72 @@
+export type EvidenceQuality = "relevant" | "ambiguous" | "irrelevant";
+
+export type EvidenceItem = {
+  id: string;
+  label: string;
+  icon: string;
+  x: number;
+  y: number;
+  action: "Inspect" | "Examine" | "Open" | "Observe";
+  description: string;
+  quality: EvidenceQuality;
+  relatedEvidence: string[];
+};
+
+export type NpcDefinition = {
+  id: string;
+  name: string;
+  color: string;
+  path: { x: number; y: number }[];
+  speed: number;
+  dialogue: string[];
+  contradiction?: boolean;
+};
+
+export type DetectiveMetrics = {
+  sessionDuration: number;
+  locationsVisited: number;
+  locationsRevisited: number;
+  objectsInspected: number;
+  objectsIgnored: number;
+  npcsApproached: number;
+  npcsInterviewed: number;
+  evidenceDiscovered: number;
+  evidenceInspected: number;
+  relevantEvidenceDiscovered: number;
+  irrelevantEvidenceCollected: number;
+  relevantEvidenceIgnored: number;
+  evidenceConnections: number;
+  validEvidenceConnections: number;
+  invalidEvidenceConnections: number;
+  eventObservations: number;
+  importantEventObservations: number;
+  missedImportantEvents: number;
+  timelineInformationObserved: number;
+  contradictionsObserved: number;
+  hypothesesFormed: number;
+  hypothesisChanges: number;
+  caseBoardInteractions: number;
+  caseResolution: number;
+  explorationEfficiency: number;
+  informationFiltering: number;
+  averageDecisionTime: number;
+  beginningPerformance: number;
+  middlePerformance: number;
+  endingPerformance: number;
+  highestDifficulty: number;
+  evidenceBasedReasoningScore: number;
+  observationScore: number;
+  informationFilteringScore: number;
+  logicalReasoningScore: number;
+  evidenceComparisonScore: number;
+  causeEffectReasoningScore: number;
+  hypothesisFormationScore: number;
+  informationIntegrationScore: number;
+  workingRecallScore: number;
+  relevantInformationAttentionScore: number;
+  problemSolvingScore: number;
+  adaptiveReasoningScore: number;
+  decisionMakingScore: number;
+  overallScore: number;
+  completionStatus: string;
+};

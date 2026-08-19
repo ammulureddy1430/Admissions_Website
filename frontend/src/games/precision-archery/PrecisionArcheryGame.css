@@ -1,0 +1,141 @@
+.archery-game {
+  height: 100%;
+  min-height: 620px;
+  overflow: hidden;
+  background: #08243a;
+  color: #fff;
+  font-family: Inter, system-ui, sans-serif;
+}
+.archery-game header {
+  height: 70px;
+  max-width: 900px;
+  margin: auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #09243a;
+  border-bottom: 2px solid #fbbf24;
+}
+.archery-game header > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.archery-game header b {
+  color: #fbbf24;
+  letter-spacing: 0.12em;
+}
+.archery-game header span,
+.archery-game header small {
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  color: #9fbed0;
+}
+.archery-game header strong {
+  color: #67e8f9;
+  font: 700 23px monospace;
+}
+.archery-game section {
+  position: relative;
+  width: min(900px, 100%);
+  height: calc(100% - 70px);
+  min-height: 550px;
+  margin: auto;
+  overflow: hidden;
+}
+.archery-game canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+.archery-phase {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 18px;
+  border: 1px solid #ffffff66;
+  border-radius: 13px;
+  background: #09243ae8;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+.archery-phase span {
+  margin-top: 2px;
+  color: #b9d6dd;
+  font-size: 9px;
+  font-weight: 600;
+}
+.archery-cover {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #062136cc;
+  backdrop-filter: blur(5px);
+}
+.archery-cover > div {
+  width: min(500px, 86%);
+  padding: 34px;
+  border: 1px solid #fbbf24;
+  border-radius: 20px;
+  background: linear-gradient(145deg, #123b55, #071b2c);
+  box-shadow: 0 25px 70px #001;
+}
+.archery-cover span {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  color: #fbbf24;
+}
+.archery-cover h1 {
+  margin: 9px 0;
+  font:
+    700 32px Georgia,
+    serif;
+}
+.archery-cover p {
+  color: #d3e7ec;
+  line-height: 1.65;
+}
+.archery-cover button {
+  width: 100%;
+  margin-top: 14px;
+  padding: 13px;
+  border: 0;
+  border-radius: 11px;
+  background: #fbbf24;
+  color: #10243a;
+  font-weight: 900;
+}
+.archery-exit {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  padding: 8px 13px;
+  border: 1px solid #fff8;
+  border-radius: 9px;
+  background: #09243a;
+  color: #fff;
+}
+@media (max-height: 700px) {
+  .archery-game {
+    min-height: 520px;
+  }
+  .archery-game header {
+    height: 58px;
+  }
+  .archery-game section {
+    height: calc(100% - 58px);
+    min-height: 460px;
+  }
+}

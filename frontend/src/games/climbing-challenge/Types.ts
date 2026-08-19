@@ -11,6 +11,16 @@ export interface ClimbingHold {
   originalY?: number;
 }
 
+export interface ClimbingObstacle {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  kind: "overhang" | "crack" | "loose-rock";
+  rotation?: number;
+}
+
 export interface LimbState {
   x: number;
   y: number;
@@ -49,6 +59,7 @@ export interface LevelData {
   holds: ClimbingHold[];
   difficulty: number;
   description: string;
+  obstacles?: ClimbingObstacle[];
 }
 
 export interface ClimbingMetrics {

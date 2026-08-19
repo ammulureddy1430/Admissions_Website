@@ -67,6 +67,8 @@ import MiniGolfGame from "@/games/mini-golf/Game";
 import RacingStrategistGame from "@/games/racing-strategist/Game";
 import PlaymakerGame from "@/games/playmaker/Game";
 import ClimbingChallengeGame from "@/games/climbing-challenge/Game";
+import DetectiveInvestigationGame from "@/games/detective-investigation/Game";
+import PrecisionArcheryGame from "@/games/precision-archery/Game";
 
 const MAX_SECURITY_WARNINGS = 3;
 const SELF_CONTAINED_GAME_ENGINES = new Set([
@@ -99,6 +101,8 @@ const SELF_CONTAINED_GAME_ENGINES = new Set([
   "RACING_STRATEGIST",
   "PLAYMAKER",
   "CLIMBING_CHALLENGE",
+  "DETECTIVE_INVESTIGATION",
+  "PRECISION_ARCHERY",
 ]);
 
 type GameOption = { id?: string; optionKey?: string; optionText: string };
@@ -514,7 +518,11 @@ export function GameRuntimePlayer({
           actionName === "AIRPORT_CONTROLLER_COMPLETE" ||
           actionName === "RULE_SHIFT_CHALLENGE_COMPLETE" ||
           actionName === "MINI_GOLF_CHALLENGE_COMPLETE" ||
-          actionName === "RACING_STRATEGIST_COMPLETE") &&
+          actionName === "RACING_STRATEGIST_COMPLETE" ||
+          actionName === "PLAYMAKER_COMPLETE" ||
+          actionName === "CLIMBING_CHALLENGE_COMPLETE" ||
+          actionName === "DETECTIVE_INVESTIGATION_COMPLETE" ||
+          actionName === "PRECISION_ARCHERY_COMPLETE") &&
         next.status === "COMPLETED"
 
       ) {
@@ -679,6 +687,8 @@ export function GameRuntimePlayer({
   const isRacingStrategist = state.engine?.engineKey === "RACING_STRATEGIST";
   const isPlaymaker = state.engine?.engineKey === "PLAYMAKER";
   const isClimbingChallenge = state.engine?.engineKey === "CLIMBING_CHALLENGE";
+  const isDetectiveInvestigation = state.engine?.engineKey === "DETECTIVE_INVESTIGATION";
+  const isPrecisionArchery = state.engine?.engineKey === "PRECISION_ARCHERY";
   const isPracticeMode =
 
     state.mode === "PRACTICE" || state.configuration?.practiceMode === true;
@@ -1052,6 +1062,24 @@ export function GameRuntimePlayer({
               onComplete={(score, metrics) =>
                 action("CLIMBING_CHALLENGE_COMPLETE", metrics)
               }
+            />
+          ) : isDetectiveInvestigation ? (
+            <DetectiveInvestigationGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              onComplete={(metrics) =>
+                action("DETECTIVE_INVESTIGATION_COMPLETE", metrics)
+              }
+              onBack={closePlayer}
+            />
+          ) : isPrecisionArchery ? (
+            <PrecisionArcheryGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              onComplete={(metrics) => action("PRECISION_ARCHERY_COMPLETE", metrics)}
+              onBack={closePlayer}
             />
           ) : q ? (
 

@@ -17,6 +17,14 @@ type Props = {
   onBack?: () => void;
 };
 
+type StrategyCue = {
+  key: string;
+  icon: string;
+  title: string;
+  detail: string;
+  tone: "info" | "warning" | "success";
+};
+
 export default function RacingStrategistGame({
   disabled = false,
   remainingSeconds,
@@ -90,11 +98,22 @@ export default function RacingStrategistGame({
   const roadsidePropsRef = useRef<{ y: number; side: "left" | "right"; offset: number; size: number; color: string; type: "tree" | "bush" | "rock" }[]>([]);
   const shakeTimeRef = useRef(0);
   const finishAnimRef = useRef(0); // Checkered flag particle animation timer
+  const controlsRef = useRef({ steering: 0, accelerating: false, braking: false });
+  const strategyCueKeyRef = useRef("");
+  const strategyCueLockUntilRef = useRef(0);
 
   const [started, setStarted] = useState(false);
   const [timePreview, setTimePreview] = useState(remainingSeconds ?? 120);
   const [speedVal, setSpeedVal] = useState(0);
   const [progressVal, setProgressVal] = useState(0);
+  const [trackName, setTrackName] = useState(TRACKS[0].name);
+  const [strategyCue, setStrategyCue] = useState<StrategyCue>({
+    key: "scan",
+    icon: "👀",
+    title: "SCAN AHEAD",
+    detail: "Check lanes, traffic, and hazards before accelerating.",
+    tone: "info",
+  });
 
   // Update callback reference
   useEffect(() => {
@@ -230,6 +249,7 @@ export default function RacingStrategistGame({
     const initTrack = (index: number) => {
       trackIndexRef.current = index;
       const trackData = TRACKS[index];
+      setTrackName(trackData.name);
       trackEngine.current.setTrack(trackData);
       vehicleEngine.current.reset(200, 150);
       opponentEngine.current.reset(trackData.opponents);
@@ -302,19 +322,6 @@ export default function RacingStrategistGame({
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
 
-    // Mouse steering
-    let pointerX: number | null = null;
-    const handlePointerMove = (e: PointerEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      pointerX = e.clientX - rect.left;
-    };
-    const handlePointerLeave = () => {
-      pointerX = null;
-    };
-
-    canvas.addEventListener("pointermove", handlePointerMove);
-    canvas.addEventListener("pointerleave", handlePointerLeave);
-
     // Overtake timers
     const timeLastDecision = { current: performance.now() };
 
@@ -335,23 +342,16 @@ export default function RacingStrategistGame({
       // Input mappings
       const veh = vehicleEngine.current.state;
       
-      // Horizontal Steer
-      if (pointerX !== null) {
-        const dxCenter = (width - 400) / 2;
-        const gamePointerX = pointerX - dxCenter;
-        const dx = gamePointerX - veh.x;
-        veh.steering = Math.max(-1, Math.min(1, dx / 40));
-      } else {
-        const left = keysPressed["arrowleft"] || keysPressed["a"];
-        const right = keysPressed["arrowright"] || keysPressed["d"];
-        veh.steering = left ? -1 : right ? 1 : 0;
-      }
+      // Direction comes only from keyboard or the explicit steering buttons.
+      const left = keysPressed["arrowleft"] || keysPressed["a"];
+      const right = keysPressed["arrowright"] || keysPressed["d"];
+      veh.steering = left ? -1 : right ? 1 : controlsRef.current.steering;
 
       // Acceleration & Braking
       const up = keysPressed["arrowup"] || keysPressed["w"];
       const down = keysPressed["arrowdown"] || keysPressed["s"];
-      veh.accelerating = up && !down;
-      veh.braking = down;
+      veh.accelerating = (up || controlsRef.current.accelerating) && !(down || controlsRef.current.braking);
+      veh.braking = down || controlsRef.current.braking;
 
       // Update Vehicle Physics
       const isWet = trackEngine.current.isWetAt(veh.y);
@@ -418,6 +418,70 @@ export default function RacingStrategistGame({
 
       const cameraY = veh.y - 220; // Centered camera viewport placing player near bottom
 
+      // Surface the strategic decision being assessed instead of leaving the
+      // player to interpret the track as a simple steering exercise.
+      if (timestamp >= strategyCueLockUntilRef.current) {
+        const upcomingObstacle = trackData.obstacles
+          .filter((obstacle) => !obstacle.collided && obstacle.y > veh.y)
+          .sort((a, b) => a.y - b.y)[0];
+        const upcomingOpponent = opponentEngine.current.opponents
+          .filter((opponent) => !opponent.isOvertaken && opponent.y > veh.y)
+          .sort((a, b) => a.y - b.y)[0];
+        const upcomingDecisionSegment = trackData.segments.find(
+          (segment) =>
+            (segment.type === "split" || segment.type === "shortcut" || segment.type === "wet") &&
+            segment.yEnd > veh.y &&
+            segment.yStart < veh.y + 320
+        );
+
+        let nextCue: StrategyCue = {
+          key: "scan",
+          icon: "👀",
+          title: "SCAN AHEAD",
+          detail: "Hold a steady line and check the next section.",
+          tone: "info",
+        };
+
+        if (upcomingObstacle && upcomingObstacle.y - veh.y < 260) {
+          nextCue = {
+            key: `hazard-${upcomingObstacle.id}`,
+            icon: "⚠️",
+            title: "ANTICIPATE THE HAZARD",
+            detail: "Brake early, identify the open lane, then steer around it.",
+            tone: "warning",
+          };
+        } else if (upcomingDecisionSegment?.type === "split" || upcomingDecisionSegment?.type === "shortcut") {
+          nextCue = {
+            key: `route-${upcomingDecisionSegment.yStart}`,
+            icon: "⑂",
+            title: "ASSESS BOTH ROUTES",
+            detail: "Compare space, hazards, and time before committing.",
+            tone: "warning",
+          };
+        } else if (upcomingDecisionSegment?.type === "wet") {
+          nextCue = {
+            key: `wet-${upcomingDecisionSegment.yStart}`,
+            icon: "💧",
+            title: "ADAPT YOUR SPEED",
+            detail: "Slow before the wet section and avoid sharp steering.",
+            tone: "warning",
+          };
+        } else if (upcomingOpponent && upcomingOpponent.y - veh.y < 240) {
+          nextCue = {
+            key: `overtake-${upcomingOpponent.id}`,
+            icon: "🏎️",
+            title: "PLAN THE OVERTAKE",
+            detail: "Check the adjacent lane, create space, then pass cleanly.",
+            tone: "info",
+          };
+        }
+
+        if (nextCue.key !== strategyCueKeyRef.current) {
+          strategyCueKeyRef.current = nextCue.key;
+          setStrategyCue(nextCue);
+        }
+      }
+
       // Dynamic blockage adaptive logic for Track 2 (Strategic Splits)
       if (trackData.id === 2) {
         // Trigger rockfall obstacle when player passes Y = 350
@@ -425,6 +489,16 @@ export default function RacingStrategistGame({
           adaptiveBlockTriggered.current = true;
           adaptiveDecisions.current++;
           setAdaptiveMessage("ROCKFALL AHEAD! PATH BLOCKED!");
+          const blockageCue: StrategyCue = {
+            key: "rockfall-reroute",
+            icon: "🪨",
+            title: "REPLAN NOW",
+            detail: "The left path is blocked. Reduce speed and move to the open right route.",
+            tone: "warning",
+          };
+          strategyCueKeyRef.current = blockageCue.key;
+          strategyCueLockUntilRef.current = timestamp + 2600;
+          setStrategyCue(blockageCue);
           // Block the left fork segment dynamically
           const segment = trackEngine.current.getSegmentAt(1000);
           if (segment) {
@@ -580,9 +654,29 @@ export default function RacingStrategistGame({
             if (choice === 2) { // Successfully rerouted to the open right fork
               successfulAdaptations.current++;
               anticipatedEvents.current++;
+              const successCue: StrategyCue = {
+                key: "safe-reroute",
+                icon: "✓",
+                title: "GOOD REPLAN",
+                detail: "You noticed the blockage and selected the open route.",
+                tone: "success",
+              };
+              strategyCueKeyRef.current = successCue.key;
+              strategyCueLockUntilRef.current = timestamp + 1800;
+              setStrategyCue(successCue);
             } else {
               failedAdaptations.current++;
               lateResponses.current++;
+              const riskCue: StrategyCue = {
+                key: "blocked-route-risk",
+                icon: "!",
+                title: "RISKY COMMITMENT",
+                detail: "The warning indicated this path was blocked. Reassess earlier next time.",
+                tone: "warning",
+              };
+              strategyCueKeyRef.current = riskCue.key;
+              strategyCueLockUntilRef.current = timestamp + 1800;
+              setStrategyCue(riskCue);
             }
           }
 
@@ -799,6 +893,39 @@ export default function RacingStrategistGame({
 
       // Draw Asphalt Track Polygon
       ctx.fillStyle = "#262626"; // Dark Asphalt
+
+      // When the camera approaches the end of the course, the final segment's
+      // world endpoint can enter the viewport. Continue its artwork to the top
+      // edge so the road never appears to stop halfway through the screen.
+      const finalSegment = trackData.segments[trackData.segments.length - 1];
+      const finalDrawEnd = height - (finalSegment.yEnd - cameraY);
+      if (finalDrawEnd > 0) {
+        const roadLeft = finalSegment.centerX - finalSegment.width / 2;
+        ctx.fillStyle = "#262626";
+        ctx.fillRect(roadLeft, 0, finalSegment.width, finalDrawEnd + 1);
+
+        const stripHeight = 15;
+        let stripIndex = 0;
+        for (let y = finalDrawEnd; y > 0; y -= stripHeight) {
+          ctx.fillStyle = stripIndex % 2 === 0 ? "#ef4444" : "#ffffff";
+          ctx.fillRect(roadLeft - 4, Math.max(0, y - stripHeight), 4, stripHeight);
+          ctx.fillRect(roadLeft + finalSegment.width, Math.max(0, y - stripHeight), 4, stripHeight);
+          stripIndex++;
+        }
+
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.65)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([15, 20]);
+        const laneSpan = finalSegment.width / finalSegment.laneCount;
+        for (let lane = 1; lane < finalSegment.laneCount; lane++) {
+          const laneX = roadLeft + lane * laneSpan;
+          ctx.beginPath();
+          ctx.moveTo(laneX, 0);
+          ctx.lineTo(laneX, finalDrawEnd);
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+      }
 
       // Loop through segments visible on screen
       for (const segment of trackData.segments) {
@@ -1041,6 +1168,20 @@ export default function RacingStrategistGame({
           ctx.save();
           ctx.translate(drawX, drawY);
 
+          // High-contrast warning footprint. This is visual only, so the
+          // obstacle's collision dimensions remain unchanged.
+          const warningPulse = 0.72 + Math.sin(timestamp / 180) * 0.18;
+          ctx.save();
+          ctx.globalAlpha = warningPulse;
+          ctx.strokeStyle = "#facc15";
+          ctx.lineWidth = 3;
+          ctx.setLineDash([5, 4]);
+          ctx.beginPath();
+          ctx.ellipse(0, 0, obs.width / 2 + 9, obs.height / 2 + 7, 0, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.restore();
+
           if (obs.type === "static_barrier") {
             // Detailed striped barricade with orange light indicators
             ctx.fillStyle = "#334155";
@@ -1057,19 +1198,41 @@ export default function RacingStrategistGame({
               ctx.lineTo(ox + 6, obs.height/6);
               ctx.stroke();
             }
+            ctx.strokeStyle = "#fef3c7";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-obs.width/2, -obs.height/2, obs.width, obs.height);
           } else if (obs.type === "debris") {
-            // Oil puddle / rock debris
-            ctx.fillStyle = "rgba(15, 23, 42, 0.75)";
+            // Reflective oil spill with a bright edge and readable marker.
+            const oilGradient = ctx.createRadialGradient(-4, -4, 1, 0, 0, obs.width / 2 + 2);
+            oilGradient.addColorStop(0, "#67e8f9");
+            oilGradient.addColorStop(0.3, "#7c3aed");
+            oilGradient.addColorStop(0.65, "#172554");
+            oilGradient.addColorStop(1, "#020617");
+            ctx.fillStyle = oilGradient;
             ctx.beginPath();
-            ctx.ellipse(0, 0, obs.width/2, obs.height/3, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, 0, obs.width/2 + 3, obs.height/3 + 3, -0.12, 0, Math.PI * 2);
             ctx.fill();
+            ctx.strokeStyle = "#fde047";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.fillStyle = "rgba(255,255,255,.8)";
+            ctx.beginPath();
+            ctx.ellipse(-4, -3, 4, 2, -0.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#fef08a";
+            ctx.font = "bold 7px Outfit, Inter, sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("OIL", 0, -obs.height / 2 - 11);
           } else {
             // Shaded boulder rock
-            ctx.fillStyle = "#475569";
+            ctx.fillStyle = "#94a3b8";
             ctx.beginPath();
             ctx.arc(0, 0, obs.width/2, 0, Math.PI * 2);
             ctx.fill();
-            ctx.fillStyle = "#64748b";
+            ctx.strokeStyle = "#facc15";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.fillStyle = "#e2e8f0";
             ctx.beginPath();
             ctx.arc(-3, -3, obs.width/3, 0, Math.PI * 2);
             ctx.fill();
@@ -1209,10 +1372,9 @@ export default function RacingStrategistGame({
 
     return () => {
       cancelAnimationFrame(rafRef.current);
+      controlsRef.current = { steering: 0, accelerating: false, braking: false };
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
-      canvas.removeEventListener("pointermove", handlePointerMove);
-      canvas.removeEventListener("pointerleave", handlePointerLeave);
       resizeObserver.disconnect();
     };
   }, [started, disabled]);
@@ -1248,8 +1410,8 @@ export default function RacingStrategistGame({
               <span>Steer left / right</span>
             </div>
             <div className="instruction-row">
-              <span className="key-badge">Mouse / Pointer</span>
-              <span>Drag or slide pointer to steer</span>
+              <span className="key-badge">On-screen buttons</span>
+              <span>Use the controls below the track</span>
             </div>
           </div>
 
@@ -1272,7 +1434,7 @@ export default function RacingStrategistGame({
             <div className="racing-hud">
               <div className="hud-panel">
                 <span className="hud-title">Circuit</span>
-                <span className="hud-value text-sky-400">{TRACKS[trackIndexRef.current].name}</span>
+                <span className="hud-value text-sky-400">{trackName}</span>
               </div>
               <div className="hud-panel">
                 <span className="hud-title">Time remaining</span>
@@ -1296,9 +1458,24 @@ export default function RacingStrategistGame({
               </div>
             </div>
 
+            <div className={`strategy-coach strategy-coach--${strategyCue.tone}`}>
+              <span className="strategy-coach-icon" aria-hidden>{strategyCue.icon}</span>
+              <span className="strategy-coach-copy">
+                <small>Strategy focus</small>
+                <strong>{strategyCue.title}</strong>
+                <span>{strategyCue.detail}</span>
+              </span>
+            </div>
+
             {/* Dynamic Adaptive alerts */}
             {adaptiveMessage && (
-              <div className="adaptive-overlay">{adaptiveMessage}</div>
+              <div className="adaptive-overlay" role="alert">
+                <span className="adaptive-icon" aria-hidden>⚠</span>
+                <span className="adaptive-copy">
+                  <strong>{adaptiveMessage}</strong>
+                  <small>Slow down and choose the open route.</small>
+                </span>
+              </div>
             )}
 
             {/* Touchscreen Steering & Braking Buttons (Mobile/Tablet support) */}
@@ -1306,43 +1483,19 @@ export default function RacingStrategistGame({
               <div className="control-group">
                 <button
                   className="control-btn"
-                  onTouchStart={() => {
-                    const veh = vehicleEngine.current.state;
-                    veh.steering = -1;
-                  }}
-                  onTouchEnd={() => {
-                    const veh = vehicleEngine.current.state;
-                    veh.steering = 0;
-                  }}
-                  onMouseDown={() => {
-                    const veh = vehicleEngine.current.state;
-                    veh.steering = -1;
-                  }}
-                  onMouseUp={() => {
-                    const veh = vehicleEngine.current.state;
-                    veh.steering = 0;
-                  }}
+                  onPointerDown={() => { controlsRef.current.steering = -1; }}
+                  onPointerUp={() => { controlsRef.current.steering = 0; }}
+                  onPointerCancel={() => { controlsRef.current.steering = 0; }}
+                  onPointerLeave={() => { controlsRef.current.steering = 0; }}
                 >
                   ◀
                 </button>
                 <button
                   className="control-btn"
-                  onTouchStart={() => {
-                    const veh = vehicleEngine.current.state;
-                    veh.steering = 1;
-                  }}
-                  onTouchEnd={() => {
-                    const veh = vehicleEngine.current.state;
-                    veh.steering = 0;
-                  }}
-                  onMouseDown={() => {
-                    const veh = vehicleEngine.current.state;
-                    veh.steering = 1;
-                  }}
-                  onMouseUp={() => {
-                    const veh = vehicleEngine.current.state;
-                    veh.steering = 0;
-                  }}
+                  onPointerDown={() => { controlsRef.current.steering = 1; }}
+                  onPointerUp={() => { controlsRef.current.steering = 0; }}
+                  onPointerCancel={() => { controlsRef.current.steering = 0; }}
+                  onPointerLeave={() => { controlsRef.current.steering = 0; }}
                 >
                   ▶
                 </button>
@@ -1352,48 +1505,26 @@ export default function RacingStrategistGame({
                 <button
                   className="control-btn"
                   style={{ background: "rgba(239, 68, 68, 0.25)", borderColor: "#dc2626" }}
-                  onTouchStart={() => {
-                    const veh = vehicleEngine.current.state;
-                    veh.braking = true;
-                    veh.accelerating = false;
+                  onPointerDown={() => {
+                    controlsRef.current.braking = true;
+                    controlsRef.current.accelerating = false;
                   }}
-                  onTouchEnd={() => {
-                    const veh = vehicleEngine.current.state;
-                    veh.braking = false;
-                  }}
-                  onMouseDown={() => {
-                    const veh = vehicleEngine.current.state;
-                    veh.braking = true;
-                    veh.accelerating = false;
-                  }}
-                  onMouseUp={() => {
-                    const veh = vehicleEngine.current.state;
-                    veh.braking = false;
-                  }}
+                  onPointerUp={() => { controlsRef.current.braking = false; }}
+                  onPointerCancel={() => { controlsRef.current.braking = false; }}
+                  onPointerLeave={() => { controlsRef.current.braking = false; }}
                 >
                   {speedVal <= 0 ? "REVERSE" : "BRAKE"}
                 </button>
                 <button
                   className="control-btn"
                   style={{ background: "rgba(16, 185, 129, 0.25)", borderColor: "#10b981" }}
-                  onTouchStart={() => {
-                    const veh = vehicleEngine.current.state;
-                    veh.accelerating = true;
-                    veh.braking = false;
+                  onPointerDown={() => {
+                    controlsRef.current.accelerating = true;
+                    controlsRef.current.braking = false;
                   }}
-                  onTouchEnd={() => {
-                    const veh = vehicleEngine.current.state;
-                    veh.accelerating = false;
-                  }}
-                  onMouseDown={() => {
-                    const veh = vehicleEngine.current.state;
-                    veh.accelerating = true;
-                    veh.braking = false;
-                  }}
-                  onMouseUp={() => {
-                    const veh = vehicleEngine.current.state;
-                    veh.accelerating = false;
-                  }}
+                  onPointerUp={() => { controlsRef.current.accelerating = false; }}
+                  onPointerCancel={() => { controlsRef.current.accelerating = false; }}
+                  onPointerLeave={() => { controlsRef.current.accelerating = false; }}
                 >
                   GO
                 </button>

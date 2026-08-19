@@ -49,6 +49,8 @@ const SELF_CONTAINED_PRACTICE_ENGINES = new Set([
   'RACING_STRATEGIST',
   'PLAYMAKER',
   'CLIMBING_CHALLENGE',
+  'DETECTIVE_INVESTIGATION',
+  'PRECISION_ARCHERY',
 ]);
 
 
@@ -1335,6 +1337,17 @@ export class GamePlayService {
       assignment.generatedGame?.engineKey === 'CLIMBING_CHALLENGE'
         ? runtime.cognitiveAnalytics
         : null;
+    const detectiveInvestigation =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'DETECTIVE_INVESTIGATION'
+        ? runtime.cognitiveAnalytics
+        : null;
+    const precisionArchery =
+      session.engineId && runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'PRECISION_ARCHERY'
+        ? runtime.cognitiveAnalytics
+        : null;
     const cognitive =
       followLights ||
       ballStack ||
@@ -1354,7 +1367,7 @@ export class GamePlayService {
       mentalRotation ||
       waterJugs ||
       tangramBuilder ||
-      sokoban || miniGolf || racingStrategist || playmaker || climbingChallenge;
+      sokoban || miniGolf || racingStrategist || playmaker || climbingChallenge || detectiveInvestigation || precisionArchery;
     const answered = miniGolf ? Number(miniGolf.shotsTaken || 0) : followLights
       ? Number(followLights.correctTaps || 0) +
         Number(followLights.wrongTaps || 0)
@@ -1420,6 +1433,12 @@ export class GamePlayService {
                                                     climbingChallenge.movementAttempts ||
                                                       0,
                                                   )
+                                                : detectiveInvestigation
+                                                  ? Number(
+                                                      detectiveInvestigation.caseBoardInteractions ||
+                                                        detectiveInvestigation.evidenceInspected ||
+                                                        0,
+                                                    )
                                                 : runtime?.answers?.length || 0;
     const total = cognitive
       ? Math.max(1, answered)
@@ -1477,6 +1496,10 @@ export class GamePlayService {
                                                 ? Number(
                                                     climbingChallenge.overallScore || 0,
                                                   )
+                                                : detectiveInvestigation
+                                                  ? Number(
+                                                      detectiveInvestigation.overallScore || 0,
+                                                    )
                                                 : total
                                                 ? (Number(runtime?.correct || 0) /
                                                     total) *

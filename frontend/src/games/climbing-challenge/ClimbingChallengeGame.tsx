@@ -8,7 +8,7 @@ import "./ClimbingChallengeGame.css";
 interface ClimbingChallengeGameProps {
   remainingSeconds: number;
   practiceOnly?: boolean;
-  onComplete?: (score: number, metrics: any) => void;
+  onComplete?: (score: number, metrics: ClimbingMetrics) => void;
 }
 
 const ClimbingChallengeGame: React.FC<ClimbingChallengeGameProps> = ({
@@ -25,8 +25,6 @@ const ClimbingChallengeGame: React.FC<ClimbingChallengeGameProps> = ({
   const [alertText, setAlertText] = useState("");
   const alertTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [balanceVal, setBalanceVal] = useState(100);
-  const [showRoundTransition, setShowRoundTransition] = useState(false);
-  const showRoundTransitionRef = useRef(false);
 
   // Time Preview for practice mode
   const [timePreview, setTimePreview] = useState(remainingSeconds || 120);
@@ -44,6 +42,8 @@ const ClimbingChallengeGame: React.FC<ClimbingChallengeGameProps> = ({
 
   const mouseXRef = useRef(0);
   const mouseYRef = useRef(0);
+  const draggedFootRef = useRef<"leftFoot" | "rightFoot" | null>(null);
+  const suppressClickRef = useRef(false);
   const popupsRef = useRef<{ x: number; y: number; text: string; color: string; timer: number }[]>([]);
 
   // Telemetry variables
@@ -81,8 +81,6 @@ const ClimbingChallengeGame: React.FC<ClimbingChallengeGameProps> = ({
   const initLevel = useCallback((index: number) => {
     levelIndexRef.current = index;
     setLevelIndex(index);
-    showRoundTransitionRef.current = false;
-    setShowRoundTransition(false);
     
     const lvl = LEVELS[index];
     // Copy holds so we can modify availability dynamically
@@ -217,9 +215,7 @@ const ClimbingChallengeGame: React.FC<ClimbingChallengeGameProps> = ({
       // 2. Update character kinematics
       const engine = climberEngine.current;
       const oldState = engine.state.state;
-      if (!showRoundTransitionRef.current) {
-        engine.update(holds);
-      }
+      engine.update(holds);
       
       setBalanceVal(Math.round(engine.state.balance));
 
@@ -240,19 +236,14 @@ const ClimbingChallengeGame: React.FC<ClimbingChallengeGameProps> = ({
 
       const camY = cameraYRef.current;
 
-      // 4. Level success detection (gaining target finish height or grabbing finish hold)
-      const hasGrabbedFinish = engine.state.leftHand.holdId === "finish" || engine.state.rightHand.holdId === "finish";
-      if ((hasGrabbedFinish || engine.state.y <= lvl.targetY + 100) && !engine.state.isTransitioning) {
+      // 4. Complete only after the climber has finished pulling up and their
+      // upper body has actually crossed the visible finish line.
+      const hasCrossedFinishLine = engine.state.y - 72 <= lvl.targetY;
+      if (hasCrossedFinishLine && !engine.state.isTransitioning) {
         climbsCompleted.current++;
-        const nextIdx = levelIndexRef.current + 1;
-        if (nextIdx < LEVELS.length) {
-          showRoundTransitionRef.current = true;
-          setShowRoundTransition(true);
-        } else {
-          showAlert("Awesome! Climbing Challenge completed.");
-          endingRef.current = true;
-          finish();
-        }
+        showAlert("Awesome! Climbing Challenge completed.");
+        endingRef.current = true;
+        finish();
         return;
       }
 
@@ -272,6 +263,45 @@ const ClimbingChallengeGame: React.FC<ClimbingChallengeGameProps> = ({
         ctx.lineTo(x, 600);
         ctx.stroke();
       }
+
+      // Optional physical-looking obstacles for levels that define them.
+      lvl.obstacles?.forEach((obstacle) => {
+        const drawY = obstacle.y - camY;
+        if (drawY < -120 || drawY > 720) return;
+        ctx.save();
+        ctx.translate(obstacle.x, drawY);
+        ctx.rotate(obstacle.rotation || 0);
+        const gradient = ctx.createLinearGradient(
+          -obstacle.width / 2,
+          -obstacle.height / 2,
+          obstacle.width / 2,
+          obstacle.height / 2
+        );
+        gradient.addColorStop(0, obstacle.kind === "loose-rock" ? "#7c3f2c" : "#475569");
+        gradient.addColorStop(1, "#172033");
+        ctx.fillStyle = gradient;
+        ctx.strokeStyle = obstacle.kind === "loose-rock" ? "#fb923c" : "#64748b";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-obstacle.width / 2, -obstacle.height * 0.25);
+        ctx.lineTo(-obstacle.width * 0.3, -obstacle.height / 2);
+        ctx.lineTo(obstacle.width * 0.35, -obstacle.height * 0.43);
+        ctx.lineTo(obstacle.width / 2, obstacle.height * 0.15);
+        ctx.lineTo(obstacle.width * 0.2, obstacle.height / 2);
+        ctx.lineTo(-obstacle.width * 0.4, obstacle.height * 0.42);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = obstacle.kind === "loose-rock" ? "rgba(253,186,116,.8)" : "rgba(148,163,184,.55)";
+        ctx.lineWidth = obstacle.kind === "crack" ? 4 : 2;
+        ctx.beginPath();
+        ctx.moveTo(-obstacle.width * 0.2, -obstacle.height * 0.32);
+        ctx.lineTo(obstacle.width * 0.08, -obstacle.height * 0.05);
+        ctx.lineTo(-obstacle.width * 0.03, obstacle.height * 0.18);
+        ctx.lineTo(obstacle.width * 0.25, obstacle.height * 0.36);
+        ctx.stroke();
+        ctx.restore();
+      });
 
       // Draw Holds
       holds.forEach(h => {
@@ -335,7 +365,7 @@ const ClimbingChallengeGame: React.FC<ClimbingChallengeGameProps> = ({
       const wmx = mx;
       const wmy = my + camY;
 
-      let hoveredHold: any = null;
+      let hoveredHold: ClimbingHold | null = null;
       let minDist = Infinity;
       for (const h of holds) {
         if (!h.available) continue;
@@ -405,6 +435,30 @@ const ClimbingChallengeGame: React.FC<ClimbingChallengeGameProps> = ({
         );
       }
 
+      // Direct foot control preview: press a shoe, drag, and release on a hold.
+      const draggedFoot = draggedFootRef.current;
+      if (draggedFoot) {
+        const foot = engine.state[draggedFoot];
+        const targetWorldY = mouseYRef.current + camY;
+        const targetDistance = Math.hypot(
+          mouseXRef.current - engine.state.x,
+          targetWorldY - engine.state.y
+        );
+        const canPlace = targetDistance <= 220;
+        ctx.strokeStyle = canPlace ? "rgba(34,197,94,.9)" : "rgba(239,68,68,.9)";
+        ctx.lineWidth = 4;
+        ctx.setLineDash([7, 5]);
+        ctx.beginPath();
+        ctx.moveTo(foot.x, foot.y - camY);
+        ctx.lineTo(mouseXRef.current, mouseYRef.current);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = canPlace ? "rgba(34,197,94,.75)" : "rgba(239,68,68,.75)";
+        ctx.beginPath();
+        ctx.ellipse(mouseXRef.current, mouseYRef.current, 13, 8, -0.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
       // Render floating popups queue
       popupsRef.current = popupsRef.current.filter(p => {
         p.timer--;
@@ -418,7 +472,7 @@ const ClimbingChallengeGame: React.FC<ClimbingChallengeGameProps> = ({
         return p.timer > 0;
       });
 
-      // Draw Climber stick-figure joints
+      // Draw an articulated, fully dressed climber instead of a stick figure.
       const j = engine.getJoints();
 
       // Adjust joints coordinates to camera offset with breathing kinematics
@@ -430,7 +484,6 @@ const ClimbingChallengeGame: React.FC<ClimbingChallengeGameProps> = ({
       });
 
       const head = drawCoord({ x: j.head.x, y: j.head.y + breathe });
-      const neck = drawCoord({ x: j.neck.x, y: j.neck.y + breathe });
       const torso = drawCoord({ x: j.torsoCenter.x, y: j.torsoCenter.y + breathe * 0.5 });
       const lSh = drawCoord({ x: j.lShoulder.x, y: j.lShoulder.y + breathe });
       const rSh = drawCoord({ x: j.rShoulder.x, y: j.rShoulder.y + breathe });
@@ -445,77 +498,89 @@ const ClimbingChallengeGame: React.FC<ClimbingChallengeGameProps> = ({
       const lFo = drawCoord(j.lFoot);
       const rFo = drawCoord(j.rFoot);
 
-      // Draw Limbs connection paths
-      ctx.lineWidth = 4.5;
+      // Arms and legs use broad outlined segments so the animation reads as a person.
+      ctx.lineWidth = 14;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
-
-      // Neon glows
-      ctx.strokeStyle = "#cbd5e1"; // Base climber bone color
-
-      // Left Arm
+      ctx.strokeStyle = "#172033";
       ctx.beginPath();
       ctx.moveTo(lSh.x, lSh.y);
       ctx.lineTo(lEl.x, lEl.y);
       ctx.lineTo(lHa.x, lHa.y);
       ctx.stroke();
-
-      // Right Arm
       ctx.beginPath();
       ctx.moveTo(rSh.x, rSh.y);
       ctx.lineTo(rEl.x, rEl.y);
       ctx.lineTo(rHa.x, rHa.y);
       ctx.stroke();
-
-      // Left Leg
+      ctx.strokeStyle = "#0f766e";
       ctx.beginPath();
       ctx.moveTo(lHi.x, lHi.y);
       ctx.lineTo(lKn.x, lKn.y);
       ctx.lineTo(lFo.x, lFo.y);
       ctx.stroke();
-
-      // Right Leg
       ctx.beginPath();
       ctx.moveTo(rHi.x, rHi.y);
       ctx.lineTo(rKn.x, rKn.y);
       ctx.lineTo(rFo.x, rFo.y);
       ctx.stroke();
 
-      // Draw Torso spine
-      ctx.lineWidth = 6;
+      // Jacket-shaped torso.
+      ctx.fillStyle = "#0284c7";
+      ctx.strokeStyle = "#0c4a6e";
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(neck.x, neck.y);
-      ctx.lineTo(torso.x, torso.y);
-      ctx.lineTo((lHi.x + rHi.x) / 2, (lHi.y + rHi.y) / 2);
-      ctx.stroke();
-
-      // Shoulders line
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(lSh.x, lSh.y);
-      ctx.lineTo(rSh.x, rSh.y);
-      ctx.stroke();
-
-      // Hips line
-      ctx.beginPath();
-      ctx.moveTo(lHi.x, lHi.y);
-      ctx.lineTo(rHi.x, rHi.y);
-      ctx.stroke();
-
-      // Head
-      ctx.fillStyle = "#e2e8f0";
-      ctx.beginPath();
-      ctx.arc(head.x, head.y, 11, 0, 2 * Math.PI);
+      ctx.moveTo(lSh.x, lSh.y - 3);
+      ctx.lineTo(rSh.x, rSh.y - 3);
+      ctx.lineTo(rHi.x + 5, rHi.y + 5);
+      ctx.lineTo(lHi.x - 5, lHi.y + 5);
+      ctx.closePath();
       ctx.fill();
-      ctx.strokeStyle = "#475569";
-      ctx.lineWidth = 1.5;
       ctx.stroke();
 
-      // Climbing helmet/cap details
-      ctx.fillStyle = "#38bdf8";
+      // Safety harness and belt.
+      ctx.strokeStyle = "#fbbf24";
+      ctx.lineWidth = 5;
       ctx.beginPath();
-      ctx.arc(head.x, head.y - 4, 10, Math.PI, 2 * Math.PI);
+      ctx.moveTo(lHi.x - 4, lHi.y - 3);
+      ctx.lineTo(rHi.x + 4, rHi.y - 3);
+      ctx.stroke();
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(torso.x, torso.y + 3);
+      ctx.lineTo(lHi.x, lHi.y + 8);
+      ctx.moveTo(torso.x, torso.y + 3);
+      ctx.lineTo(rHi.x, rHi.y + 8);
+      ctx.stroke();
+
+      // Face and helmet.
+      ctx.fillStyle = "#f2c6a0";
+      ctx.beginPath();
+      ctx.arc(head.x, head.y, 13, 0, 2 * Math.PI);
       ctx.fill();
+      ctx.fillStyle = "#facc15";
+      ctx.beginPath();
+      ctx.arc(head.x, head.y - 3, 14, Math.PI, 2 * Math.PI);
+      ctx.fill();
+      ctx.fillRect(head.x - 14, head.y - 4, 28, 4);
+      ctx.fillStyle = "#172033";
+      ctx.beginPath();
+      ctx.arc(head.x + 5, head.y + 1, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Gloves and climbing shoes follow the animated limb endpoints.
+      [lHa, rHa].forEach((hand) => {
+        ctx.fillStyle = "#f2c6a0";
+        ctx.beginPath();
+        ctx.arc(hand.x, hand.y, 7, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      [lFo, rFo].forEach((foot) => {
+        ctx.fillStyle = "#111827";
+        ctx.beginPath();
+        ctx.ellipse(foot.x, foot.y, 10, 6, -0.2, 0, Math.PI * 2);
+        ctx.fill();
+      });
 
       // Draw limb status highlights
       const drawLimbGlow = (hand: { x: number; y: number }, active: boolean) => {
@@ -566,8 +631,83 @@ const ClimbingChallengeGame: React.FC<ClimbingChallengeGameProps> = ({
     mouseYRef.current = (e.clientY - rect.top) * (canvas.height / rect.height);
   };
 
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!started || doneRef.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    handlePointerMove(e);
+    const camY = cameraYRef.current;
+    const engine = climberEngine.current;
+    const feet = (["leftFoot", "rightFoot"] as const).map((key) => ({
+      key,
+      distance: Math.hypot(
+        mouseXRef.current - engine.state[key].x,
+        mouseYRef.current - (engine.state[key].y - camY)
+      ),
+    }));
+    const closest = feet.sort((a, b) => a.distance - b.distance)[0];
+    if (closest.distance <= 28) {
+      draggedFootRef.current = closest.key;
+      canvas.setPointerCapture(e.pointerId);
+      suppressClickRef.current = true;
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const footKey = draggedFootRef.current;
+    if (!footKey) return;
+    handlePointerMove(e);
+    draggedFootRef.current = null;
+    window.setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 0);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+
+    const worldX = mouseXRef.current;
+    const worldY = mouseYRef.current + cameraYRef.current;
+    const hold = levelHoldsRef.current.find((candidate) =>
+      candidate.available &&
+      Math.hypot(worldX - candidate.x, worldY - candidate.y) <= candidate.size + 18
+    );
+    if (!hold) {
+      holdsMissed.current++;
+      showAlert("Place the foot directly on a climbing hold.");
+      return;
+    }
+
+    reachAttempts.current++;
+    movementAttempts.current++;
+    const success = climberEngine.current.tryReach(hold, footKey);
+    if (success) {
+      successfulReaches.current++;
+      successfulMovements.current++;
+      holdsReached.current++;
+      popupsRef.current.push({
+        x: mouseXRef.current,
+        y: mouseYRef.current,
+        text: "FOOT PLACED!",
+        color: "#22c55e",
+        timer: 40,
+      });
+    } else {
+      failedReaches.current++;
+      showAlert("That foothold is too far away.");
+    }
+  };
+
+  const handlePointerCancel = () => {
+    draggedFootRef.current = null;
+    suppressClickRef.current = false;
+  };
+
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!started || doneRef.current || showRoundTransitionRef.current) return;
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    if (!started || doneRef.current) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -733,31 +873,15 @@ const ClimbingChallengeGame: React.FC<ClimbingChallengeGameProps> = ({
           </div>
         ) : null}
 
-        {showRoundTransition ? (
-          <div className="climber-start-screen">
-            <div className="climber-start-panel">
-              <div className="text-[44px]">🏆</div>
-              <h2 className="text-[20px] font-bold text-white mt-2">Round 1 Complete!</h2>
-              <p className="text-[12px] text-white/60 mt-1 max-w-[320px]">
-                Well climbed! Get ready for Round 2: Route Choice Challenge.
-              </p>
-              
-              <button className="climber-start-button mt-4" onClick={() => {
-                const nextIdx = levelIndexRef.current + 1;
-                initLevel(nextIdx);
-              }}>
-                Start Round 2
-              </button>
-            </div>
-          </div>
-        ) : null}
-
         <canvas
           ref={canvasRef}
           width={800}
           height={600}
           onClick={handleCanvasClick}
+          onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
           className="climber-canvas"
         />
 
@@ -770,7 +894,7 @@ const ClimbingChallengeGame: React.FC<ClimbingChallengeGameProps> = ({
         {/* Floating Instruction Guide */}
         {started ? (
           <div className="climber-controls-guide">
-            🖱️ Click holds inside the blue circle to climb. Grabbing closer holds lifts your body to reach higher!
+            🖱️ Click holds for hands, or press and drag either shoe onto a foothold.
           </div>
         ) : null}
       </div>

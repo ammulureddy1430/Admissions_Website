@@ -41,13 +41,4 @@ export const LEVELS: LevelData[] = [
     difficulty: 1,
     description: "Learn reach, hold grabbing, and motor sequencing.",
   },
-  {
-    id: 2,
-    name: "Round 2: Route Choice Challenge",
-    height: 1000,
-    targetY: 150,
-    holds: generateHoldsForLevel(2, 1000, 2, "routes"),
-    difficulty: 2,
-    description: "Choose between left and right routes to climb.",
-  },
 ];

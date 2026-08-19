@@ -175,6 +175,14 @@ registerGame({
   componentName: "CLIMBING_CHALLENGE",
   load: () => import("./climbing-challenge/Game"),
 });
+registerGame({
+  componentName: "DETECTIVE_INVESTIGATION",
+  load: () => import("./detective-investigation/Game"),
+});
+registerGame({
+  componentName: "PRECISION_ARCHERY",
+  load: () => import("./precision-archery/Game"),
+});
 
 registerGame({
   componentName: "NUMBER_BUILDER",

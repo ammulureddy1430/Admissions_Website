@@ -1,29 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 100" width="100%" height="100%">
-  <rect width="160" height="100" fill="#070a13" rx="10"/>
-  <!-- Court lines -->
-  <rect x="10" y="10" width="140" height="80" fill="none" stroke="#1e293b" stroke-width="1.5"/>
-  <rect x="55" y="10" width="50" height="30" fill="#111827" stroke="#38bdf8" stroke-width="1"/>
-  <path d="M 10 50 Q 50 50 50 50" stroke="#38bdf8" stroke-dasharray="2" stroke-width="1"/>
-  <circle cx="80" cy="90" r="25" fill="none" stroke="#38bdf8" stroke-width="1"/>
-  <!-- Hoop -->
-  <line x1="70" y1="13" x2="90" y2="13" stroke="#f1f5f9" stroke-width="1.5"/>
-  <circle cx="80" cy="18" r="4" fill="none" stroke="#f97316" stroke-width="1.5"/>
-  <!-- Tactical strategy vectors -->
-  <!-- Player (Playmaker) -->
-  <circle cx="80" cy="65" r="5" fill="#6366f1"/>
-  <!-- Teammate A cutting -->
-  <circle cx="45" cy="35" r="4" fill="#0ea5e9"/>
-  <path d="M 45 35 Q 60 25 74 20" fill="none" stroke="#38bdf8" stroke-dasharray="2" stroke-width="1" marker-end="url(#arrow)"/>
-  <!-- Ball flying -->
-  <circle cx="68" cy="42" r="3.5" fill="#f97316"/>
-  <!-- Defender -->
-  <circle cx="65" cy="30" r="4.5" fill="#ef4444"/>
-  <!-- Legend / Text -->
-  <text x="80" y="82" fill="#fb923c" font-family="sans-serif" font-size="7" font-weight="bold" text-anchor="middle" letter-spacing="1">PLAYMAKER</text>
-  <!-- Marker -->
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#38bdf8"/>
-    </marker>
+    <linearGradient id="wall" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#102a43"/><stop offset="1" stop-color="#07131f"/></linearGradient>
+    <linearGradient id="shirt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#38bdf8"/><stop offset="1" stop-color="#0369a1"/></linearGradient>
   </defs>
+  <rect width="160" height="100" rx="10" fill="url(#wall)"/>
+  <path d="M18 0v100M52 0v100M88 0v100M126 0v100" stroke="#38bdf8" stroke-opacity=".08"/>
+  <path d="M13 77 35 61 48 73 67 51 83 58 103 32 121 42 146 18" fill="none" stroke="#38bdf8" stroke-opacity=".22" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <g stroke="#fff" stroke-opacity=".45" stroke-width="1">
+    <ellipse cx="29" cy="76" rx="8" ry="5" fill="#f97316" transform="rotate(-18 29 76)"/>
+    <ellipse cx="48" cy="59" rx="7" ry="5" fill="#22c55e" transform="rotate(14 48 59)"/>
+    <ellipse cx="75" cy="74" rx="7" ry="4" fill="#a855f7" transform="rotate(-10 75 74)"/>
+    <ellipse cx="91" cy="48" rx="8" ry="5" fill="#facc15" transform="rotate(18 91 48)"/>
+    <ellipse cx="121" cy="32" rx="7" ry="5" fill="#fb7185" transform="rotate(-12 121 32)"/>
+    <ellipse cx="140" cy="17" rx="8" ry="5" fill="#22c55e" transform="rotate(8 140 17)"/>
+  </g>
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <path d="M76 55 60 45 49 58M84 55 103 43 120 33" fill="none" stroke="#f1c39b" stroke-width="6"/>
+    <path d="M77 72 66 84 56 94M85 72 97 83 109 91" fill="none" stroke="#0f766e" stroke-width="7"/>
+    <path d="M75 51 87 50 91 72 76 75Z" fill="url(#shirt)" stroke="#075985" stroke-width="1.5"/>
+    <path d="M76 70h15M81 69l-5 9M86 69l8 8" stroke="#facc15" stroke-width="2.5" fill="none"/>
+    <circle cx="80" cy="42" r="8" fill="#f1c39b"/>
+    <path d="M72 41a8 8 0 0 1 16 0Z" fill="#facc15"/><path d="M71 41h18" stroke="#ca8a04" stroke-width="2"/>
+    <circle cx="49" cy="58" r="3.5" fill="#f1c39b"/><circle cx="120" cy="33" r="3.5" fill="#f1c39b"/>
+    <path d="m51 94 9-1M105 92l9 1" stroke="#111827" stroke-width="5"/>
+  </g>
+  <path d="M79 77c-4 7-3 14 4 19" fill="none" stroke="#facc15" stroke-width="1.5" stroke-dasharray="2 2"/>
+  <text x="12" y="16" fill="#7dd3fc" font-family="sans-serif" font-size="7" font-weight="bold" letter-spacing="1.3">CLIMB HIGHER</text>
 </svg>

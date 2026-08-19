@@ -84,6 +84,8 @@ const ENGINES = [
   ['RACING_STRATEGIST', 'Racing Strategist — Strategic Decision Making'],
   ['PLAYMAKER', 'Playmaker — Anticipation & Decision Making'],
   ['CLIMBING_CHALLENGE', 'Climbing Challenge — Motor Planning & Spatial-Motor Coordination'],
+  ['DETECTIVE_INVESTIGATION', 'Detective Investigation — Evidence-Based Reasoning'],
+  ['PRECISION_ARCHERY', 'Precision Archery — Visual-Motor Precision & Control'],
 ] as const;
 
 // These catalog games generate their own rounds and cognitive metrics at
@@ -118,6 +120,8 @@ const SELF_CONTAINED_ENGINES = new Set([
   'RACING_STRATEGIST',
   'PLAYMAKER',
   'CLIMBING_CHALLENGE',
+  'DETECTIVE_INVESTIGATION',
+  'PRECISION_ARCHERY',
 ]);
 
 
@@ -693,6 +697,15 @@ export class GameRuntimeService {
         schoolId,
         user,
       );
+    if (action === 'DETECTIVE_INVESTIGATION_COMPLETE')
+      return this.detectiveInvestigationComplete(
+        session,
+        dto.payload,
+        schoolId,
+        user,
+      );
+    if (action === 'PRECISION_ARCHERY_COMPLETE')
+      return this.precisionArcheryComplete(session, dto.payload, schoolId, user);
 
     if (action === 'SECURITY_VIOLATION')
       return this.securityViolation(session, dto.payload, schoolId, user);
@@ -4214,6 +4227,92 @@ export class GameRuntimeService {
     });
 
     await this.event(session.id, 'CLIMBING_CHALLENGE_COMPLETED', analytics);
+    return { state: await this.state(session.id, schoolId, user) };
+  }
+
+  private async detectiveInvestigationComplete(
+    session: any,
+    payload: unknown,
+    schoolId: string,
+    user: any,
+  ) {
+    if (
+      session.engine.engineKey !== 'DETECTIVE_INVESTIGATION' ||
+      !['RUNNING', 'PAUSED'].includes(session.status)
+    )
+      throw new BadRequestException(
+        'Detective Investigation metrics require an active session.',
+      );
+    const input = (payload || {}) as Record<string, unknown>;
+    const scoreKeys = new Set([
+      'overallScore',
+      'evidenceBasedReasoningScore',
+      'observationScore',
+      'informationFilteringScore',
+      'logicalReasoningScore',
+      'evidenceComparisonScore',
+      'causeEffectReasoningScore',
+      'hypothesisFormationScore',
+      'informationIntegrationScore',
+      'workingRecallScore',
+      'relevantInformationAttentionScore',
+      'problemSolvingScore',
+      'adaptiveReasoningScore',
+      'decisionMakingScore',
+      'beginningPerformance',
+      'middlePerformance',
+      'endingPerformance',
+    ]);
+    const metricKeys = [
+      'sessionDuration', 'locationsVisited', 'locationsRevisited',
+      'objectsInspected', 'objectsIgnored', 'npcsApproached',
+      'npcsInterviewed', 'evidenceDiscovered', 'evidenceInspected',
+      'relevantEvidenceDiscovered', 'irrelevantEvidenceCollected',
+      'relevantEvidenceIgnored', 'evidenceConnections',
+      'validEvidenceConnections', 'invalidEvidenceConnections',
+      'eventObservations', 'importantEventObservations',
+      'missedImportantEvents', 'timelineInformationObserved',
+      'contradictionsObserved', 'hypothesesFormed', 'hypothesisChanges',
+      'caseBoardInteractions', 'caseResolution', 'explorationEfficiency',
+      'informationFiltering', 'averageDecisionTime', 'highestDifficulty',
+      ...scoreKeys,
+    ];
+    const analytics: Record<string, unknown> = {};
+    for (const key of metricKeys) {
+      analytics[key] = Math.max(
+        0,
+        Math.min(scoreKeys.has(key) ? 100 : 100000, Number(input[key]) || 0),
+      );
+    }
+    analytics.completionStatus = String(input.completionStatus || 'COMPLETED').slice(0, 50);
+    await this.prisma.gameRuntimeSession.update({
+      where: { id: session.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        score: Number(analytics.overallScore),
+        elapsedSeconds: Math.max(0, Math.round((Date.now() - new Date(session.startedAt || Date.now()).getTime()) / 1000)),
+        runtimeState: {
+          ...((session.runtimeState || {}) as Record<string, unknown>),
+          cognitiveAnalytics: analytics,
+        } as Prisma.InputJsonValue,
+      },
+    });
+    await this.event(session.id, 'DETECTIVE_INVESTIGATION_COMPLETED', analytics);
+    return { state: await this.state(session.id, schoolId, user) };
+  }
+
+  private async precisionArcheryComplete(session: any, payload: unknown, schoolId: string, user: any) {
+    if (session.engine.engineKey !== 'PRECISION_ARCHERY' || !['RUNNING', 'PAUSED'].includes(session.status))
+      throw new BadRequestException('Precision Archery metrics require an active session.');
+    const input = (payload || {}) as Record<string, unknown>;
+    const scoreKeys = new Set(['overallScore','visualMotorPrecisionScore','handEyeCoordinationScore','fineMotorControlScore','visualTrackingScore','forceControlScore','timingScore','precisionScore','distanceEstimationScore','movementAdjustmentScore','responseControlScore','attentionTrackingScore','errorCorrectionScore','motorConsistencyScore','beginningPerformance','middlePerformance','endingPerformance']);
+    const metricKeys = ['sessionDuration','shotsTaken','targetsHit','targetMisses','centerHits','outerHits','edgeHits','averageAimStability','averageAimVariance','averageDrawConsistency','averageReleaseTiming','averageForceVariance','trackingStability','correctionEfficiency','averageCorrectionTime','highestDifficulty',...scoreKeys];
+    const analytics: Record<string, unknown> = {};
+    for (const key of metricKeys) analytics[key] = Math.max(0, Math.min(scoreKeys.has(key) ? 100 : 100000, Number(input[key]) || 0));
+    analytics.completionStatus = String(input.completionStatus || 'COMPLETED').slice(0, 50);
+    await this.prisma.gameRuntimeSession.update({where:{id:session.id},data:{status:'COMPLETED',completedAt:new Date(),score:Number(analytics.overallScore),elapsedSeconds:Math.max(0,Math.round((Date.now()-new Date(session.startedAt||Date.now()).getTime())/1000)),runtimeState:{...((session.runtimeState||{}) as Record<string,unknown>),cognitiveAnalytics:analytics} as Prisma.InputJsonValue}});
+    await this.event(session.id, 'PRECISION_ARCHERY_COMPLETED', analytics);
     return { state: await this.state(session.id, schoolId, user) };
   }
 

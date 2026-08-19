@@ -6,9 +6,8 @@ function runTests() {
   console.log("Starting Climbing Challenge Engine tests...");
 
   // 1. Verify Levels generation
-  console.assert(LEVELS.length === 2, "Expected 2 levels");
+  console.assert(LEVELS.length === 1, "Expected one climbing level");
   console.assert(LEVELS[0].holds.length > 5, "Expected beginner wall holds");
-  console.assert(LEVELS[1].holds.length > 5, "Expected route choice wall holds");
   console.log("✓ Levels hold counts verified");
 
   // 2. Test Climber Kinematics Engine

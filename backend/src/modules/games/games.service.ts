@@ -35,7 +35,7 @@ export class GamesService implements OnModuleInit {
       result.numberBuilderAnalytics ||
       result.ballSortAnalytics ||
       result.redLightGreenLightAnalytics ||
-      (['CATCH_THE_TARGET', 'MENTAL_ROTATION', 'WATER_JUGS', 'TANGRAM_BUILDER', 'SOKOBAN', 'RACING_STRATEGIST', 'PLAYMAKER', 'CLIMBING_CHALLENGE'].includes(
+      (['CATCH_THE_TARGET', 'MENTAL_ROTATION', 'WATER_JUGS', 'TANGRAM_BUILDER', 'SOKOBAN', 'RACING_STRATEGIST', 'PLAYMAKER', 'CLIMBING_CHALLENGE', 'DETECTIVE_INVESTIGATION', 'PRECISION_ARCHERY'].includes(
         result.game?.componentName,
       )
         ? result.attempts?.[0]?.scores?.[0]?.details
@@ -1807,7 +1807,7 @@ export class GamesService implements OnModuleInit {
         result.waterPipelineAnalytics ||
         result.patternMatrixAnalytics ||
         result.numberBuilderAnalytics ||
-        (['CATCH_THE_TARGET', 'MENTAL_ROTATION', 'WATER_JUGS', 'TANGRAM_BUILDER', 'SOKOBAN', 'RACING_STRATEGIST', 'PLAYMAKER', 'CLIMBING_CHALLENGE'].includes(
+        (['CATCH_THE_TARGET', 'MENTAL_ROTATION', 'WATER_JUGS', 'TANGRAM_BUILDER', 'SOKOBAN', 'RACING_STRATEGIST', 'PLAYMAKER', 'CLIMBING_CHALLENGE', 'DETECTIVE_INVESTIGATION', 'PRECISION_ARCHERY'].includes(
           game.componentName,
         )
           ? result.attempts?.[0]?.scores?.[0]?.details

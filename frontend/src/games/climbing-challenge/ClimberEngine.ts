@@ -108,26 +108,34 @@ export class ClimberEngine {
       }
     }
 
-    // 1.5 Auto foot step-up / drag tracking
+    // 1.5 Auto foot step-up. Feet should visibly follow the torso instead of
+    // dragging until they are fully extended.
     const feet = ["leftFoot", "rightFoot"] as const;
     for (const key of feet) {
       const foot = this.state[key];
-      const dx = foot.x - this.state.x;
-      const dy = foot.y - this.state.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      const verticalTrail = foot.y - this.state.y;
       
-      if (dist > 185 && !foot.isMoving) {
+      // Wait until the torso has settled, then move one foot at a time. Using
+      // vertical trail (rather than total distance) prevents wide poses from
+      // repeatedly retriggering a step and making the knees flicker.
+      if (
+        verticalTrail > 132 &&
+        !foot.isMoving &&
+        !anyLimbMoving &&
+        !this.state.isTransitioning
+      ) {
         let bestHold: ClimbingHold | null = null;
         let minDist = Infinity;
         
         for (const h of holds) {
           if (!h.available) continue;
-          if (h.y > this.state.y + 35) {
+          // A useful foothold sits below the hips but above the current foot.
+          if (h.y > this.state.y + 25 && h.y < foot.y - 8) {
             const hdx = h.x - this.state.x;
             const hdy = h.y - this.state.y;
             const hdist = Math.sqrt(hdx * hdx + hdy * hdy);
             
-            if (hdist <= 165) {
+            if (hdist <= 175) {
               const otherKey = key === "leftFoot" ? "rightFoot" : "leftFoot";
               if (this.state[otherKey].holdId !== h.id && hdist < minDist) {
                 minDist = hdist;
@@ -140,16 +148,14 @@ export class ClimberEngine {
         if (bestHold) {
           foot.isMoving = true;
           foot.moveTimer = 0;
+          foot.moveDuration = 16;
           foot.startX = foot.x;
           foot.startY = foot.y;
           foot.targetX = bestHold.x;
           foot.targetY = bestHold.y;
           foot.holdId = bestHold.id;
-        } else {
-          const angle = Math.atan2(dy, dx);
-          foot.x = this.state.x + Math.cos(angle) * 165;
-          foot.y = this.state.y + Math.sin(angle) * 165;
-          foot.holdId = null;
+          // Prevent the other foot from starting during this same frame.
+          anyLimbMoving = true;
         }
       }
     }

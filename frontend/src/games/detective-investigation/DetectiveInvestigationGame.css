@@ -1,0 +1,427 @@
+.detective-game {
+  width: 100%;
+  height: 100%;
+  min-height: 620px;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 0, #19324a, #060b13 70%);
+  color: #f8fafc;
+  font-family: Inter, system-ui, sans-serif;
+}
+.detective-hud {
+  height: 70px;
+  max-width: 800px;
+  margin: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  background: rgba(7, 16, 29, 0.88);
+  border: 1px solid #334155;
+  border-bottom-color: #d4a72c;
+}
+.detective-hud > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.detective-hud b {
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  color: #facc15;
+}
+.detective-hud span {
+  font-size: 11px;
+  color: #94a3b8;
+}
+.detective-time {
+  text-align: right;
+}
+.detective-time small {
+  display: block;
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  color: #64748b;
+}
+.detective-time strong {
+  font-family: monospace;
+  font-size: 20px;
+  color: #67e8f9;
+}
+.detective-stage {
+  position: relative;
+  width: min(800px, 100%);
+  height: calc(100% - 70px);
+  min-height: 550px;
+  margin: auto;
+  overflow: hidden;
+  border-inline: 1px solid #334155;
+}
+.detective-stage canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+  background: #0f172a;
+  cursor: crosshair;
+}
+.detective-cover,
+.detective-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: rgba(3, 7, 18, 0.83);
+  backdrop-filter: blur(8px);
+}
+.detective-brief {
+  width: min(520px, 88%);
+  padding: 36px;
+  border: 1px solid #785d20;
+  border-radius: 20px;
+  background: linear-gradient(145deg, #15263a, #090f19);
+  box-shadow: 0 28px 70px #000;
+}
+.detective-brief > span,
+.detective-modal small,
+.case-board small {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: #facc15;
+}
+.detective-brief h1 {
+  margin: 10px 0;
+  font-family: Georgia, serif;
+  font-size: 29px;
+  color: #fff;
+}
+.detective-brief p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #b7c5d6;
+}
+.detective-brief-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 20px 0;
+}
+.detective-brief-grid span {
+  padding: 10px;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: #101827;
+  color: #cbd5e1;
+  font-size: 9px;
+  text-align: center;
+}
+.detective-brief button,
+.detective-modal button,
+.detective-dialogue button {
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  border-radius: 10px;
+  background: #d4a72c;
+  color: #111827;
+  font-weight: 900;
+  cursor: pointer;
+}
+.detective-interact {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transform: translateX(-50%);
+  padding: 11px 15px;
+  border: 1px solid #67e8f9;
+  border-radius: 12px;
+  background: rgba(7, 22, 38, 0.94);
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 8px 24px #000;
+}
+.detective-interact kbd {
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: #facc15;
+  color: #111827;
+}
+.detective-modal > div {
+  width: min(430px, 86%);
+  padding: 28px;
+  border: 1px solid #50677d;
+  border-radius: 18px;
+  background: #101c2b;
+  box-shadow: 0 22px 60px #000;
+}
+.evidence-big {
+  display: block;
+  float: right;
+  font-size: 48px;
+}
+.detective-modal h2 {
+  margin: 7px 0 10px;
+  font-family: Georgia, serif;
+}
+.detective-modal p {
+  min-height: 62px;
+  color: #cbd5e1;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.detective-dialogue {
+  position: absolute;
+  z-index: 18;
+  left: 5%;
+  right: 5%;
+  bottom: 22px;
+  padding: 16px 20px;
+  border: 1px solid #64748b;
+  border-left: 6px solid #c084fc;
+  border-radius: 14px;
+  background: rgba(10, 18, 31, 0.97);
+  box-shadow: 0 16px 40px #000;
+}
+.detective-dialogue strong {
+  color: #d8b4fe;
+}
+.detective-dialogue p {
+  margin: 5px 0 12px;
+  font-family: Georgia, serif;
+  font-size: 15px;
+}
+.detective-dialogue button {
+  width: auto;
+  padding: 7px 15px;
+}
+.case-board {
+  position: absolute;
+  inset: 12px;
+  z-index: 25;
+  overflow: auto;
+  padding: 22px;
+  border: 7px solid #5c3518;
+  border-radius: 16px;
+  background: radial-gradient(circle, #553721, #2b1a12);
+  box-shadow:
+    inset 0 0 0 2px #a7773a,
+    0 25px 70px #000;
+}
+.case-board-head {
+  display: flex;
+  justify-content: space-between;
+}
+.case-board-head h2 {
+  margin: 4px 0;
+  font-family: Georgia, serif;
+}
+.case-board-head p {
+  margin: 0;
+  color: #d6c2a9;
+  font-size: 11px;
+}
+.case-board-head > button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #c9a873;
+  border-radius: 50%;
+  background: #27170e;
+  color: #fff;
+  font-size: 22px;
+}
+.case-chain {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+  margin: 30px 0;
+  position: relative;
+}
+.case-chain:before {
+  content: "";
+  position: absolute;
+  left: 15%;
+  right: 15%;
+  top: 50%;
+  border-top: 3px dashed #d4a72c;
+}
+.chain-slot {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-height: 105px;
+  place-items: center;
+  border: 2px dashed #b78a4b;
+  border-radius: 10px;
+  background: rgba(30, 18, 11, 0.9);
+}
+.chain-slot span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 29px;
+}
+.chain-slot b {
+  font-size: 10px;
+}
+.chain-slot em {
+  color: #a98c6e;
+  font-size: 10px;
+}
+.evidence-tray {
+  display: flex;
+  min-height: 92px;
+  flex-wrap: wrap;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid #7d5735;
+  border-radius: 12px;
+  background: rgba(20, 12, 8, 0.52);
+}
+.evidence-tray button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid #9d774e;
+  border-radius: 8px;
+  background: #eee1c7;
+  color: #2b1a12;
+  font-size: 9px;
+  font-weight: 800;
+  cursor: grab;
+}
+.evidence-tray button span {
+  font-size: 20px;
+}
+.evidence-tray p {
+  color: #b9a58c;
+  font-size: 11px;
+}
+.case-board-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+.case-board-actions button {
+  padding: 10px 16px;
+  border: 1px solid #b78a4b;
+  border-radius: 9px;
+  background: #2b1a12;
+  color: #fff;
+  font-weight: 850;
+}
+.case-board-actions button:last-child {
+  background: #d4a72c;
+  color: #111827;
+}
+.case-board-actions button:disabled {
+  opacity: 0.35;
+}
+.detective-touch {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 8;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  pointer-events: none;
+}
+.detective-touch > div,
+.detective-touch > button {
+  pointer-events: auto;
+}
+.detective-touch > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.detective-touch span {
+  display: flex;
+}
+.detective-touch button {
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  font-weight: 900;
+  touch-action: none;
+}
+.detective-touch > button {
+  width: 68px;
+  height: 68px;
+  border-color: #d4a72c;
+  color: #facc15;
+  font-size: 10px;
+}
+.detective-exit {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 12;
+  padding: 7px 12px;
+  border: 1px solid #64748b;
+  border-radius: 9px;
+  background: #0f172a;
+  color: #fff;
+}
+.detective-board-shortcut {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 13px;
+  border: 2px solid #facc15;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.96);
+  color: #facc15;
+  font-size: 10px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 8px 24px #000;
+}
+.detective-board-shortcut span {
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+}
+.detective-modal ~ .detective-touch,
+.case-board ~ .detective-touch {
+  display: none;
+}
+@media (min-width: 900px) {
+  .detective-touch {
+    opacity: 0.55;
+  }
+  .detective-touch:hover {
+    opacity: 1;
+  }
+}
+@media (max-height: 700px) {
+  .detective-game {
+    min-height: 520px;
+  }
+  .detective-hud {
+    height: 58px;
+  }
+  .detective-stage {
+    height: calc(100% - 58px);
+    min-height: 460px;
+  }
+  .strategy-coach {
+    top: 170px;
+  }
+}
