@@ -64,6 +64,7 @@ import MemoryMarketGame from "@/games/memory-market/Game";
 import AirportControllerGame from "@/games/airport-controller/Game";
 import RuleShiftChallengeGame from "@/games/rule-shift-challenge/Game";
 import MiniGolfGame from "@/games/mini-golf/Game";
+import RacingStrategistGame from "@/games/racing-strategist/Game";
 
 const MAX_SECURITY_WARNINGS = 3;
 const SELF_CONTAINED_GAME_ENGINES = new Set([
@@ -93,6 +94,7 @@ const SELF_CONTAINED_GAME_ENGINES = new Set([
   "AIRPORT_CONTROLLER",
   "RULE_SHIFT_CHALLENGE",
   "MINI_GOLF_CHALLENGE",
+  "RACING_STRATEGIST",
 ]);
 
 type GameOption = { id?: string; optionKey?: string; optionText: string };
@@ -507,7 +509,8 @@ export function GameRuntimePlayer({
           actionName === "MEMORY_MARKET_COMPLETE" ||
           actionName === "AIRPORT_CONTROLLER_COMPLETE" ||
           actionName === "RULE_SHIFT_CHALLENGE_COMPLETE" ||
-          actionName === "MINI_GOLF_CHALLENGE_COMPLETE") &&
+          actionName === "MINI_GOLF_CHALLENGE_COMPLETE" ||
+          actionName === "RACING_STRATEGIST_COMPLETE") &&
         next.status === "COMPLETED"
 
       ) {
@@ -669,6 +672,7 @@ export function GameRuntimePlayer({
   const isAirportController = state.engine?.engineKey === "AIRPORT_CONTROLLER";
   const isRuleShiftChallenge = state.engine?.engineKey === "RULE_SHIFT_CHALLENGE";
   const isMiniGolf = state.engine?.engineKey === "MINI_GOLF_CHALLENGE";
+  const isRacingStrategist = state.engine?.engineKey === "RACING_STRATEGIST";
   const isPracticeMode =
 
     state.mode === "PRACTICE" || state.configuration?.practiceMode === true;
@@ -711,7 +715,8 @@ export function GameRuntimePlayer({
     isNumberBuilder ||
     isBallSort ||
     isRedLightGreenLight ||
-    isRuleShiftChallenge;
+    isRuleShiftChallenge ||
+    isRacingStrategist;
   const player = (
 
     <div
@@ -1012,6 +1017,16 @@ export function GameRuntimePlayer({
             />
           ) : isMiniGolf ? (
             <MiniGolfGame disabled={!isPracticeMode && state.status !== "RUNNING"} remainingSeconds={seconds} practiceOnly={isPracticeMode} onComplete={(metrics) => action("MINI_GOLF_CHALLENGE_COMPLETE", metrics)} />
+          ) : isRacingStrategist ? (
+            <RacingStrategistGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              onComplete={(metrics) =>
+                action("RACING_STRATEGIST_COMPLETE", metrics)
+              }
+              onBack={closePlayer}
+            />
           ) : q ? (
 
             state.engine?.engineKey === "BOARD_GAME" ? (

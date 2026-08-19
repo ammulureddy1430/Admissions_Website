@@ -163,6 +163,10 @@ registerGame({
   load: () => import("./rule-shift-challenge/Game"),
 });
 registerGame({ componentName: "MINI_GOLF_CHALLENGE", load: () => import("./mini-golf/Game") });
+registerGame({
+  componentName: "RACING_STRATEGIST",
+  load: () => import("./racing-strategist/Game"),
+});
 
 registerGame({
   componentName: "NUMBER_BUILDER",

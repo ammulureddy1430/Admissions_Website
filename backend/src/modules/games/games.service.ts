@@ -35,7 +35,7 @@ export class GamesService implements OnModuleInit {
       result.numberBuilderAnalytics ||
       result.ballSortAnalytics ||
       result.redLightGreenLightAnalytics ||
-      (['CATCH_THE_TARGET', 'MENTAL_ROTATION', 'WATER_JUGS', 'TANGRAM_BUILDER', 'SOKOBAN'].includes(
+      (['CATCH_THE_TARGET', 'MENTAL_ROTATION', 'WATER_JUGS', 'TANGRAM_BUILDER', 'SOKOBAN', 'RACING_STRATEGIST'].includes(
         result.game?.componentName,
       )
         ? result.attempts?.[0]?.scores?.[0]?.details

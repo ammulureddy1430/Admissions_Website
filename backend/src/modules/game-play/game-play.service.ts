@@ -46,6 +46,7 @@ const SELF_CONTAINED_PRACTICE_ENGINES = new Set([
   'AIRPORT_CONTROLLER',
   'RULE_SHIFT_CHALLENGE',
   'MINI_GOLF_CHALLENGE',
+  'RACING_STRATEGIST',
 ]);
 
 
@@ -1314,6 +1315,12 @@ export class GamePlayService {
         ? runtime.cognitiveAnalytics
         : null;
     const miniGolf = session.engineId && runtime?.cognitiveAnalytics && assignment.generatedGame?.engineKey === 'MINI_GOLF_CHALLENGE' ? runtime.cognitiveAnalytics : null;
+    const racingStrategist =
+      session.engineId &&
+      runtime?.cognitiveAnalytics &&
+      assignment.generatedGame?.engineKey === 'RACING_STRATEGIST'
+        ? runtime.cognitiveAnalytics
+        : null;
     const cognitive =
       followLights ||
       ballStack ||
@@ -1333,7 +1340,7 @@ export class GamePlayService {
       mentalRotation ||
       waterJugs ||
       tangramBuilder ||
-      sokoban || miniGolf;
+      sokoban || miniGolf || racingStrategist;
     const answered = miniGolf ? Number(miniGolf.shotsTaken || 0) : followLights
       ? Number(followLights.correctTaps || 0) +
         Number(followLights.wrongTaps || 0)
@@ -1384,7 +1391,12 @@ export class GamePlayService {
                                           ? Number(
                                               sokoban.puzzlesCompleted || 0,
                                             )
-                                          : runtime?.answers?.length || 0;
+                                          : racingStrategist
+                                            ? Number(
+                                                racingStrategist.decisionEvents ||
+                                                  0,
+                                              )
+                                            : runtime?.answers?.length || 0;
     const total = cognitive
       ? Math.max(1, answered)
       : session.questionIds.length;
@@ -1428,11 +1440,16 @@ export class GamePlayService {
                                           )
                                         : sokoban
                                           ? Number(sokoban.overallScore || 0)
-                                          : total
-                                            ? (Number(runtime?.correct || 0) /
-                                                total) *
-                                              100
-                                            : 0;
+                                          : racingStrategist
+                                            ? Number(
+                                                racingStrategist.overallScore ||
+                                                  0,
+                                              )
+                                            : total
+                                              ? (Number(runtime?.correct || 0) /
+                                                  total) *
+                                                100
+                                              : 0;
     const passed = percentage >= assignment.passingScore;
     const attempt = await this.prisma.gameAttempt.findFirst({
       where: { gameResultId: result.id, submittedAt: null },

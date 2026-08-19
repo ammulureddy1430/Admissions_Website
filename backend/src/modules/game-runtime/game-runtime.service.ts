@@ -81,6 +81,7 @@ const ENGINES = [
     'Rule Shift Challenge — Cognitive Flexibility & Inhibitory Control',
   ],
   ['MINI_GOLF_CHALLENGE','Mini Golf Challenge — Hand-Eye Coordination & Motor Planning'],
+  ['RACING_STRATEGIST', 'Racing Strategist — Strategic Decision Making'],
 ] as const;
 
 // These catalog games generate their own rounds and cognitive metrics at
@@ -112,6 +113,7 @@ const SELF_CONTAINED_ENGINES = new Set([
   'AIRPORT_CONTROLLER',
   'RULE_SHIFT_CHALLENGE',
   'MINI_GOLF_CHALLENGE',
+  'RACING_STRATEGIST',
 ]);
 
 
@@ -666,6 +668,13 @@ export class GameRuntimeService {
       );
     if (action === 'MINI_GOLF_CHALLENGE_COMPLETE')
       return this.miniGolfComplete(session, dto.payload, schoolId, user);
+    if (action === 'RACING_STRATEGIST_COMPLETE')
+      return this.racingStrategistComplete(
+        session,
+        dto.payload,
+        schoolId,
+        user,
+      );
 
     if (action === 'SECURITY_VIOLATION')
       return this.securityViolation(session, dto.payload, schoolId, user);
@@ -2327,6 +2336,137 @@ export class GameRuntimeService {
       'AIRPORT_CONTROLLER_COMPLETED',
       cognitiveAnalytics,
     );
+    return { state: await this.state(session.id, schoolId, user) };
+  }
+
+  private async racingStrategistComplete(
+    session: any,
+    payload: unknown,
+    schoolId: string,
+    user: { id: string; role: Role },
+  ) {
+    if (
+      session.engine.engineKey !== 'RACING_STRATEGIST' ||
+      !['RUNNING', 'PAUSED'].includes(session.status)
+    )
+      throw new BadRequestException(
+        'Racing Strategist metrics require an active session.',
+      );
+    const input = (payload || {}) as Record<string, unknown>;
+    const scores = new Set([
+      'overallScore',
+      'strategicDecisionMakingScore',
+      'riskAssessmentScore',
+      'anticipatoryReasoningScore',
+      'adaptiveDecisionMakingScore',
+      'routeSelectionScore',
+      'consequencePredictionScore',
+      'spatialJudgmentScore',
+      'planningScore',
+      'situationalAwarenessScore',
+      'responseControlScore',
+      'problemSolvingScore',
+      'decisionConsistencyScore',
+      'beginningPerformance',
+      'middlePerformance',
+      'endingPerformance',
+    ]);
+    const keys = [
+      'sessionDuration',
+      'tracksStarted',
+      'tracksCompleted',
+      'distanceTravelled',
+      'routeChoices',
+      'safeRouteChoices',
+      'riskyRouteChoices',
+      'shortcutChoices',
+      'shortcutSuccesses',
+      'shortcutFailures',
+      'overtakeAttempts',
+      'successfulOvertakes',
+      'unsuccessfulOvertakes',
+      'overtakeWaitDecisions',
+      'collisions',
+      'nearCollisions',
+      'obstacleAvoidanceAttempts',
+      'successfulObstacleAvoidance',
+      'brakingEvents',
+      'appropriateBrakingEvents',
+      'lateBrakingEvents',
+      'unnecessaryBrakingEvents',
+      'speedChanges',
+      'routeChanges',
+      'strategyChanges',
+      'adaptiveDecisions',
+      'successfulAdaptations',
+      'failedAdaptations',
+      'anticipatedEvents',
+      'lateResponses',
+      'decisionEvents',
+      'averageDecisionTime',
+      'decisionConsistency',
+      'riskDecisions',
+      'opponentInteractions',
+      'trackConditionChanges',
+      'responseToTrackChanges',
+      'beginningPerformance',
+      'middlePerformance',
+      'endingPerformance',
+      'highestDifficulty',
+      'strategicDecisionMakingScore',
+      'riskAssessmentScore',
+      'anticipatoryReasoningScore',
+      'adaptiveDecisionMakingScore',
+      'routeSelectionScore',
+      'consequencePredictionScore',
+      'spatialJudgmentScore',
+      'planningScore',
+      'situationalAwarenessScore',
+      'responseControlScore',
+      'problemSolvingScore',
+      'decisionConsistencyScore',
+      'overallScore',
+    ];
+    const analytics: Record<string, unknown> = {};
+    for (const key of keys) {
+      analytics[key] = Math.max(
+        0,
+        Math.min(
+          scores.has(key) ? 100 : 100000,
+          Number(input[key]) || 0,
+        ),
+      );
+    }
+    for (const arrayKey of ['decisionTimes', 'routeChoiceTypes', 'riskOutcomes']) {
+      analytics[arrayKey] = Array.isArray(input[arrayKey])
+        ? (input[arrayKey] as unknown[]).slice(0, 300)
+        : [];
+    }
+    analytics.completionStatus = String(
+      input.completionStatus || 'COMPLETED',
+    ).slice(0, 50);
+
+    await this.prisma.gameRuntimeSession.update({
+      where: { id: session.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        score: Number(analytics.overallScore),
+        elapsedSeconds: Math.max(
+          0,
+          Math.round(
+            (Date.now() - new Date(session.startedAt || Date.now()).getTime()) /
+              1000,
+          ),
+        ),
+        runtimeState: {
+          ...((session.runtimeState || {}) as Record<string, unknown>),
+          cognitiveAnalytics: analytics,
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    await this.event(session.id, 'RACING_STRATEGIST_COMPLETED', analytics);
     return { state: await this.state(session.id, schoolId, user) };
   }
 

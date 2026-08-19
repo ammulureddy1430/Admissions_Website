@@ -520,4 +520,19 @@ export const GAME_CATALOG: RegisteredGame[] = [
     templateCode: 'GT-RULE-SHIFT',
     cognitiveSkill: 'Cognitive Flexibility',
   },
+  {
+    name: 'Racing Strategist — Strategic Decision Making',
+    slug: 'racing-strategist',
+    description:
+      'A real-time game-based assessment where children drive a vehicle through changing tracks, making strategic decisions under changing conditions.',
+    category: 'Strategic Thinking & Decision Making',
+    ageGroup: '11–13 Years',
+    difficulty: 'PROGRESSIVE',
+    durationSeconds: 120,
+    thumbnail: '/games/racing-strategist.svg',
+    componentName: 'RACING_STRATEGIST',
+    gameType: 'REAL_TIME',
+    templateCode: 'GT-RACING-STRATEGIST',
+    cognitiveSkill: 'Strategic Decision Making',
+  },
 ];
