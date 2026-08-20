@@ -17,7 +17,51 @@ export type RegisteredGame = {
 // synchronizes this catalog into the master `games` table on application start.
 // Every registered game must use one of the supported age-group labels.
 export const GAME_CATALOG: RegisteredGame[] = [
-  { name:'Mini Golf Challenge — Hand-Eye Coordination & Motor Planning',slug:'mini-golf-challenge',description:'A real-time mini-golf assessment where children independently aim, control power, navigate obstacles, and adapt each shot.',category:'Motor & Visual-Motor Skills',ageGroup:'9–11 Years',difficulty:'PROGRESSIVE',durationSeconds:120,thumbnail:'/games/mini-golf-challenge.svg',componentName:'MINI_GOLF_CHALLENGE',gameType:'REAL_TIME',templateCode:'GT-MINI-GOLF',cognitiveSkill:'Hand-Eye Coordination' },
+  {
+    name: 'Stealth Escape — Inhibitory Control',
+    slug: 'stealth-escape',
+    description:
+      'A real-time stealth adventure where students observe patrols, suppress unnecessary reactions, use physical cover, and reach extraction without combat.',
+    category: 'Attention & Executive Skills',
+    ageGroup: '13–16 Years',
+    difficulty: 'PROGRESSIVE',
+    durationSeconds: 180,
+    thumbnail: '/games/stealth-escape.svg',
+    componentName: 'STEALTH_ESCAPE',
+    gameType: 'REAL_TIME',
+    templateCode: 'GT-STEALTH-ESCAPE',
+    cognitiveSkill: 'Inhibitory Control',
+  },
+  {
+    name: 'Wave Rider — Balance & Adaptive Control',
+    slug: 'wave-rider',
+    description:
+      'A continuous surfing game where students balance against changing wave forces, make smooth corrections, avoid obstacles, and recover from falls.',
+    category: 'Motor & Adaptive Skills',
+    ageGroup: '13–16 Years',
+    difficulty: 'PROGRESSIVE',
+    durationSeconds: 180,
+    thumbnail: '/games/wave-rider.svg',
+    componentName: 'WAVE_RIDER',
+    gameType: 'REAL_TIME',
+    templateCode: 'GT-WAVE-RIDER',
+    cognitiveSkill: 'Balance & Adaptive Control',
+  },
+  {
+    name: 'Mini Golf Challenge — Hand-Eye Coordination & Motor Planning',
+    slug: 'mini-golf-challenge',
+    description:
+      'A real-time mini-golf assessment where children independently aim, control power, navigate obstacles, and adapt each shot.',
+    category: 'Motor & Visual-Motor Skills',
+    ageGroup: '9–11 Years',
+    difficulty: 'PROGRESSIVE',
+    durationSeconds: 120,
+    thumbnail: '/games/mini-golf-challenge.svg',
+    componentName: 'MINI_GOLF_CHALLENGE',
+    gameType: 'REAL_TIME',
+    templateCode: 'GT-MINI-GOLF',
+    cognitiveSkill: 'Hand-Eye Coordination',
+  },
   {
     name: 'Adventure Dash',
     slug: 'adventure-dash',
@@ -583,7 +627,8 @@ export const GAME_CATALOG: RegisteredGame[] = [
   {
     name: 'Precision Archery — Visual-Motor Precision & Control',
     slug: 'precision-archery',
-    description: 'A real-time sport archery game where children aim, draw, track moving targets, control force, and adapt to wind through physical arrow flight.',
+    description:
+      'A real-time sport archery game where children aim, draw, track moving targets, control force, and adapt to wind through physical arrow flight.',
     category: 'Motor & Precision Skills',
     ageGroup: '11–13 Years',
     difficulty: 'PROGRESSIVE',

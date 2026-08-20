@@ -162,7 +162,10 @@ registerGame({
   componentName: "RULE_SHIFT_CHALLENGE",
   load: () => import("./rule-shift-challenge/Game"),
 });
-registerGame({ componentName: "MINI_GOLF_CHALLENGE", load: () => import("./mini-golf/Game") });
+registerGame({
+  componentName: "MINI_GOLF_CHALLENGE",
+  load: () => import("./mini-golf/Game"),
+});
 registerGame({
   componentName: "RACING_STRATEGIST",
   load: () => import("./racing-strategist/Game"),
@@ -182,6 +185,14 @@ registerGame({
 registerGame({
   componentName: "PRECISION_ARCHERY",
   load: () => import("./precision-archery/Game"),
+});
+registerGame({
+  componentName: "WAVE_RIDER",
+  load: () => import("./wave-rider/Game"),
+});
+registerGame({
+  componentName: "STEALTH_ESCAPE",
+  load: () => import("./stealth-escape/Game"),
 });
 
 registerGame({

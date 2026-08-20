@@ -69,10 +69,11 @@ import PlaymakerGame from "@/games/playmaker/Game";
 import ClimbingChallengeGame from "@/games/climbing-challenge/Game";
 import DetectiveInvestigationGame from "@/games/detective-investigation/Game";
 import PrecisionArcheryGame from "@/games/precision-archery/Game";
+import WaveRiderGame from "@/games/wave-rider/Game";
+import StealthEscapeGame from "@/games/stealth-escape/Game";
 
 const MAX_SECURITY_WARNINGS = 3;
 const SELF_CONTAINED_GAME_ENGINES = new Set([
-
   "FOLLOW_THE_LIGHTS",
   "BALL_STACK",
   "SOUND_DETECTIVE",
@@ -103,6 +104,8 @@ const SELF_CONTAINED_GAME_ENGINES = new Set([
   "CLIMBING_CHALLENGE",
   "DETECTIVE_INVESTIGATION",
   "PRECISION_ARCHERY",
+  "WAVE_RIDER",
+  "STEALTH_ESCAPE",
 ]);
 
 type GameOption = { id?: string; optionKey?: string; optionText: string };
@@ -524,7 +527,6 @@ export function GameRuntimePlayer({
           actionName === "DETECTIVE_INVESTIGATION_COMPLETE" ||
           actionName === "PRECISION_ARCHERY_COMPLETE") &&
         next.status === "COMPLETED"
-
       ) {
         setAssessmentCompleted(true);
         void finishGameplayRecording().finally(() =>
@@ -682,15 +684,18 @@ export function GameRuntimePlayer({
     state.engine?.engineKey === "AIR_HOCKEY_CHALLENGE";
   const isMemoryMarket = state.engine?.engineKey === "MEMORY_MARKET";
   const isAirportController = state.engine?.engineKey === "AIRPORT_CONTROLLER";
-  const isRuleShiftChallenge = state.engine?.engineKey === "RULE_SHIFT_CHALLENGE";
+  const isRuleShiftChallenge =
+    state.engine?.engineKey === "RULE_SHIFT_CHALLENGE";
   const isMiniGolf = state.engine?.engineKey === "MINI_GOLF_CHALLENGE";
   const isRacingStrategist = state.engine?.engineKey === "RACING_STRATEGIST";
   const isPlaymaker = state.engine?.engineKey === "PLAYMAKER";
   const isClimbingChallenge = state.engine?.engineKey === "CLIMBING_CHALLENGE";
-  const isDetectiveInvestigation = state.engine?.engineKey === "DETECTIVE_INVESTIGATION";
+  const isDetectiveInvestigation =
+    state.engine?.engineKey === "DETECTIVE_INVESTIGATION";
   const isPrecisionArchery = state.engine?.engineKey === "PRECISION_ARCHERY";
+  const isWaveRider = state.engine?.engineKey === "WAVE_RIDER";
+  const isStealthEscape = state.engine?.engineKey === "STEALTH_ESCAPE";
   const isPracticeMode =
-
     state.mode === "PRACTICE" || state.configuration?.practiceMode === true;
   const showGameIntro =
     !isPracticeMode && (introVisible || state.status === "READY");
@@ -734,9 +739,10 @@ export function GameRuntimePlayer({
     isRuleShiftChallenge ||
     isRacingStrategist ||
     isPlaymaker ||
-    isClimbingChallenge;
+    isClimbingChallenge ||
+    isWaveRider ||
+    isStealthEscape;
   const player = (
-
     <div
       ref={playerRef}
       data-engine={state.engine?.engineKey || "QUIZ_CHALLENGE"}
@@ -1034,7 +1040,14 @@ export function GameRuntimePlayer({
               }
             />
           ) : isMiniGolf ? (
-            <MiniGolfGame disabled={!isPracticeMode && state.status !== "RUNNING"} remainingSeconds={seconds} practiceOnly={isPracticeMode} onComplete={(metrics) => action("MINI_GOLF_CHALLENGE_COMPLETE", metrics)} />
+            <MiniGolfGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              onComplete={(metrics) =>
+                action("MINI_GOLF_CHALLENGE_COMPLETE", metrics)
+              }
+            />
           ) : isRacingStrategist ? (
             <RacingStrategistGame
               disabled={!isPracticeMode && state.status !== "RUNNING"}
@@ -1050,9 +1063,7 @@ export function GameRuntimePlayer({
               disabled={!isPracticeMode && state.status !== "RUNNING"}
               remainingSeconds={seconds}
               practiceOnly={isPracticeMode}
-              onComplete={(metrics) =>
-                action("PLAYMAKER_COMPLETE", metrics)
-              }
+              onComplete={(metrics) => action("PLAYMAKER_COMPLETE", metrics)}
               onBack={closePlayer}
             />
           ) : isClimbingChallenge ? (
@@ -1078,11 +1089,35 @@ export function GameRuntimePlayer({
               disabled={!isPracticeMode && state.status !== "RUNNING"}
               remainingSeconds={seconds}
               practiceOnly={isPracticeMode}
-              onComplete={(metrics) => action("PRECISION_ARCHERY_COMPLETE", metrics)}
+              onComplete={(metrics) =>
+                action("PRECISION_ARCHERY_COMPLETE", metrics)
+              }
               onBack={closePlayer}
             />
+          ) : isWaveRider ? (
+            <WaveRiderGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              sound={sound}
+              attemptSeed={Number(
+                state.attemptNumber || state.attempt?.attemptNumber || 0,
+              )}
+              onComplete={(metrics) => action("WAVE_RIDER_COMPLETE", metrics)}
+            />
+          ) : isStealthEscape ? (
+            <StealthEscapeGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              attemptSeed={Number(
+                state.attemptNumber || state.attempt?.attemptNumber || 0,
+              )}
+              onComplete={(metrics) =>
+                action("STEALTH_ESCAPE_COMPLETE", metrics)
+              }
+            />
           ) : q ? (
-
             state.engine?.engineKey === "BOARD_GAME" ? (
               <BoardGame
                 key={q.id}

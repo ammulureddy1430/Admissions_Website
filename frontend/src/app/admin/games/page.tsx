@@ -49,9 +49,10 @@ import PlaymakerGame from "@/games/playmaker/Game";
 import ClimbingChallengeGame from "@/games/climbing-challenge/Game";
 import DetectiveInvestigationGame from "@/games/detective-investigation/Game";
 import PrecisionArcheryGame from "@/games/precision-archery/Game";
+import WaveRiderGame from "@/games/wave-rider/Game";
+import StealthEscapeGame from "@/games/stealth-escape/Game";
 
 type Game = {
-
   id: string;
   name: string;
   slug: string;
@@ -1741,10 +1742,26 @@ export default function GamesPage() {
                 onComplete={() => setPreviewing(null)}
                 onBack={() => setPreviewing(null)}
               />
+            ) : previewing.componentName === "WAVE_RIDER" ? (
+              <WaveRiderGame
+                remainingSeconds={previewing.durationSeconds}
+                practiceOnly
+                sound
+                onComplete={() => setPreviewing(null)}
+              />
+            ) : previewing.componentName === "STEALTH_ESCAPE" ? (
+              <StealthEscapeGame
+                remainingSeconds={previewing.durationSeconds}
+                practiceOnly
+                onComplete={() => setPreviewing(null)}
+              />
             ) : previewing.componentName === "MINI_GOLF_CHALLENGE" ? (
-              <MiniGolfGame remainingSeconds={previewing.durationSeconds} practiceOnly onComplete={() => setPreviewing(null)} />
+              <MiniGolfGame
+                remainingSeconds={previewing.durationSeconds}
+                practiceOnly
+                onComplete={() => setPreviewing(null)}
+              />
             ) : (
-
               <div className="grid h-full place-items-center text-center text-white">
                 <div>
                   <Gamepad2 className="mx-auto h-10 w-10" />
@@ -2237,12 +2254,110 @@ function GameArtwork({ componentName }: { componentName: string }) {
         />
       </div>
     );
-  if (componentName === "MINI_GOLF_CHALLENGE") return <div className={`${common} bg-gradient-to-br from-[#16484d] to-[#61bd72]`} aria-hidden><img src="/games/mini-golf-challenge.svg" alt="" className="h-full w-full object-cover" /></div>;
-  if (componentName === "RACING_STRATEGIST") return <div className={`${common} bg-gradient-to-br from-[#be123c] to-[#312e81]`} aria-hidden><img src="/games/racing-strategist.svg" alt="" className="h-full w-full object-cover" /></div>;
-  if (componentName === "PLAYMAKER") return <div className={`${common} bg-gradient-to-br from-[#fb923c] to-[#451a03]`} aria-hidden><img src="/games/playmaker.svg" alt="" className="h-full w-full object-cover" /></div>;
-  if (componentName === "CLIMBING_CHALLENGE") return <div className={`${common} bg-gradient-to-br from-[#0891b2] to-[#0f3b66]`} aria-hidden><img src="/games/climbing-challenge.svg" alt="" className="h-full w-full object-cover" /></div>;
-  if (componentName === "DETECTIVE_INVESTIGATION") return <div className={`${common} bg-gradient-to-br from-[#312e81] to-[#111827]`} aria-hidden><img src="/games/detective-investigation.svg" alt="" className="h-full w-full object-cover" /></div>;
-  if (componentName === "PRECISION_ARCHERY") return <div className={`${common} bg-gradient-to-br from-[#38bdf8] to-[#4d7c0f]`} aria-hidden><img src="/games/precision-archery.svg" alt="" className="h-full w-full object-cover" /></div>;
+  if (componentName === "MINI_GOLF_CHALLENGE")
+    return (
+      <div
+        className={`${common} bg-gradient-to-br from-[#16484d] to-[#61bd72]`}
+        aria-hidden
+      >
+        <img
+          src="/games/mini-golf-challenge.svg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  if (componentName === "RACING_STRATEGIST")
+    return (
+      <div
+        className={`${common} bg-gradient-to-br from-[#be123c] to-[#312e81]`}
+        aria-hidden
+      >
+        <img
+          src="/games/racing-strategist.svg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  if (componentName === "PLAYMAKER")
+    return (
+      <div
+        className={`${common} bg-gradient-to-br from-[#fb923c] to-[#451a03]`}
+        aria-hidden
+      >
+        <img
+          src="/games/playmaker.svg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  if (componentName === "CLIMBING_CHALLENGE")
+    return (
+      <div
+        className={`${common} bg-gradient-to-br from-[#0891b2] to-[#0f3b66]`}
+        aria-hidden
+      >
+        <img
+          src="/games/climbing-challenge.svg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  if (componentName === "DETECTIVE_INVESTIGATION")
+    return (
+      <div
+        className={`${common} bg-gradient-to-br from-[#312e81] to-[#111827]`}
+        aria-hidden
+      >
+        <img
+          src="/games/detective-investigation.svg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  if (componentName === "PRECISION_ARCHERY")
+    return (
+      <div
+        className={`${common} bg-gradient-to-br from-[#38bdf8] to-[#4d7c0f]`}
+        aria-hidden
+      >
+        <img
+          src="/games/precision-archery.svg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  if (componentName === "WAVE_RIDER")
+    return (
+      <div
+        className={`${common} bg-gradient-to-br from-[#59cbd5] to-[#075477]`}
+        aria-hidden
+      >
+        <img
+          src="/games/wave-rider.svg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  if (componentName === "STEALTH_ESCAPE")
+    return (
+      <div
+        className={`${common} bg-gradient-to-br from-[#102b35] to-[#06131c]`}
+        aria-hidden
+      >
+        <img
+          src="/games/stealth-escape.svg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
 
   return (
     <div className={`${common} place-items-center`} aria-hidden>
@@ -2326,12 +2441,20 @@ function gameCardTheme(componentName: string) {
     return "from-[#23627d] via-[#3998aa] to-[#70b777]";
   if (componentName === "RULE_SHIFT_CHALLENGE")
     return "from-[#ff9f1c] via-[#ffbf69] to-[#ffcad4]";
-  if (componentName === "MINI_GOLF_CHALLENGE") return "from-[#16484d] via-[#287a63] to-[#61bd72]";
-  if (componentName === "RACING_STRATEGIST") return "from-[#be123c] via-[#7e22ce] to-[#312e81]";
-  if (componentName === "PLAYMAKER") return "from-[#fb923c] via-[#ea580c] to-[#451a03]";
-  if (componentName === "CLIMBING_CHALLENGE") return "from-[#06b6d4] via-[#0891b2] to-[#0f3b66]";
-  if (componentName === "DETECTIVE_INVESTIGATION") return "from-[#7c3aed] via-[#4338ca] to-[#111827]";
-  if (componentName === "PRECISION_ARCHERY") return "from-[#38bdf8] via-[#0ea5e9] to-[#4d7c0f]";
+  if (componentName === "MINI_GOLF_CHALLENGE")
+    return "from-[#16484d] via-[#287a63] to-[#61bd72]";
+  if (componentName === "RACING_STRATEGIST")
+    return "from-[#be123c] via-[#7e22ce] to-[#312e81]";
+  if (componentName === "PLAYMAKER")
+    return "from-[#fb923c] via-[#ea580c] to-[#451a03]";
+  if (componentName === "CLIMBING_CHALLENGE")
+    return "from-[#06b6d4] via-[#0891b2] to-[#0f3b66]";
+  if (componentName === "DETECTIVE_INVESTIGATION")
+    return "from-[#7c3aed] via-[#4338ca] to-[#111827]";
+  if (componentName === "PRECISION_ARCHERY")
+    return "from-[#38bdf8] via-[#0ea5e9] to-[#4d7c0f]";
+  if (componentName === "WAVE_RIDER")
+    return "from-[#63d1da] via-[#0e91a8] to-[#064d72]";
 
   return "from-[#0b6870] via-[#168e84] to-[#54baa5]";
 }
