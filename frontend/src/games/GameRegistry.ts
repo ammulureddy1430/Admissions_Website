@@ -154,6 +154,7 @@ registerGame({
   componentName: "MEMORY_MARKET",
   load: () => import("./memory-market/Game"),
 });
+registerGame({componentName:"MEMORY_VAULT",load:()=>import("./memory-vault/Game")});
 registerGame({
   componentName: "AIRPORT_CONTROLLER",
   load: () => import("./airport-controller/Game"),
@@ -189,6 +190,10 @@ registerGame({
 registerGame({
   componentName: "WAVE_RIDER",
   load: () => import("./wave-rider/Game"),
+});
+registerGame({
+  componentName: "DRIFT_RACER",
+  load: () => import("./drift-racer/Game"),
 });
 registerGame({
   componentName: "STEALTH_ESCAPE",

@@ -70,7 +70,9 @@ import ClimbingChallengeGame from "@/games/climbing-challenge/Game";
 import DetectiveInvestigationGame from "@/games/detective-investigation/Game";
 import PrecisionArcheryGame from "@/games/precision-archery/Game";
 import WaveRiderGame from "@/games/wave-rider/Game";
+import DriftRacerGame from "@/games/drift-racer/Game";
 import StealthEscapeGame from "@/games/stealth-escape/Game";
+import MemoryVaultGame from "@/games/memory-vault/Game";
 
 const MAX_SECURITY_WARNINGS = 3;
 const SELF_CONTAINED_GAME_ENGINES = new Set([
@@ -105,7 +107,9 @@ const SELF_CONTAINED_GAME_ENGINES = new Set([
   "DETECTIVE_INVESTIGATION",
   "PRECISION_ARCHERY",
   "WAVE_RIDER",
+  "DRIFT_RACER",
   "STEALTH_ESCAPE",
+  "MEMORY_VAULT",
 ]);
 
 type GameOption = { id?: string; optionKey?: string; optionText: string };
@@ -518,6 +522,7 @@ export function GameRuntimePlayer({
           actionName === "COLOR_SHIFT_COMPLETE" ||
           actionName === "AIR_HOCKEY_CHALLENGE_COMPLETE" ||
           actionName === "MEMORY_MARKET_COMPLETE" ||
+          actionName === "MEMORY_VAULT_COMPLETE" ||
           actionName === "AIRPORT_CONTROLLER_COMPLETE" ||
           actionName === "RULE_SHIFT_CHALLENGE_COMPLETE" ||
           actionName === "MINI_GOLF_CHALLENGE_COMPLETE" ||
@@ -683,6 +688,7 @@ export function GameRuntimePlayer({
   const isAirHockeyChallenge =
     state.engine?.engineKey === "AIR_HOCKEY_CHALLENGE";
   const isMemoryMarket = state.engine?.engineKey === "MEMORY_MARKET";
+  const isMemoryVault = state.engine?.engineKey === "MEMORY_VAULT";
   const isAirportController = state.engine?.engineKey === "AIRPORT_CONTROLLER";
   const isRuleShiftChallenge =
     state.engine?.engineKey === "RULE_SHIFT_CHALLENGE";
@@ -694,6 +700,7 @@ export function GameRuntimePlayer({
     state.engine?.engineKey === "DETECTIVE_INVESTIGATION";
   const isPrecisionArchery = state.engine?.engineKey === "PRECISION_ARCHERY";
   const isWaveRider = state.engine?.engineKey === "WAVE_RIDER";
+  const isDriftRacer = state.engine?.engineKey === "DRIFT_RACER";
   const isStealthEscape = state.engine?.engineKey === "STEALTH_ESCAPE";
   const isPracticeMode =
     state.mode === "PRACTICE" || state.configuration?.practiceMode === true;
@@ -741,7 +748,8 @@ export function GameRuntimePlayer({
     isPlaymaker ||
     isClimbingChallenge ||
     isWaveRider ||
-    isStealthEscape;
+    isStealthEscape ||
+    isMemoryVault;
   const player = (
     <div
       ref={playerRef}
@@ -1012,6 +1020,8 @@ export function GameRuntimePlayer({
                 action("AIR_HOCKEY_CHALLENGE_COMPLETE", metrics)
               }
             />
+          ) : isMemoryVault ? (
+            <MemoryVaultGame disabled={!isPracticeMode&&state.status!=="RUNNING"} remainingSeconds={seconds} practiceOnly={isPracticeMode} attemptSeed={Number(state.attemptNumber||state.id?.length||1)} onComplete={(metrics)=>action("MEMORY_VAULT_COMPLETE",metrics)}/>
           ) : isMemoryMarket ? (
             <MemoryMarketGame
               disabled={!isPracticeMode && state.status !== "RUNNING"}
@@ -1104,6 +1114,17 @@ export function GameRuntimePlayer({
                 state.attemptNumber || state.attempt?.attemptNumber || 0,
               )}
               onComplete={(metrics) => action("WAVE_RIDER_COMPLETE", metrics)}
+            />
+          ) : isDriftRacer ? (
+            <DriftRacerGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              sound={sound}
+              attemptSeed={Number(
+                state.attemptNumber || state.attempt?.attemptNumber || 0,
+              )}
+              onComplete={(metrics) => action("DRIFT_RACER_COMPLETE", metrics)}
             />
           ) : isStealthEscape ? (
             <StealthEscapeGame

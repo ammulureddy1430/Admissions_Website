@@ -1,0 +1,265 @@
+.drift-racer-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 100dvh;
+  max-width: none;
+  margin: 0;
+  background-color: #0f172a;
+  overflow: hidden;
+  border-radius: 0;
+  border: 0;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
+  user-select: none;
+}
+
+.drift-racer-intro {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: radial-gradient(circle at center, #1e1b4b 0%, #030712 100%);
+  z-index: 20;
+}
+
+.drift-racer-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-color: #1b4332;
+}
+
+.drift-racer-hud {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 1rem;
+  z-index: 10;
+  pointer-events: none;
+  background: rgba(15, 23, 42, 0.75);
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+}
+
+.drift-racer-coach {
+  position: absolute;
+  z-index: 11;
+  top: 5.7rem;
+  left: 50%;
+  width: min(34rem, calc(100% - 2rem));
+  transform: translateX(-50%);
+  padding: .65rem 1rem;
+  border: 1px solid rgba(56, 189, 248, .35);
+  border-radius: .8rem;
+  background: rgba(5, 15, 30, .86);
+  box-shadow: 0 10px 30px rgba(0,0,0,.28);
+  color: white;
+  text-align: center;
+  pointer-events: none;
+  backdrop-filter: blur(10px);
+}
+.drift-racer-coach strong, .drift-racer-coach span { display: block; }
+.drift-racer-coach strong { font-size: .78rem; letter-spacing: .02em; }
+.drift-racer-coach span { margin-top: .2rem; color: #94a3b8; font-size: .68rem; }
+.drift-racer-coach.is-warning { border-color: #fb7185; background: rgba(69, 10, 20, .9); }
+
+.hud-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hud-panel:last-child {
+  border-right: none;
+}
+
+.hud-label {
+  font-size: 0.65rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  margin-bottom: 0.1rem;
+}
+
+.hud-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* Touch Control overlays for smaller devices */
+.drift-racer-mobile-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+  z-index: 10;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.mobile-dpad, .mobile-pedals {
+  display: flex;
+  gap: 0.75rem;
+  pointer-events: auto;
+}
+
+.control-btn {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  background: rgba(15, 23, 42, 0.85);
+  color: #fff;
+  font-weight: 800;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  outline: none;
+  font-size: 1.25rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.1s ease, background-color 0.1s ease;
+  user-select: none;
+  cursor: pointer;
+  touch-action: none;
+  flex-direction: column;
+  gap: .05rem;
+}
+
+.control-btn small { font-size: .5rem; line-height: 1; opacity: .68; }
+
+.control-btn:active, .control-btn.is-active {
+  transform: scale(0.9);
+  background: rgba(239, 68, 68, 0.8);
+  border-color: #ef4444;
+}
+
+.drift-racer-actions {
+  position: absolute;
+  z-index: 12;
+  right: 1rem;
+  top: 1rem;
+  display: flex;
+  gap: .45rem;
+}
+.drift-racer-actions button {
+  padding: .45rem .7rem;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: .6rem;
+  background: rgba(15,23,42,.82);
+  color: #e2e8f0;
+  font-size: .68rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.drift-racer-actions button:hover { background: #1e293b; border-color: #38bdf8; }
+
+.drift-racer-help {
+  position: absolute;
+  z-index: 40;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(2, 8, 23, .76);
+  backdrop-filter: blur(8px);
+}
+.drift-racer-help > div {
+  width: min(31rem, 100%);
+  padding: 1.5rem;
+  border: 1px solid rgba(56,189,248,.35);
+  border-radius: 1.25rem;
+  background: linear-gradient(145deg,#111d34,#07101f);
+  box-shadow: 0 24px 70px rgba(0,0,0,.55);
+  color: white;
+}
+.help-kicker { color: #38bdf8; font-size: .66rem; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
+.drift-racer-help h2 { margin: .35rem 0 .5rem; font-size: 1.65rem; font-weight: 900; }
+.drift-racer-help p { color: #cbd5e1; font-size: .8rem; line-height: 1.55; }
+.drift-racer-help ol { display: grid; gap: .55rem; margin: 1rem 0; padding: 0; list-style: none; }
+.drift-racer-help li { display: flex; align-items: center; gap: .7rem; padding: .6rem; border-radius: .7rem; background: rgba(30,41,59,.72); }
+.drift-racer-help li > b { display: grid; width: 1.7rem; height: 1.7rem; place-items: center; border-radius: 50%; background: #f97316; }
+.drift-racer-help li span, .drift-racer-help li strong { display: block; }
+.drift-racer-help li span { color: #94a3b8; font-size: .7rem; }
+.drift-racer-help li strong { color: white; font-size: .78rem; }
+.drift-racer-help > div > button { width: 100%; padding: .75rem; border: 0; border-radius: .75rem; background: linear-gradient(90deg,#ea580c,#ef4444); color: white; font-weight: 900; cursor: pointer; }
+
+.control-btn.steer-left, .control-btn.steer-right {
+  font-size: 1.5rem;
+}
+
+.control-btn.handbrake {
+  width: 4rem;
+  height: 4rem;
+  background: rgba(249, 115, 22, 0.85);
+  border-color: rgba(249, 115, 22, 0.4);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+.control-btn.handbrake:active {
+  background: rgba(234, 88, 12, 1.0);
+}
+
+.control-btn.gas {
+  background: rgba(34, 197, 94, 0.85);
+  border-color: rgba(34, 197, 94, 0.4);
+  font-size: 0.85rem;
+}
+
+.control-btn.gas:active {
+  background: rgba(22, 163, 74, 1.0);
+}
+
+.control-btn.brake {
+  background: rgba(239, 68, 68, 0.85);
+  border-color: rgba(239, 68, 68, 0.4);
+  font-size: 0.7rem;
+}
+
+.control-btn.brake:active {
+  background: rgba(220, 38, 38, 1.0);
+}
+
+@media (max-width: 768px) {
+  .drift-racer-hud {
+    top: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    gap: 0.5rem;
+  }
+  .hud-panel {
+    padding: 0.1rem 0.4rem;
+  }
+  .hud-value {
+    font-size: 0.9rem;
+  }
+  .drift-racer-coach { top: 4.3rem; padding: .45rem .65rem; }
+  .drift-racer-coach span { display: none; }
+  .drift-racer-actions { top: auto; right: .6rem; bottom: 6.2rem; flex-direction: column; }
+  .drift-racer-actions button { font-size: .58rem; }
+  .drift-racer-mobile-controls { padding: 0 .65rem; bottom: 1rem; }
+  .mobile-dpad, .mobile-pedals { gap: .35rem; }
+  .control-btn { width: 3.15rem; height: 3.15rem; }
+  .control-btn.handbrake { width: 3.5rem; height: 3.5rem; }
+}
+
+@media (min-width: 769px) {
+  .drift-racer-mobile-controls { padding: 0 2rem; }
+  .control-btn { width: 4.2rem; height: 4.2rem; }
+  .control-btn.handbrake { width: 4.6rem; height: 4.6rem; }
+}

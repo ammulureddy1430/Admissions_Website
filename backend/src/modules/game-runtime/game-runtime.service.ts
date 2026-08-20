@@ -96,7 +96,9 @@ const ENGINES = [
   ],
   ['PRECISION_ARCHERY', 'Precision Archery — Visual-Motor Precision & Control'],
   ['WAVE_RIDER', 'Wave Rider — Balance & Adaptive Control'],
+  ['DRIFT_RACER', 'Drift Racer — Motor Control & Adaptation'],
   ['STEALTH_ESCAPE', 'Stealth Escape — Inhibitory Control'],
+  ['MEMORY_VAULT', 'Memory Vault — Working Memory'],
 ] as const;
 
 // These catalog games generate their own rounds and cognitive metrics at
@@ -134,7 +136,9 @@ const SELF_CONTAINED_ENGINES = new Set([
   'DETECTIVE_INVESTIGATION',
   'PRECISION_ARCHERY',
   'WAVE_RIDER',
+  'DRIFT_RACER',
   'STEALTH_ESCAPE',
+  'MEMORY_VAULT',
 ]);
 
 @Injectable()
@@ -720,8 +724,12 @@ export class GameRuntimeService {
       );
     if (action === 'WAVE_RIDER_COMPLETE')
       return this.waveRiderComplete(session, dto.payload, schoolId, user);
+    if (action === 'DRIFT_RACER_COMPLETE')
+      return this.driftRacerComplete(session, dto.payload, schoolId, user);
     if (action === 'STEALTH_ESCAPE_COMPLETE')
       return this.stealthEscapeComplete(session, dto.payload, schoolId, user);
+    if (action === 'MEMORY_VAULT_COMPLETE')
+      return this.memoryVaultComplete(session, dto.payload, schoolId, user);
 
     if (action === 'SECURITY_VIOLATION')
       return this.securityViolation(session, dto.payload, schoolId, user);
@@ -4626,6 +4634,114 @@ export class GameRuntimeService {
     return { state: await this.state(session.id, schoolId, user) };
   }
 
+  private async driftRacerComplete(
+    session: any,
+    payload: unknown,
+    schoolId: string,
+    user: any,
+  ) {
+    if (
+      session.engine.engineKey !== 'DRIFT_RACER' ||
+      !['RUNNING', 'PAUSED'].includes(session.status)
+    )
+      throw new BadRequestException(
+        'Drift Racer metrics require an active session.',
+      );
+    const input = (payload || {}) as Record<string, unknown>;
+    const scoreKeys = new Set([
+      'overallScore',
+      'motorControlAdaptationScore',
+      'dynamicMotorControlScore',
+      'steeringControlScore',
+      'movementPrecisionScore',
+      'continuousAdjustmentScore',
+      'motorCoordinationScore',
+      'adaptiveControlScore',
+      'spatialAwarenessScore',
+      'errorCorrectionScore',
+      'movementConsistencyScore',
+      'responseControlScore',
+      'trackAwarenessScore',
+      'movementConsistency',
+      'controlConsistency',
+      'adaptationConsistency',
+      'errorRecovery',
+      'beginningPerformance',
+      'middlePerformance',
+      'endingPerformance',
+    ]);
+    const metricKeys = [
+      'sessionDuration',
+      'distanceTravelled',
+      'driftCount',
+      'driftDuration',
+      'averageDriftAngle',
+      'maximumDriftAngle',
+      'driftControlScore',
+      'driftRecoveryCount',
+      'driftOvercorrectionCount',
+      'counterSteeringEvents',
+      'successfulCornerDrifts',
+      'failedCornerDrifts',
+      'steeringChanges',
+      'steeringMagnitude',
+      'oversteerEvents',
+      'understeerEvents',
+      'steeringCorrections',
+      'averageCorrectionTime',
+      'correctionMagnitude',
+      'steeringConsistency',
+      'surfaceChanges',
+      'adaptationTime',
+      'preChangeControl',
+      'postChangeControl',
+      'surfaceRecoveryTime',
+      'lapsCompleted',
+      'averageSpeed',
+      'maximumSpeed',
+      'brakingEvents',
+      'accelerationEvents',
+      'cornerCount',
+      'corneringTime',
+      'trackBoundaryHits',
+      'obstacleCollisions',
+      'spinCount',
+      'recoveryCount',
+      'highestDifficulty',
+      ...scoreKeys,
+    ];
+    const analytics: Record<string, unknown> = {};
+    for (const key of metricKeys)
+      analytics[key] = Math.max(
+        0,
+        Math.min(scoreKeys.has(key) ? 100 : 100000, Number(input[key]) || 0),
+      );
+    analytics.completionStatus = String(
+      input.completionStatus || 'COMPLETED',
+    ).slice(0, 50);
+    await this.prisma.gameRuntimeSession.update({
+      where: { id: session.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        score: Number(analytics.overallScore),
+        elapsedSeconds: Math.max(
+          0,
+          Math.round(
+            (Date.now() - new Date(session.startedAt || Date.now()).getTime()) /
+              1000,
+          ),
+        ),
+        runtimeState: {
+          ...((session.runtimeState || {}) as Record<string, unknown>),
+          cognitiveAnalytics: analytics,
+        } as Prisma.InputJsonValue,
+      },
+    });
+    await this.event(session.id, 'DRIFT_RACER_COMPLETED', analytics);
+    return { state: await this.state(session.id, schoolId, user) };
+  }
+
   private async stealthEscapeComplete(
     session: any,
     payload: unknown,
@@ -4718,6 +4834,17 @@ export class GameRuntimeService {
     });
     await this.event(session.id, 'STEALTH_ESCAPE_COMPLETED', analytics);
     return { state: await this.state(session.id, schoolId, user) };
+  }
+
+  private async memoryVaultComplete(session: any, payload: unknown, schoolId: string, user: {id:string;role:Role}) {
+    if (session.engine.engineKey !== 'MEMORY_VAULT' || !['RUNNING','PAUSED'].includes(session.status))
+      throw new BadRequestException('Memory Vault metrics require an active session.');
+    const input=(payload||{}) as Record<string,unknown>, scores=new Set(['overallScore','workingMemoryScore','informationRetentionScore','spatialMemoryScore','memoryUpdatingScore','attentionScore','sequencingScore','recallUnderDistractionScore','navigationScore','informationManagementScore','errorMonitoringScore','cognitiveLoadManagementScore','beginningPerformance','middlePerformance','endingPerformance','memoryConsistency','updatingConsistency','recallConsistency']);
+    const analytics:Record<string,unknown>={};
+    for(const [key,value] of Object.entries(input)) analytics[key]=typeof value==='number'?Math.max(0,Math.min(scores.has(key)?100:100000,value)):String(value).slice(0,50);
+    await this.prisma.gameRuntimeSession.update({where:{id:session.id},data:{status:'COMPLETED',completedAt:new Date(),score:Number(analytics.overallScore)||0,elapsedSeconds:Math.max(0,Math.round((Date.now()-new Date(session.startedAt||Date.now()).getTime())/1000)),runtimeState:{...((session.runtimeState||{}) as Record<string,unknown>),cognitiveAnalytics:analytics} as Prisma.InputJsonValue}});
+    await this.event(session.id,'MEMORY_VAULT_COMPLETED',analytics);
+    return {state:await this.state(session.id,schoolId,user)};
   }
 
   private async event(sessionId: string, eventType: string, payload?: unknown) {

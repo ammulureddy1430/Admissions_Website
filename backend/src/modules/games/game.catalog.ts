@@ -18,6 +18,12 @@ export type RegisteredGame = {
 // Every registered game must use one of the supported age-group labels.
 export const GAME_CATALOG: RegisteredGame[] = [
   {
+    name: 'Memory Vault — Working Memory', slug: 'memory-vault',
+    description: 'A real-time futuristic exploration game where students retain changing item routes while navigating, collecting, carrying, and delivering artifacts.',
+    category: 'Memory & Cognitive Skills', ageGroup: '13–16 Years', difficulty: 'PROGRESSIVE', durationSeconds: 180,
+    thumbnail: '/games/memory-vault.svg', componentName: 'MEMORY_VAULT', gameType: 'REAL_TIME', templateCode: 'GT-MEMORY-VAULT', cognitiveSkill: 'Working Memory',
+  },
+  {
     name: 'Stealth Escape — Inhibitory Control',
     slug: 'stealth-escape',
     description:
@@ -46,6 +52,21 @@ export const GAME_CATALOG: RegisteredGame[] = [
     gameType: 'REAL_TIME',
     templateCode: 'GT-WAVE-RIDER',
     cognitiveSkill: 'Balance & Adaptive Control',
+  },
+  {
+    name: 'Drift Racer — Motor Control & Adaptation',
+    slug: 'drift-racer',
+    description:
+      'A real-time arcade drifting game assessing steering precision, drift control, and motor adaptation under changing surface and track conditions.',
+    category: 'Motor & Adaptive Skills',
+    ageGroup: '13–16 Years',
+    difficulty: 'PROGRESSIVE',
+    durationSeconds: 180,
+    thumbnail: '/games/drift-racer.svg',
+    componentName: 'DRIFT_RACER',
+    gameType: 'REAL_TIME',
+    templateCode: 'GT-DRIFT-RACER',
+    cognitiveSkill: 'Motor Control & Adaptation',
   },
   {
     name: 'Mini Golf Challenge — Hand-Eye Coordination & Motor Planning',

@@ -50,7 +50,9 @@ import ClimbingChallengeGame from "@/games/climbing-challenge/Game";
 import DetectiveInvestigationGame from "@/games/detective-investigation/Game";
 import PrecisionArcheryGame from "@/games/precision-archery/Game";
 import WaveRiderGame from "@/games/wave-rider/Game";
+import DriftRacerGame from "@/games/drift-racer/Game";
 import StealthEscapeGame from "@/games/stealth-escape/Game";
+import MemoryVaultGame from "@/games/memory-vault/Game";
 
 type Game = {
   id: string;
@@ -1692,6 +1694,8 @@ export default function GamesPage() {
                 practiceOnly
                 onComplete={() => setPreviewing(null)}
               />
+            ) : previewing.componentName === "MEMORY_VAULT" ? (
+              <MemoryVaultGame remainingSeconds={previewing.durationSeconds} practiceOnly onComplete={()=>setPreviewing(null)}/>
             ) : previewing.componentName === "MEMORY_MARKET" ? (
               <MemoryMarketGame
                 remainingSeconds={previewing.durationSeconds}
@@ -1744,6 +1748,13 @@ export default function GamesPage() {
               />
             ) : previewing.componentName === "WAVE_RIDER" ? (
               <WaveRiderGame
+                remainingSeconds={previewing.durationSeconds}
+                practiceOnly
+                sound
+                onComplete={() => setPreviewing(null)}
+              />
+            ) : previewing.componentName === "DRIFT_RACER" ? (
+              <DriftRacerGame
                 remainingSeconds={previewing.durationSeconds}
                 practiceOnly
                 sound
@@ -2345,6 +2356,19 @@ function GameArtwork({ componentName }: { componentName: string }) {
         />
       </div>
     );
+  if (componentName === "DRIFT_RACER")
+    return (
+      <div
+        className={`${common} bg-gradient-to-br from-[#f87171] to-[#991b1b]`}
+        aria-hidden
+      >
+        <img
+          src="/games/drift-racer.svg"
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
   if (componentName === "STEALTH_ESCAPE")
     return (
       <div
@@ -2358,6 +2382,7 @@ function GameArtwork({ componentName }: { componentName: string }) {
         />
       </div>
     );
+  if(componentName==="MEMORY_VAULT")return <div className={`${common} bg-gradient-to-br from-[#0891b2] to-[#312e81]`} aria-hidden><img src="/games/memory-vault.svg" alt="" className="h-full w-full object-cover"/></div>;
 
   return (
     <div className={`${common} place-items-center`} aria-hidden>
@@ -2455,6 +2480,8 @@ function gameCardTheme(componentName: string) {
     return "from-[#38bdf8] via-[#0ea5e9] to-[#4d7c0f]";
   if (componentName === "WAVE_RIDER")
     return "from-[#63d1da] via-[#0e91a8] to-[#064d72]";
+  if (componentName === "DRIFT_RACER")
+    return "from-[#f87171] via-[#dc2626] to-[#7f1d1d]";
 
   return "from-[#0b6870] via-[#168e84] to-[#54baa5]";
 }
