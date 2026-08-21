@@ -33,6 +33,7 @@ import PatternMatrixGame from "@/games/pattern-matrix/Game";
 import NumberBuilderGame from "@/games/number-builder/Game";
 import BallSortGame from "@/games/ball-sort/Game";
 import RedLightGreenLightGame from "@/games/red-light-green-light/Game";
+import QuickSwitchGame from "@/games/quick-switch/Game";
 import CatchTheTargetGame from "@/games/catch-the-target/Game";
 import MentalRotationGame from "@/games/mental-rotation/Game";
 import WaterJugsGame from "@/games/water-jugs/Game";
@@ -1636,6 +1637,12 @@ export default function GamesPage() {
                 durationSeconds={previewing.durationSeconds}
                 onComplete={() => setPreviewing(null)}
               />
+            ) : previewing.componentName === "QUICK_SWITCH" ? (
+              <QuickSwitchGame
+                sound
+                durationSeconds={previewing.durationSeconds}
+                onComplete={() => setPreviewing(null)}
+              />
             ) : previewing.componentName === "WATER_PIPELINE" ? (
               <WaterPipelineGame
                 sound
@@ -2090,6 +2097,22 @@ function GameArtwork({ componentName }: { componentName: string }) {
         </span>
       </div>
     );
+  if (componentName === "QUICK_SWITCH")
+    return (
+      <div
+        className={`${common} bg-gradient-to-b from-[#818cf8] to-[#4f46e5]`}
+        aria-hidden
+      >
+        <span className="absolute bottom-4 left-3 text-4xl">🚀</span>
+        <span className="absolute left-1/2 top-3 -translate-x-1/2 text-4xl">
+          🔄
+        </span>
+        <span className="absolute bottom-3 right-3 text-4xl">🔴</span>
+        <span className="absolute inset-x-0 bottom-1 text-center text-[8px] font-black tracking-widest text-white">
+          FLEXIBILITY • SHIFT • ADAPT
+        </span>
+      </div>
+    );
   if (componentName === "WATER_PIPELINE")
     return (
       <div
@@ -2442,6 +2465,8 @@ function gameCardTheme(componentName: string) {
     return "from-[#4b2673] via-[#7d4db3] to-[#c78df0]";
   if (componentName === "RED_LIGHT_GREEN_LIGHT")
     return "from-[#065f46] via-[#059669] to-[#34d399]";
+  if (componentName === "QUICK_SWITCH")
+    return "from-[#312e81] via-[#4f46e5] to-[#818cf8]";
   if (componentName === "WATER_PIPELINE")
     return "from-[#137da1] via-[#20a7b0] to-[#68bd70]";
   if (componentName === "PATTERN_MATRIX")

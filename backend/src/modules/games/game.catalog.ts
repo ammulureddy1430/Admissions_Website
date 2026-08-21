@@ -660,4 +660,20 @@ export const GAME_CATALOG: RegisteredGame[] = [
     templateCode: 'GT-PRECISION-ARCHERY',
     cognitiveSkill: 'Visual-Motor Precision',
   },
+  {
+    name: 'Quick Switch — Cognitive Flexibility',
+    slug: 'quick-switch',
+    description:
+      'A real-time arcade game assessing cognitive flexibility, rule switching, and inhibitory control as game rules dynamically change.',
+    category: 'Executive & Cognitive Skills',
+    ageGroup: '13–16 Years',
+    difficulty: 'PROGRESSIVE',
+    durationSeconds: 180,
+    thumbnail: '/games/quick-switch.svg',
+    componentName: 'QUICK_SWITCH',
+    gameType: 'REAL_TIME',
+    templateCode: 'GT-QUICK-SWITCH',
+    cognitiveSkill: 'Cognitive Flexibility',
+  },
 ];
+

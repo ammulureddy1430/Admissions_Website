@@ -213,6 +213,10 @@ registerGame({
   load: () => import("./red-light-green-light/Game"),
 });
 registerGame({
+  componentName: "QUICK_SWITCH",
+  load: () => import("./quick-switch/Game"),
+});
+registerGame({
   componentName: "RACING_GAME",
   load: () =>
     import("@/components/racing-game/RacingGame").then((module) => ({

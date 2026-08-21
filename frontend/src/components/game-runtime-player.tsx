@@ -73,6 +73,7 @@ import WaveRiderGame from "@/games/wave-rider/Game";
 import DriftRacerGame from "@/games/drift-racer/Game";
 import StealthEscapeGame from "@/games/stealth-escape/Game";
 import MemoryVaultGame from "@/games/memory-vault/Game";
+import QuickSwitchGame from "@/games/quick-switch/Game";
 
 const MAX_SECURITY_WARNINGS = 3;
 const SELF_CONTAINED_GAME_ENGINES = new Set([
@@ -110,6 +111,7 @@ const SELF_CONTAINED_GAME_ENGINES = new Set([
   "DRIFT_RACER",
   "STEALTH_ESCAPE",
   "MEMORY_VAULT",
+  "QUICK_SWITCH",
 ]);
 
 type GameOption = { id?: string; optionKey?: string; optionText: string };
@@ -702,6 +704,7 @@ export function GameRuntimePlayer({
   const isWaveRider = state.engine?.engineKey === "WAVE_RIDER";
   const isDriftRacer = state.engine?.engineKey === "DRIFT_RACER";
   const isStealthEscape = state.engine?.engineKey === "STEALTH_ESCAPE";
+  const isQuickSwitch = state.engine?.engineKey === "QUICK_SWITCH";
   const isPracticeMode =
     state.mode === "PRACTICE" || state.configuration?.practiceMode === true;
   const showGameIntro =
@@ -1022,6 +1025,8 @@ export function GameRuntimePlayer({
             />
           ) : isMemoryVault ? (
             <MemoryVaultGame disabled={!isPracticeMode&&state.status!=="RUNNING"} remainingSeconds={seconds} practiceOnly={isPracticeMode} attemptSeed={Number(state.attemptNumber||state.id?.length||1)} onComplete={(metrics)=>action("MEMORY_VAULT_COMPLETE",metrics)}/>
+          ) : isQuickSwitch ? (
+            <QuickSwitchGame disabled={!isPracticeMode&&state.status!=="RUNNING"} remainingSeconds={seconds} practiceOnly={isPracticeMode} attemptSeed={Number(state.attemptNumber||state.id?.length||1)} onComplete={(metrics)=>action("QUICK_SWITCH_COMPLETE",metrics)}/>
           ) : isMemoryMarket ? (
             <MemoryMarketGame
               disabled={!isPracticeMode && state.status !== "RUNNING"}

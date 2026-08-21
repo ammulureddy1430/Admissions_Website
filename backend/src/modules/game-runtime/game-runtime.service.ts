@@ -99,6 +99,7 @@ const ENGINES = [
   ['DRIFT_RACER', 'Drift Racer — Motor Control & Adaptation'],
   ['STEALTH_ESCAPE', 'Stealth Escape — Inhibitory Control'],
   ['MEMORY_VAULT', 'Memory Vault — Working Memory'],
+  ['QUICK_SWITCH', 'Quick Switch — Cognitive Flexibility'],
 ] as const;
 
 // These catalog games generate their own rounds and cognitive metrics at
@@ -139,6 +140,7 @@ const SELF_CONTAINED_ENGINES = new Set([
   'DRIFT_RACER',
   'STEALTH_ESCAPE',
   'MEMORY_VAULT',
+  'QUICK_SWITCH',
 ]);
 
 @Injectable()
@@ -554,6 +556,13 @@ export class GameRuntimeService {
       throw new BadRequestException(
         'Sokoban only accepts direct movement interactions.',
       );
+    if (
+      session.engine.engineKey === 'QUICK_SWITCH' &&
+      ['PAUSE', 'HINT', 'ANSWER', 'COMPLETE'].includes(action)
+    )
+      throw new BadRequestException(
+        'Quick Switch does not allow pause, hints, answers, or skips.',
+      );
     if (action === 'START')
       return this.transition(
         session.id,
@@ -730,6 +739,8 @@ export class GameRuntimeService {
       return this.stealthEscapeComplete(session, dto.payload, schoolId, user);
     if (action === 'MEMORY_VAULT_COMPLETE')
       return this.memoryVaultComplete(session, dto.payload, schoolId, user);
+    if (action === 'QUICK_SWITCH_COMPLETE')
+      return this.quickSwitchComplete(session, dto.payload, schoolId, user);
 
     if (action === 'SECURITY_VIOLATION')
       return this.securityViolation(session, dto.payload, schoolId, user);
@@ -4845,6 +4856,76 @@ export class GameRuntimeService {
     await this.prisma.gameRuntimeSession.update({where:{id:session.id},data:{status:'COMPLETED',completedAt:new Date(),score:Number(analytics.overallScore)||0,elapsedSeconds:Math.max(0,Math.round((Date.now()-new Date(session.startedAt||Date.now()).getTime())/1000)),runtimeState:{...((session.runtimeState||{}) as Record<string,unknown>),cognitiveAnalytics:analytics} as Prisma.InputJsonValue}});
     await this.event(session.id,'MEMORY_VAULT_COMPLETED',analytics);
     return {state:await this.state(session.id,schoolId,user)};
+  }
+
+  private async quickSwitchComplete(session: any, payload: unknown, schoolId: string, user: {id:string;role:Role}) {
+    if (session.engine.engineKey !== 'QUICK_SWITCH' || !['RUNNING','PAUSED'].includes(session.status))
+      throw new BadRequestException('Quick Switch metrics require an active session.');
+    const input = (payload || {}) as Record<string, unknown>;
+    const scores = new Set([
+      'overallScore',
+      'cognitiveFlexibilityScore',
+      'ruleSwitchingScore',
+      'adaptiveResponseScore',
+      'mentalSetShiftingScore',
+      'attentionShiftingScore',
+      'errorRecoveryScore',
+      'responseAdaptationScore',
+      'processingFlexibilityScore',
+      'taskSwitchingScore',
+    ]);
+    const metrics = [
+      'sessionDuration',
+      'totalInteractions',
+      'correctInteractions',
+      'incorrectInteractions',
+      'ruleChanges',
+      'switchingLatency',
+      'perseverativeErrors',
+      'postSwitchErrors',
+      'postSwitchAccuracy',
+      'adaptationTime',
+      'recoveryTime',
+      'responseConsistency',
+      'ruleMasteryTime',
+      'ruleSwitchSuccess',
+      'ruleSwitchFailure',
+      'attentionShiftEvents',
+      'taskSwitchEvents',
+      'comboCount',
+      'highestCombo',
+      'score',
+      ...scores,
+    ];
+    const analytics: Record<string, unknown> = {};
+    for (const key of metrics) {
+      analytics[key] = Math.max(0, Math.min(scores.has(key) ? 100 : 100000, Number(input[key]) || 0));
+    }
+    analytics.ruleSpecificAnalytics = input.ruleSpecificAnalytics || [];
+    analytics.completionStatus = String(input.completionStatus || 'COMPLETED').slice(0, 50);
+
+    await this.prisma.gameRuntimeSession.update({
+      where: { id: session.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        score: Number(analytics.overallScore) || 0,
+        elapsedSeconds: Math.max(
+          0,
+          Math.round(
+            (Date.now() - new Date(session.startedAt || Date.now()).getTime()) /
+              1000,
+          ),
+        ),
+        runtimeState: {
+          ...((session.runtimeState || {}) as Record<string, unknown>),
+          cognitiveAnalytics: analytics,
+        } as Prisma.InputJsonValue,
+      },
+    });
+
+    await this.event(session.id, 'QUICK_SWITCH_COMPLETED', analytics);
+    return { state: await this.state(session.id, schoolId, user) };
   }
 
   private async event(sessionId: string, eventType: string, payload?: unknown) {
