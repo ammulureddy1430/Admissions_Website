@@ -358,7 +358,11 @@ export default function WaveRiderGame({
             <br />
             <em>RIDER</em>
           </h1>
-          <p>Balance on the swell, jump over hazards, and collect floating stars.</p>
+          <p>
+            Keep the board level with continuous left and right corrections,
+            jump over hazards, and collect floating stars. The board will not
+            straighten itself.
+          </p>
           <div>
             <span>← →</span>
             <b>LEAN</b>

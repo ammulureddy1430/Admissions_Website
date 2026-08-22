@@ -42,7 +42,7 @@ export const GAME_CATALOG: RegisteredGame[] = [
     name: 'Wave Rider — Balance & Adaptive Control',
     slug: 'wave-rider',
     description:
-      'A continuous surfing game where students balance against changing wave forces, make smooth corrections, avoid obstacles, and recover from falls.',
+      'A continuous surfing assessment where students must actively counter changing wave forces, make smooth corrections without automatic leveling, avoid obstacles, and recover from falls.',
     category: 'Motor & Adaptive Skills',
     ageGroup: '13–16 Years',
     difficulty: 'PROGRESSIVE',
@@ -676,4 +676,3 @@ export const GAME_CATALOG: RegisteredGame[] = [
     cognitiveSkill: 'Cognitive Flexibility',
   },
 ];
-

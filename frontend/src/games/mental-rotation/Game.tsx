@@ -49,20 +49,19 @@ function Shape({ shape }: { shape: RotationShape }) {
 export default function MentalRotationGame({
   disabled = false,
   remainingSeconds,
-  practiceOnly = false,
   onComplete,
 }: Props) {
-  const [challenges] = useState(() => createChallenges());
+  const [challenges] = useState(() => createChallenges().slice(0, 6));
   const [index, setIndex] = useState(0);
   const [rotation, setRotation] = useState(challenges[0].startRotation);
   const [transitioning, setTransitioning] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(() => Math.max(1, remainingSeconds ?? 120));
   const attempts = useRef<RotationAttempt[]>([]);
   const challengeStarted = useRef(0);
   const actions = useRef(0);
   const amount = useRef(0);
   const lastRotation = useRef(rotation);
   const drag = useRef<{ pointerId: number; lastAngle: number } | null>(null);
-  const buttonEvaluationTimer = useRef<number | null>(null);
   const finished = useRef(false);
   const onCompleteRef = useRef(onComplete);
   const challenge = challenges[index];
@@ -72,10 +71,6 @@ export default function MentalRotationGame({
   }, [onComplete]);
   useEffect(() => {
     challengeStarted.current = performance.now();
-    return () => {
-      if (buttonEvaluationTimer.current !== null)
-        window.clearTimeout(buttonEvaluationTimer.current);
-    };
   }, []);
   const finish = useCallback(
     (status: string) => {
@@ -88,13 +83,13 @@ export default function MentalRotationGame({
     [challenges],
   );
   useEffect(() => {
-    if (
-      !practiceOnly &&
-      remainingSeconds !== undefined &&
-      remainingSeconds <= 0
-    )
-      finish("TIME_LIMIT_REACHED");
-  }, [finish, practiceOnly, remainingSeconds]);
+    if (disabled || finished.current) return;
+    const timer = window.setInterval(() => setSecondsLeft((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [disabled]);
+  useEffect(() => {
+    if (secondsLeft === 0) finish("TIME_LIMIT_REACHED");
+  }, [finish, secondsLeft]);
 
   const recordAction = (next: number) => {
     const normalized = normalizeRotation(next);
@@ -111,37 +106,11 @@ export default function MentalRotationGame({
         finalRotation,
         challenge.targetRotation,
       );
-      if (!isOrientationMatch(finalRotation, challenge.targetRotation)) {
-        attempts.current.push({
-          challengeId: challenge.id,
-          level: challenge.level,
-          matched: false,
-          targetRotation: challenge.targetRotation,
-          finalRotation: normalizeRotation(finalRotation),
-          angularDifference: difference,
-          rotationAmount: amount.current,
-          rotationActions: actions.current,
-          extraRotations: Math.max(
-            0,
-            Math.round(
-              (amount.current -
-                shortestRequiredRotation(
-                  challenge.startRotation,
-                  challenge.targetRotation,
-                )) /
-                45,
-            ),
-          ),
-          completionTime: Math.round(
-            performance.now() - challengeStarted.current,
-          ),
-        });
-        return;
-      }
+      const matched = isOrientationMatch(finalRotation, challenge.targetRotation);
       attempts.current.push({
         challengeId: challenge.id,
         level: challenge.level,
-        matched: true,
+        matched,
         targetRotation: challenge.targetRotation,
         finalRotation: normalizeRotation(finalRotation),
         angularDifference: difference,
@@ -164,7 +133,7 @@ export default function MentalRotationGame({
       });
       setTransitioning(true);
       window.setTimeout(() => {
-        if (index + 1 >= challenges.length || practiceOnly) {
+        if (index + 1 >= challenges.length) {
           finish("COMPLETED");
           return;
         }
@@ -176,7 +145,7 @@ export default function MentalRotationGame({
         setIndex((value) => value + 1);
         setRotation(next.startRotation);
         setTransitioning(false);
-      }, 520);
+      }, 180);
     },
     [
       challenge,
@@ -184,7 +153,6 @@ export default function MentalRotationGame({
       disabled,
       finish,
       index,
-      practiceOnly,
       transitioning,
     ],
   );
@@ -208,18 +176,19 @@ export default function MentalRotationGame({
   const rotateWithButton = (direction: -1 | 1) => {
     const next = lastRotation.current + direction * 45;
     recordAction(next);
-    if (buttonEvaluationTimer.current !== null)
-      window.clearTimeout(buttonEvaluationTimer.current);
-    buttonEvaluationTimer.current = window.setTimeout(
-      () => evaluate(lastRotation.current),
-      420,
-    );
   };
+
+  const formatTime = (value: number) => `${Math.floor(value / 60)}:${String(value % 60).padStart(2, "0")}`;
 
   return (
     <div
       className={`mental-rotation-game${transitioning ? " is-transitioning" : ""}`}
     >
+      <header className="mental-rotation-game__assessment-hud">
+        <div><small>MENTAL ROTATION ASSESSMENT</small><strong>Make the right shape match the target</strong></div>
+        <span>Trial {index + 1} of {challenges.length}</span>
+        <time>{formatTime(secondsLeft)}</time>
+      </header>
       <div
         className="mental-rotation-game__progress"
         aria-label={`Difficulty ${challenge.level} of 5`}
@@ -230,6 +199,7 @@ export default function MentalRotationGame({
         className="mental-rotation-game__target"
         aria-label="Target orientation"
       >
+        <b className="mental-rotation-game__panel-label">TARGET</b>
         <div className="mental-rotation-game__target-frame">
           <span className="mental-rotation-game__target-marker" aria-hidden>
             ◎
@@ -249,6 +219,7 @@ export default function MentalRotationGame({
         className="mental-rotation-game__work"
         aria-label="Rotatable object"
       >
+        <b className="mental-rotation-game__panel-label">ROTATE THIS</b>
         <div className="mental-rotation-game__orbit" aria-hidden />
         <div
           className="mental-rotation-game__object"
@@ -278,9 +249,9 @@ export default function MentalRotationGame({
           onPointerUp={(event) => {
             if (!drag.current) return;
             drag.current = null;
-            evaluate(lastRotation.current);
             event.currentTarget.releasePointerCapture(event.pointerId);
           }}
+          onPointerCancel={() => { drag.current = null; }}
         >
           <div
             className="mental-rotation-game__object-shape"
@@ -307,6 +278,14 @@ export default function MentalRotationGame({
           onClick={() => rotateWithButton(1)}
         >
           ↷
+        </button>
+        <button
+          type="button"
+          className="mental-rotation-game__check"
+          disabled={disabled || transitioning}
+          onClick={() => evaluate(lastRotation.current)}
+        >
+          CHECK MATCH
         </button>
       </div>
     </div>

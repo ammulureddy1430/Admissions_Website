@@ -2,6 +2,7 @@ import {
   aimAngle,
   drawFromDistance,
   launchArrow,
+  launchArrowAt,
   pointerToWorld,
   stepArrow,
 } from "./ArrowEngine";
@@ -41,6 +42,12 @@ console.assert(arrow.vy > oldVy, "Gravity must curve the arrow");
 console.assert(
   arrow.vx > Math.cos(-0.2) * (360 + 0.8 * 430),
   "Wind must affect velocity",
+);
+const pointerShot = launchArrowAt({ x: 665, y: 248 }, 0.8, 12);
+while (pointerShot.x < 665) stepArrow(pointerShot, 1 / 120, 12);
+console.assert(
+  pointerShot.x === 665 && pointerShot.y === 248,
+  "The arrow must arrive at the exact pointer position",
 );
 const targets = createTargets(7, 4);
 console.assert(
@@ -102,8 +109,14 @@ console.assert(
   "Center collision must be detected",
 );
 console.assert(
-  !collision(targets[0].x - targets[0].radius, targets[0].y, targets[0]).hit,
-  "An arrow must not stick before reaching the target face",
+  collision(targets[0].x - targets[0].radius, targets[0].y, targets[0]).ring ===
+    "edge",
+  "A pointer on the outer left layer must register an edge hit",
+);
+console.assert(
+  collision(targets[0].x + targets[0].radius, targets[0].y, targets[0]).ring ===
+    "edge",
+  "A pointer on the outer right layer must register an edge hit",
 );
 const metrics = scoreArchery(
   [

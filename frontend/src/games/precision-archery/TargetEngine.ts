@@ -41,17 +41,9 @@ export function targetPosition(target: Target, time: number) {
   return { x: target.baseX, y: target.baseY };
 }
 export function collision(x: number, y: number, target: Target) {
-  // Side-view archery: the arrow must first reach the vertical target face.
-  // Ring placement is then determined by height on that face, preventing
-  // every shot from incorrectly sticking to the circle's left boundary.
-  if (x < target.x) {
-    return {
-      hit: false,
-      distance: Number.POSITIVE_INFINITY,
-      ring: "miss" as const,
-    };
-  }
-  const distance = Math.abs(y - target.y);
+  // Score the exact two-dimensional point selected by the player so clicks on
+  // the left, right, top, or bottom outer rings land in those same rings.
+  const distance = Math.hypot(x - target.x, y - target.y);
   if (distance <= target.radius * 0.25)
     return { hit: true, distance, ring: "center" as const };
   if (distance <= target.radius * 0.68)

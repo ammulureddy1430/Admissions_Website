@@ -12,11 +12,11 @@ type Props = {
   onComplete: (metrics: PatternMatrixMetrics) => void | Promise<void>;
 };
 
-const TOTAL_ROUNDS = 3;
+const TOTAL_ROUNDS = 2;
 
 function patternFor(round: number) {
   const size = round < 4 ? 3 : round < 8 ? 4 : 5;
-  const count = Math.min(3 + Math.floor(round / 2), 8);
+  const count = Math.min(3 + round, 8);
   const cells = new Set<number>();
   while (cells.size < count) cells.add(Math.floor(Math.random() * size * size));
   return { size, cells: [...cells], difficulty: size - 2 };
@@ -88,13 +88,13 @@ export default function PatternMatrixGame({ disabled = false, remainingSeconds, 
     stats.current.responseTimes.push((Date.now() - responseStarted.current) / 1000);
     stats.current.rounds++;
     stats.current.highestDifficulty = Math.max(stats.current.highestDifficulty, pattern.difficulty);
-    if (practiceOnly || stats.current.rounds >= TOTAL_ROUNDS) { void finish(); return; }
+    if (stats.current.rounds >= TOTAL_ROUNDS) { void finish(); return; }
     const nextRound = round + 1;
     setRound(nextRound); setSelected(new Set()); setPattern(patternFor(nextRound)); setPhase("show");
   };
 
   return <main className="pattern-matrix-game">
-    <header><div><small>PATTERN MATRIX</small><h2>Remember the glowing tiles</h2></div><div className="pattern-round">Challenge {Math.min(round + 1, TOTAL_ROUNDS)} of {practiceOnly ? 1 : TOTAL_ROUNDS}</div></header>
+    <header><div><small>PATTERN MATRIX</small><h2>Remember the glowing tiles</h2></div><div className="pattern-round">Round {Math.min(round + 1, TOTAL_ROUNDS)} of {TOTAL_ROUNDS}</div></header>
     <p className="pattern-instruction">{phase === "show" ? "Look carefully. The tiles will hide." : phase === "recall" ? "Tap the tiles you remember, then continue." : "Challenge complete."}</p>
     <section className="pattern-board" style={{ gridTemplateColumns: `repeat(${pattern.size}, 1fr)` }} aria-label="Pattern memory grid">
       {Array.from({ length: pattern.size * pattern.size }, (_, index) => <button key={index} type="button" aria-label={`Tile ${index + 1}`} disabled={disabled || phase !== "recall"} onClick={() => toggle(index)} className={`${phase === "show" && pattern.cells.includes(index) ? "shown" : ""} ${selected.has(index) ? "selected" : ""}`} />)}

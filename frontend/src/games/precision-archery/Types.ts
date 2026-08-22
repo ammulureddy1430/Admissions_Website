@@ -22,6 +22,8 @@ export type Arrow = {
   angle: number;
   active: boolean;
   trail: Vec[];
+  aimPoint?: Vec;
+  arrived?: boolean;
 };
 export type ShotRecord = {
   aimError: number;

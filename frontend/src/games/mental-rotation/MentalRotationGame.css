@@ -19,7 +19,7 @@
   z-index: 5;
   left: 5%;
   right: 5%;
-  top: 22px;
+  top: 16px;
   height: 9px;
   overflow: hidden;
   border: 2px solid #fff;
@@ -27,6 +27,30 @@
   background: #d7dced;
   box-shadow: 0 4px 12px #34446422;
 }
+.mental-rotation-game__assessment-hud {
+  position: absolute;
+  z-index: 6;
+  top: 38px;
+  left: 50%;
+  display: flex;
+  width: min(760px, 84%);
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 12px 18px;
+  transform: translateX(-50%);
+  border: 1px solid #ffffffcc;
+  border-radius: 18px;
+  background: #ffffffc9;
+  box-shadow: 0 10px 28px #34446418;
+  backdrop-filter: blur(12px);
+}
+.mental-rotation-game__assessment-hud div { display: flex; flex-direction: column; gap: 3px; }
+.mental-rotation-game__assessment-hud small { color: #6d5bc5; font-size: 9px; font-weight: 900; letter-spacing: .14em; }
+.mental-rotation-game__assessment-hud strong { color: #243553; font-size: 13px; }
+.mental-rotation-game__assessment-hud span,
+.mental-rotation-game__assessment-hud time { padding: 7px 11px; border-radius: 999px; background: #ece9ff; color: #4f3c7c; font-size: 11px; font-weight: 900; white-space: nowrap; }
+.mental-rotation-game__assessment-hud time { background: #243553; color: #fff; font-variant-numeric: tabular-nums; }
 .mental-rotation-game__progress i {
   display: block;
   height: 100%;
@@ -43,6 +67,13 @@
 }
 .mental-rotation-game__target {
   grid-column: 1;
+}
+.mental-rotation-game__panel-label {
+  position: absolute;
+  top: 19%;
+  color: #64748b;
+  font-size: 10px;
+  letter-spacing: .18em;
 }
 .mental-rotation-game__target-frame {
   position: relative;
@@ -193,6 +224,14 @@
   opacity: 0.45;
   cursor: default;
 }
+.mental-rotation-game__controls .mental-rotation-game__check {
+  width: 160px;
+  padding: 0 18px;
+  border-color: #fff;
+  background: linear-gradient(145deg, #7668d4, #4f46a8);
+  font-size: 13px;
+  letter-spacing: .08em;
+}
 .mental-rotation-game__controls span {
   color: #7786a6;
   font-size: 30px;
@@ -212,6 +251,9 @@
     grid-row: 1;
     padding-top: 38px;
   }
+  .mental-rotation-game__assessment-hud { top: 32px; width: 90%; padding: 8px 10px; }
+  .mental-rotation-game__assessment-hud strong { display: none; }
+  .mental-rotation-game__panel-label { display: none; }
   .mental-rotation-game__target-frame {
     width: min(38vw, 170px);
   }

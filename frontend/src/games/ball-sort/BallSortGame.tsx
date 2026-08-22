@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Play, Timer, CheckCircle2 } from "lucide-react";
+import { Play, Timer } from "lucide-react";
 import { BallSortAnalyticsService } from "./AnalyticsService";
 import { scoreBallSort } from "./ScoringEngine";
 import type { BallColor, Tube, RawBallSortMetrics, BallSortScores } from "./Types";
@@ -18,7 +18,7 @@ class SoundSynth {
 
   private init() {
     if (!this.ctx && typeof window !== "undefined") {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (AudioCtx) this.ctx = new AudioCtx();
     }
   }
@@ -163,6 +163,9 @@ export default function BallSortGame({
   const [level, setLevel] = useState(1);
   const [tubes, setTubes] = useState<Tube[]>([]);
   const [selectedTubeId, setSelectedTubeId] = useState<number | null>(null);
+  const [drag, setDrag] = useState<{ sourceTubeId: number; color: BallColor; pointerId: number; x: number; y: number } | null>(null);
+  const [invalidTubeId, setInvalidTubeId] = useState<number | null>(null);
+  const [moveCount, setMoveCount] = useState(0);
   const [seconds, setSeconds] = useState(durationSeconds);
   const [celebrating, setCelebrating] = useState(false);
   const [result, setResult] = useState<BallSortScores | null>(null);
@@ -183,14 +186,8 @@ export default function BallSortGame({
     }));
     setTubes(configuredTubes);
     setSelectedTubeId(null);
+    setDrag(null);
   }, []);
-
-  // Sync level state
-  useEffect(() => {
-    if (started) {
-      loadLevel(level);
-    }
-  }, [level, started, loadLevel]);
 
   // Finish game assessment
   const finish = useCallback(
@@ -251,57 +248,37 @@ export default function BallSortGame({
   };
 
   // Check if all tubes are solved (either empty or full of identical colors)
-  const checkWinCondition = (currentTubes: Tube[]): boolean => {
+  const checkWinCondition = useCallback((currentTubes: Tube[]): boolean => {
     return currentTubes.every((tube) => {
       if (tube.balls.length === 0) return true;
       if (tube.balls.length !== tube.capacity) return false;
       const first = tube.balls[0];
       return tube.balls.every((c) => c === first);
     });
-  };
+  }, []);
 
-  // Tube click interaction handler (supports clicks, taps, and mouse releases)
-  const handleTubeClick = (tubeId: number) => {
+  const attemptMove = useCallback((sourceTubeId: number, targetTubeId: number | null) => {
     if (disabled || finished.current || celebrating) return;
+    const sourceTube = tubes.find((t) => t.id === sourceTubeId);
+    const targetTube = targetTubeId === null ? null : tubes.find((t) => t.id === targetTubeId);
+    if (!sourceTube || !sourceTube.balls.length) return;
 
-    if (selectedTubeId === null) {
-      // First click: select source tube
-      const sourceTube = tubes.find((t) => t.id === tubeId);
-      if (sourceTube && sourceTube.balls.length > 0) {
-        setSelectedTubeId(tubeId);
-        sounds.current?.playPop();
-      }
-    } else {
-      // Second click: target tube selected
-      if (selectedTubeId === tubeId) {
-        // Deselect if clicked same tube again
-        setSelectedTubeId(null);
-        sounds.current?.playDrop();
-        return;
-      }
+    const topBall = sourceTube.balls[sourceTube.balls.length - 1];
+    totalMoves.current++;
+    setMoveCount(totalMoves.current);
 
-      const sourceTube = tubes.find((t) => t.id === selectedTubeId);
-      const targetTube = tubes.find((t) => t.id === tubeId);
+    const hasSpace = Boolean(targetTube && targetTube.balls.length < targetTube.capacity);
+    const targetIsEmpty = targetTube?.balls.length === 0;
+    const targetTopBallColorMatches = Boolean(
+      targetTube && targetTube.balls[targetTube.balls.length - 1] === topBall,
+    );
+    const validMove = Boolean(
+      targetTube && targetTube.id !== sourceTube.id && hasSpace && (targetIsEmpty || targetTopBallColorMatches),
+    );
 
-      if (!sourceTube || !targetTube) {
-        setSelectedTubeId(null);
-        return;
-      }
-
-      const topBall = sourceTube.balls[sourceTube.balls.length - 1];
-
-      // Interaction Rules Check:
-      // Target must have space.
-      // Top ball color of target must match source top ball, OR target is empty.
-      const hasSpace = targetTube.balls.length < targetTube.capacity;
-      const targetIsEmpty = targetTube.balls.length === 0;
-      const targetTopBallColorMatches =
-        !targetIsEmpty && targetTube.balls[targetTube.balls.length - 1] === topBall;
-
-      if (hasSpace && (targetIsEmpty || targetTopBallColorMatches)) {
+      if (validMove && targetTube) {
         // Valid Move
         sounds.current?.playDrop();
-        totalMoves.current++;
         correctMoves.current++;
 
         const nextTubes = tubes.map((t) => {
@@ -330,21 +307,71 @@ export default function BallSortGame({
             setCelebrating(true);
             window.setTimeout(() => {
               setCelebrating(false);
-              setLevel((prev) => {
-                const nextLevel = prev + 1;
-                highestLevel.current = Math.max(highestLevel.current, nextLevel);
-                return nextLevel;
-              });
+              const nextLevel = level + 1;
+              highestLevel.current = Math.max(highestLevel.current, nextLevel);
+              setLevel(nextLevel);
+              loadLevel(nextLevel);
             }, 1200);
           }
         }
-      } else {
-        // Invalid Move: do NOT show error message, just record mistake internally
-        incorrectMoves.current++;
-        setSelectedTubeId(null);
-      }
+    } else {
+      incorrectMoves.current++;
+      setInvalidTubeId(targetTubeId);
+      sounds.current?.playDrop();
+      window.setTimeout(() => setInvalidTubeId(null), 320);
     }
+  }, [disabled, celebrating, tubes, checkWinCondition, level, finish, loadLevel]);
+
+  const startDrag = (event: React.PointerEvent<HTMLDivElement>, tube: Tube) => {
+    if (disabled || finished.current || celebrating || !tube.balls.length) return;
+    const color = tube.balls[tube.balls.length - 1];
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setSelectedTubeId(tube.id);
+    setDrag({ sourceTubeId: tube.id, color, pointerId: event.pointerId, x: event.clientX, y: event.clientY });
+    sounds.current?.playPop();
   };
+
+  useEffect(() => {
+    if (!drag) return;
+
+    const move = (event: PointerEvent) => {
+      if (event.pointerId !== drag.pointerId) return;
+      event.preventDefault();
+      setDrag((current) => current && current.pointerId === event.pointerId
+        ? { ...current, x: event.clientX, y: event.clientY }
+        : current);
+    };
+    const release = (event: PointerEvent) => {
+      if (event.pointerId !== drag.pointerId) return;
+      const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-tube-id]");
+      const targetTubeId = target ? Number(target.dataset.tubeId) : null;
+      setDrag(null);
+      setSelectedTubeId(null);
+      attemptMove(drag.sourceTubeId, Number.isFinite(targetTubeId) ? targetTubeId : null);
+    };
+    const cancel = () => {
+      setDrag(null);
+      setSelectedTubeId(null);
+    };
+    const keyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") cancel();
+    };
+
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", cancel);
+    window.addEventListener("blur", cancel);
+    window.addEventListener("keydown", keyDown);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("blur", cancel);
+      window.removeEventListener("keydown", keyDown);
+    };
+  }, [drag, attemptMove]);
 
   const progressPercentage = ((durationSeconds - seconds) / durationSeconds) * 100;
 
@@ -365,7 +392,7 @@ export default function BallSortGame({
         </div>
         <div className="ball-sort-hud-center">
           <h2>Put same colors in one tube!</h2>
-          <p>Click a tube to pick up the top ball, then click another to drop it.</p>
+          <p>Drag the top ball into another tube. Every drop counts.</p>
         </div>
         <div className="ball-sort-timer">
           <Timer className="h-5 w-5" />
@@ -388,8 +415,8 @@ export default function BallSortGame({
           return (
             <div
               key={tube.id}
-              className="ball-sort-tube-container"
-              onClick={() => handleTubeClick(tube.id)}
+              data-tube-id={tube.id}
+              className={`ball-sort-tube-container ${invalidTubeId === tube.id ? "invalid-drop" : ""}`}
             >
               <div className={`ball-sort-tube ${isSelected ? "selected" : ""}`}>
                 {tube.balls.map((color, index) => {
@@ -399,7 +426,8 @@ export default function BallSortGame({
                       key={index}
                       className={`ball-sort-ball ${color} ${
                         isSelected && isTopBall ? "selected-hover" : ""
-                      }`}
+                      } ${drag?.sourceTubeId === tube.id && isTopBall ? "drag-source" : ""}`}
+                      onPointerDown={isTopBall ? (event) => startDrag(event, tube) : undefined}
                     />
                   );
                 })}
@@ -410,8 +438,12 @@ export default function BallSortGame({
         })}
       </div>
 
+      {drag && (
+        <div className={`ball-sort-drag-ball ${drag.color}`} style={{ left: drag.x, top: drag.y }} aria-hidden />
+      )}
+
       <div className="ball-sort-footer">
-        <span>MOVES: {totalMoves.current}</span>
+        <span>MOVES: {moveCount}</span>
       </div>
 
       {/* Intro Modal Overlay */}

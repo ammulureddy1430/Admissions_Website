@@ -100,6 +100,18 @@
   align-items: center;
   gap: 16px;
   cursor: pointer;
+  touch-action: none;
+}
+
+.ball-sort-tube-container.invalid-drop .ball-sort-tube {
+  border-color: #fb7185;
+  animation: ballSortInvalidDrop 0.3s ease-in-out;
+}
+
+@keyframes ballSortInvalidDrop {
+  25% { transform: translateX(-8px); }
+  50% { transform: translateX(8px); }
+  75% { transform: translateX(-4px); }
 }
 
 .ball-sort-tube {
@@ -187,6 +199,34 @@
   z-index: 5;
 }
 
+.ball-sort-ball.drag-source {
+  opacity: 0.2;
+  animation: none;
+}
+
+.ball-sort-drag-ball {
+  position: fixed;
+  z-index: 200;
+  width: 54px;
+  height: 54px;
+  transform: translate(-50%, -50%) scale(1.08);
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: 0 18px 30px rgba(0, 0, 0, 0.48), inset 0 -6px 12px rgba(0, 0, 0, 0.2), inset 0 6px 12px rgba(255, 255, 255, 0.35);
+}
+
+.ball-sort-drag-ball::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 12px;
+  width: 14px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  transform: rotate(-15deg);
+}
+
 @keyframes floatBall {
   0% { transform: translateY(-50px); }
   100% { transform: translateY(-58px); }
@@ -197,7 +237,15 @@
   background: radial-gradient(circle at 35% 35%, #ff7675 0%, #d63031 70%, #8b0000 100%);
 }
 
+.ball-sort-drag-ball.red {
+  background: radial-gradient(circle at 35% 35%, #ff7675 0%, #d63031 70%, #8b0000 100%);
+}
+
 .ball-sort-ball.blue {
+  background: radial-gradient(circle at 35% 35%, #74b9ff 0%, #0984e3 70%, #002d62 100%);
+}
+
+.ball-sort-drag-ball.blue {
   background: radial-gradient(circle at 35% 35%, #74b9ff 0%, #0984e3 70%, #002d62 100%);
 }
 
@@ -205,7 +253,15 @@
   background: radial-gradient(circle at 35% 35%, #55efc4 0%, #00b894 70%, #004d3c 100%);
 }
 
+.ball-sort-drag-ball.green {
+  background: radial-gradient(circle at 35% 35%, #55efc4 0%, #00b894 70%, #004d3c 100%);
+}
+
 .ball-sort-ball.yellow {
+  background: radial-gradient(circle at 35% 35%, #ffeaa7 0%, #fdcb6e 70%, #c08000 100%);
+}
+
+.ball-sort-drag-ball.yellow {
   background: radial-gradient(circle at 35% 35%, #ffeaa7 0%, #fdcb6e 70%, #c08000 100%);
 }
 

@@ -787,9 +787,9 @@ export default function QuickSwitchGame({
         ctx.rotate(-Math.PI / 2); // facing upwards default
       }
 
-      // Neon glow shadow
-      ctx.shadowColor = "#38bdf8";
-      ctx.shadowBlur = 18;
+      // Keep the player visually separate from every collectible color.
+      ctx.shadowColor = "#e879f9";
+      ctx.shadowBlur = 22;
 
       // Draw engine fire trail if moving
       if (speed > 1) {
@@ -803,9 +803,9 @@ export default function QuickSwitchGame({
       }
 
       // Ship body (sleek futuristic flyer)
-      ctx.fillStyle = "#f8fafc";
-      ctx.strokeStyle = "#0284c7";
-      ctx.lineWidth = 3.5;
+      ctx.fillStyle = "#a21caf";
+      ctx.strokeStyle = "#fae8ff";
+      ctx.lineWidth = 4;
       ctx.beginPath();
       // Arrow shape wings
       ctx.moveTo(player.current.radius, 0);
@@ -818,7 +818,7 @@ export default function QuickSwitchGame({
       ctx.stroke();
 
       // Wing glow stripes
-      ctx.strokeStyle = "#38bdf8";
+      ctx.strokeStyle = "#f5d0fe";
       ctx.lineWidth = 2.5;
       ctx.beginPath();
       ctx.moveTo(-player.current.radius + 10, -10);

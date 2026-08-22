@@ -9,6 +9,8 @@ import { goalSide, paddleHit } from "./CollisionEngine";
 import { scoreAirHockey } from "./ScoringEngine";
 import type { AirHockeyMetrics, RallyEvent } from "./Types";
 import "./AirHockeyChallengeGame.css";
+const GOALS_TO_WIN = 5;
+
 type Props = {
   disabled?: boolean;
   remainingSeconds?: number;
@@ -43,7 +45,9 @@ export default function AirHockeyChallengeGame({
     premature = useRef(0),
     corrections = useRef(0);
   const [started, setStarted] = useState(false),
-    [preview, setPreview] = useState(remainingSeconds ?? 120);
+    [preview, setPreview] = useState(remainingSeconds ?? 120),
+    [playerScore, setPlayerScore] = useState(0),
+    [opponentScore, setOpponentScore] = useState(0);
   useEffect(() => {
     complete.current = onComplete;
   }, [onComplete]);
@@ -198,6 +202,7 @@ export default function AirHockeyChallengeGame({
       if (goal && !resetAt.current) {
         if (goal === "child") {
           goalsConceded.current++;
+          setOpponentScore(goalsConceded.current);
           events.current.push({
             kind: "miss",
             at: Math.round(elapsed),
@@ -205,7 +210,25 @@ export default function AirHockeyChallengeGame({
             distance: Math.abs(puck.current.puck.x - child.current.state.x),
             stage: level.stage,
           });
-        } else opponentGoals.current++;
+          if (goalsConceded.current >= GOALS_TO_WIN) {
+            ending.current = true;
+            finishAt.current = now + 900;
+          }
+        } else {
+          opponentGoals.current++;
+          setPlayerScore(opponentGoals.current);
+          events.current.push({
+            kind: "goal",
+            at: Math.round(elapsed),
+            responseTime: 0,
+            distance: 0,
+            stage: level.stage,
+          });
+          if (opponentGoals.current >= GOALS_TO_WIN) {
+            ending.current = true;
+            finishAt.current = now + 900;
+          }
+        }
         resetAt.current = now + 650;
         puck.current.puck.active = false;
       }
@@ -251,10 +274,7 @@ export default function AirHockeyChallengeGame({
           puck.current.puck.radius,
           "#17283c",
         );
-      if (
-        ending.current &&
-        (!puck.current.puck.active || now >= finishAt.current)
-      ) {
+      if (ending.current && now >= finishAt.current) {
         finish();
         return;
       }
@@ -270,8 +290,34 @@ export default function AirHockeyChallengeGame({
       cancelAnimationFrame(raf.current);
     };
   }, [disabled, finish, started]);
+  const timeLeft = Math.max(
+    0,
+    practiceOnly ? preview : (remainingSeconds ?? preview),
+  );
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
   return (
     <div className="air-hockey">
+      {started && (
+        <div className="ah-hud" aria-live="polite">
+          <div>
+            <span>YOUR GOALS</span>
+            <strong>{playerScore} / {GOALS_TO_WIN}</strong>
+          </div>
+          <div className="ah-round">
+            <span>ROUND</span>
+            <strong>1 / 1</strong>
+          </div>
+          <div>
+            <span>TIME</span>
+            <strong>{minutes}:{String(seconds).padStart(2, "0")}</strong>
+          </div>
+          <div className="ah-opponent-count">
+            <span>OPPONENT</span>
+            <strong>{opponentScore}</strong>
+          </div>
+        </div>
+      )}
       <div className="ah-table">
         <div className="ah-center" />
         <div className="ah-circle" />
@@ -285,6 +331,8 @@ export default function AirHockeyChallengeGame({
       {!started && (
         <div className="ah-intro">
           <div>
+            <p className="ah-instruction">Score {GOALS_TO_WIN} goals through the top yellow line</p>
+            <small>One round only</small>
             <span className="ah-demo red" />
             <i>●</i>
             <span className="ah-demo green" />

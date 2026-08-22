@@ -8,6 +8,41 @@
   touch-action: none;
   user-select: none;
 }
+.ah-hud {
+  position: absolute;
+  z-index: 6;
+  top: 1.5%;
+  left: 50%;
+  display: flex;
+  gap: 12px;
+  transform: translateX(-50%);
+  color: #fff;
+  pointer-events: none;
+}
+.ah-hud > div {
+  min-width: 108px;
+  padding: 8px 14px;
+  border: 2px solid #b9fff3;
+  border-radius: 16px;
+  background: #061a38e6;
+  text-align: center;
+  box-shadow: 0 5px 18px #020b1f88;
+}
+.ah-hud span {
+  display: block;
+  color: #aef5e9;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+.ah-hud strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 22px;
+  line-height: 1;
+}
+.ah-hud > div:first-child strong { color: #ffd866; }
+.ah-opponent-count strong { color: #ff7a8d; }
 .ah-table {
   position: absolute;
   inset: 4% 12%;
@@ -90,6 +125,29 @@
   background: #164f74;
   box-shadow: 0 25px 65px #020b1f;
 }
+.ah-instruction {
+  position: absolute;
+  z-index: 2;
+  top: 8px;
+  left: 18px;
+  right: 18px;
+  margin: 0;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+  text-align: center;
+}
+.ah-intro small {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  top: 40px;
+  color: #b9fff3;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
 .ah-demo {
   position: absolute;
   left: 50%;
@@ -152,6 +210,11 @@
   }
 }
 @media (max-width: 700px) {
+  .ah-hud { gap: 5px; top: 1%; }
+  .ah-hud > div { min-width: 70px; padding: 6px 8px; }
+  .ah-hud span { font-size: 8px; }
+  .ah-hud strong { font-size: 17px; }
+  .ah-round { display: none; }
   .ah-table {
     inset: 3% 3%;
     border-radius: 38px;

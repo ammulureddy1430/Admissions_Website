@@ -4,7 +4,7 @@ import {
   aimAngle,
   ARCHER,
   drawFromDistance,
-  launchArrow,
+  launchArrowAt,
   pointerToWorld,
   stepArrow,
 } from "./ArrowEngine";
@@ -422,20 +422,28 @@ export default function PrecisionArcheryGame({
             }
           | undefined;
         let hitTarget: Target | undefined;
-        for (const target of targets.current) {
-          const c = collision(arrow.current.x, arrow.current.y, target);
-          if (c.hit) {
-            result = c;
-            hitTarget = target;
-            target.hitFlash = 1;
-            break;
+        // Do not stop at the near edge of the circle. Wait until the arrow
+        // reaches the selected marker, then score that exact point.
+        if (arrow.current.arrived) {
+          for (const target of targets.current) {
+            const c = collision(arrow.current.x, arrow.current.y, target);
+            if (c.hit) {
+              result = c;
+              hitTarget = target;
+              target.hitFlash = 1;
+              break;
+            }
           }
         }
-        if (result?.hit || arrow.current.x > 920 || arrow.current.y > 530) {
+        if (
+          arrow.current.arrived ||
+          arrow.current.x > 920 ||
+          arrow.current.y > 530
+        ) {
           if (result?.hit && hitTarget) {
             embeddedArrows.current.push({
               targetId: hitTarget.id,
-              dx: 0,
+              dx: arrow.current.x - hitTarget.x,
               dy: arrow.current.y - hitTarget.y,
               angle: arrow.current.angle,
             });
@@ -515,7 +523,7 @@ export default function PrecisionArcheryGame({
         draw.current + (performance.now() - drawStart.current) / 1800,
       ),
     );
-    arrow.current = launchArrow(angle.current, draw.current);
+    arrow.current = launchArrowAt(aim.current, draw.current, wind.current);
     followThrough.current = 0.65;
     setPhase("ARROW IN FLIGHT");
   };
@@ -554,8 +562,8 @@ export default function PrecisionArcheryGame({
               <span>SPORT ARCHERY</span>
               <h1>Aim. Draw. Release.</h1>
               <p>
-                Drag anywhere on the range to aim the bow. Keep holding to draw
-                the string, then release to shoot.
+                Point at the exact place you want to hit. Keep holding to draw
+                the string, then release—the arrow will travel to your marker.
               </p>
               <button
                 onClick={() => {
