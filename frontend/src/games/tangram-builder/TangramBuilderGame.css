@@ -169,6 +169,24 @@
 .tangram-game__controls button:disabled { opacity: .4; cursor: default; }
 .tangram-game__controls svg { width: 56%; height: 56%; stroke-width: 3; }
 .tangram-game.is-transitioning .tangram-game__board { animation: tangram-neutral-transition .55s ease; }
+.tangram-game.is-practice .tangram-game__progress,
+.tangram-game.is-practice .tangram-game__timer { display: none; }
+.tangram-game.is-practice .tangram-game__target {
+  top: 3%;
+  height: clamp(145px, 23%, 190px);
+}
+.tangram-game.is-practice .tangram-game__board {
+  top: 29%;
+  bottom: 2%;
+}
+.tangram-game.is-practice .tangram-game__controls {
+  top: 5%;
+  gap: 7px;
+  padding: 7px;
+}
+.tangram-game.is-practice .tangram-game__controls button {
+  width: clamp(42px, 4.2vw, 56px);
+}
 @keyframes tangram-neutral-transition { 45% { opacity: .18; transform: translateX(-50%) scale(.985); } }
 @media (max-width: 720px) {
   .tangram-game { min-height: 500px; }

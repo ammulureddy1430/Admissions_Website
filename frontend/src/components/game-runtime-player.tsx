@@ -74,45 +74,16 @@ import DriftRacerGame from "@/games/drift-racer/Game";
 import StealthEscapeGame from "@/games/stealth-escape/Game";
 import MemoryVaultGame from "@/games/memory-vault/Game";
 import QuickSwitchGame from "@/games/quick-switch/Game";
+import MagicTrainGame from "@/games/magic-train/Game";
 
 const MAX_SECURITY_WARNINGS = 3;
-const SELF_CONTAINED_GAME_ENGINES = new Set([
-  "FOLLOW_THE_LIGHTS",
-  "BALL_STACK",
-  "SOUND_DETECTIVE",
-  "COLOR_PATH",
-  "MAGIC_PAINT",
-  "TRAIN_TRACK_BUILDER",
-  "PACKAGE_SORTER",
-  "RESCUE_MISSION",
-  "PARKING_ESCAPE",
-  "WATER_PIPELINE",
-  "PATTERN_MATRIX",
-  "NUMBER_BUILDER",
-  "BALL_SORT",
-  "RED_LIGHT_GREEN_LIGHT",
-  "CATCH_THE_TARGET",
-  "MENTAL_ROTATION",
-  "WATER_JUGS",
-  "TANGRAM_BUILDER",
-  "SOKOBAN",
-  "COLOR_SHIFT",
-  "AIR_HOCKEY_CHALLENGE",
-  "MEMORY_MARKET",
-  "AIRPORT_CONTROLLER",
-  "RULE_SHIFT_CHALLENGE",
-  "MINI_GOLF_CHALLENGE",
-  "RACING_STRATEGIST",
-  "PLAYMAKER",
-  "CLIMBING_CHALLENGE",
-  "DETECTIVE_INVESTIGATION",
-  "PRECISION_ARCHERY",
-  "WAVE_RIDER",
-  "DRIFT_RACER",
-  "STEALTH_ESCAPE",
-  "MEMORY_VAULT",
-  "QUICK_SWITCH",
-]);
+type AssessmentSecurityPhase =
+  | "INITIALIZING"
+  | "SCREEN_SHARE_REQUESTED"
+  | "SCREEN_SHARE_ACTIVE"
+  | "ENTERING_FULLSCREEN"
+  | "ASSESSMENT_ACTIVE"
+  | "SUBMITTED";
 
 type GameOption = { id?: string; optionKey?: string; optionText: string };
 type AnswerResult = {
@@ -153,6 +124,9 @@ export function GameRuntimePlayer({
   const [fullscreenRequired, setFullscreenRequired] = useState(false);
   const [recordingInterrupted, setRecordingInterrupted] = useState(false);
   const [assessmentCompleted, setAssessmentCompleted] = useState(false);
+  const [securityPhase, setSecurityPhase] =
+    useState<AssessmentSecurityPhase>("INITIALIZING");
+  const [screenShareError, setScreenShareError] = useState<string | null>(null);
   const totalGameSeconds = Number(initial.configuration?.timeLimitMinutes)
     ? Number(initial.configuration.timeLimitMinutes) * 60
     : Number(
@@ -173,11 +147,22 @@ export function GameRuntimePlayer({
   const gameplayChunksRef = useRef<Blob[]>([]);
   const gameplayRecordingStartedAtRef = useRef(0);
   const gameplayFinishingRef = useRef(false);
+  const securityPhaseRef = useRef<AssessmentSecurityPhase>("INITIALIZING");
   const gameplayUploadRef = useRef<{
     uploadUrl: string;
     contentType: string;
     objectKey: string;
   } | null>(null);
+  const gameplayUploadPromiseRef = useRef<Promise<{
+    uploadUrl: string;
+    contentType: string;
+    objectKey: string;
+  } | null> | null>(null);
+
+  const moveToSecurityPhase = (phase: AssessmentSecurityPhase) => {
+    securityPhaseRef.current = phase;
+    setSecurityPhase(phase);
+  };
 
   const startGameplayRecording = async () => {
     if (
@@ -190,8 +175,12 @@ export function GameRuntimePlayer({
       gameplayStreamRef.current
         ?.getVideoTracks()
         .some((track) => track.readyState === "live")
-    )
+    ) {
+      moveToSecurityPhase("SCREEN_SHARE_ACTIVE");
       return true;
+    }
+    moveToSecurityPhase("SCREEN_SHARE_REQUESTED");
+    setScreenShareError(null);
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: 15, displaySurface: "browser" },
@@ -201,18 +190,35 @@ export function GameRuntimePlayer({
         surfaceSwitching: "exclude",
         monitorTypeSurfaces: "exclude",
       } as DisplayMediaStreamOptions);
+      const videoTrack = stream.getVideoTracks()[0];
+      if (!videoTrack) throw new Error("No screen-sharing video was selected.");
+      const selectedSurface = videoTrack.getSettings().displaySurface;
+      if (selectedSurface && selectedSurface !== "browser") {
+        stream.getTracks().forEach((track) => track.stop());
+        throw new Error(
+          'Please select the assessment tab from the browser\'s "This Tab" section.',
+        );
+      }
       const contentType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
         ? "video/webm;codecs=vp9"
         : "video/webm";
-      const upload =
-        gameplayUploadRef.current ||
-        (await request(
+      if (!gameplayUploadRef.current && !gameplayUploadPromiseRef.current) {
+        gameplayChunksRef.current = [];
+        gameplayUploadPromiseRef.current = request(
           `game-assessments/engine/sessions/${state.id}/recording-upload-url`,
           { method: "POST", body: JSON.stringify({ contentType }) },
-        ));
-      if (!gameplayUploadRef.current) gameplayChunksRef.current = [];
+        )
+          .then((upload) => {
+            gameplayUploadRef.current = upload;
+            return upload;
+          })
+          .catch((uploadError) => {
+            gameplayUploadPromiseRef.current = null;
+            console.error("Gameplay recording upload setup failed.", uploadError);
+            return null;
+          });
+      }
       gameplayStreamRef.current = stream;
-      gameplayUploadRef.current = upload;
       const recorder = new MediaRecorder(stream, {
         mimeType: contentType,
         videoBitsPerSecond: 1_000_000,
@@ -221,32 +227,60 @@ export function GameRuntimePlayer({
         if (event.data.size) gameplayChunksRef.current.push(event.data);
       };
       gameplayRecorderRef.current = recorder;
-      stream.getVideoTracks()[0]?.addEventListener("ended", () => {
-        if (recorder.state === "recording" && !gameplayFinishingRef.current)
+      moveToSecurityPhase("SCREEN_SHARE_ACTIVE");
+      videoTrack.addEventListener("ended", () => {
+        if (
+          securityPhaseRef.current === "ASSESSMENT_ACTIVE" &&
+          recorder.state === "recording" &&
+          !gameplayFinishingRef.current
+        )
           void action("RECORDING_STOPPED");
+        else if (
+          securityPhaseRef.current !== "SUBMITTED" &&
+          !gameplayFinishingRef.current
+        ) {
+          moveToSecurityPhase("INITIALIZING");
+          setScreenShareError(
+            'Screen recording is required to start this assessment. Please allow screen sharing and select "This Tab" to continue.',
+          );
+        }
       });
       return true;
-    } catch {
+    } catch (error) {
       gameplayStreamRef.current?.getTracks().forEach((track) => track.stop());
       gameplayStreamRef.current = null;
       gameplayRecorderRef.current = null;
-      const sharingTarget = SELF_CONTAINED_GAME_ENGINES.has(
-        initial.engine?.engineKey,
-      )
-        ? "this game tab"
-        : "the assessment tab";
-      alert(
-        `Gameplay screen recording is required. Please choose ${sharingTarget} in the sharing dialog.`,
+      moveToSecurityPhase("INITIALIZING");
+      setScreenShareError(
+        error instanceof Error && error.message.startsWith("Please select")
+          ? error.message
+          : 'Screen recording is required to start this assessment. Please allow screen sharing and select "This Tab" to continue.',
       );
       return false;
     }
   };
 
   const finishGameplayRecording = async () => {
+    moveToSecurityPhase("SUBMITTED");
     const recorder = gameplayRecorderRef.current;
-    const upload = gameplayUploadRef.current;
-    if (!recorder || !upload) return;
+    if (!recorder) return;
     gameplayFinishingRef.current = true;
+    let upload = gameplayUploadRef.current;
+    try {
+      upload =
+        upload || (await gameplayUploadPromiseRef.current) || null;
+    } catch (uploadError) {
+      gameplayStreamRef.current?.getTracks().forEach((track) => track.stop());
+      gameplayRecorderRef.current = null;
+      gameplayStreamRef.current = null;
+      throw uploadError;
+    }
+    if (!upload) {
+      gameplayStreamRef.current?.getTracks().forEach((track) => track.stop());
+      gameplayRecorderRef.current = null;
+      gameplayStreamRef.current = null;
+      throw new Error("Gameplay recording upload was not initialized.");
+    }
     await new Promise<void>((resolve) => {
       recorder.onstop = async () => {
         try {
@@ -311,7 +345,7 @@ export function GameRuntimePlayer({
     );
   };
 
-  const enterFullscreen = async (element: HTMLDivElement | null) => {
+  const enterFullscreen = async (element: HTMLElement | null) => {
     if (!element) return false;
     try {
       if (element.requestFullscreen) {
@@ -337,8 +371,6 @@ export function GameRuntimePlayer({
   useEffect(() => {
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const element = playerRef.current;
-    if (element && !checkFullscreenState()) void enterFullscreen(element);
     return () => {
       gameplayFinishingRef.current = true;
       gameplayStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -364,19 +396,6 @@ export function GameRuntimePlayer({
     gameplayStreamRef.current?.getTracks().forEach((track) => track.stop());
     gameplayStreamRef.current = null;
     gameplayRecorderRef.current = null;
-    let completedState = state;
-    if (!state.demo && state.status !== "COMPLETED") {
-      try {
-        const result = await request(
-          `game-assessments/engine/sessions/${state.id}/action`,
-          { method: "POST", body: JSON.stringify({ action: "END" }) },
-        );
-        completedState = result.state || result;
-        setState(completedState);
-      } catch (error) {
-        console.error("Unable to end the game session while closing.", error);
-      }
-    }
     if (checkFullscreenState()) {
       if (document.exitFullscreen) {
         void document.exitFullscreen().catch(() => undefined);
@@ -388,7 +407,7 @@ export function GameRuntimePlayer({
         void (document as any).msExitFullscreen().catch(() => undefined);
       }
     }
-    onClose(completedState);
+    onClose(state);
   };
   const forcePlayerFullscreen = async () => {
     const element = playerRef.current;
@@ -413,17 +432,19 @@ export function GameRuntimePlayer({
   };
   const startGame = async () => {
     const element = playerRef.current;
-    if (!checkFullscreenState()) {
-      const entered = await enterFullscreen(element);
-      if (!entered) {
-        setFullscreenRequired(true);
-        return;
-      }
-    }
-    setFullscreenRequired(false);
+    // Ask for the mandatory browser screen-share permission only when the
+    // student explicitly starts the real assessment. The tutorial and mock
+    // game remain available without recording or fullscreen.
     if (!(await startGameplayRecording())) return;
+    const recorder = gameplayRecorderRef.current;
+    if (recorder?.state === "inactive") {
+      recorder.start(1000);
+      gameplayRecordingStartedAtRef.current = performance.now();
+    }
+    moveToSecurityPhase("ENTERING_FULLSCREEN");
     const fullscreenRestored =
-      checkFullscreenState() || (await enterFullscreen(element));
+      checkFullscreenState() ||
+      (await enterFullscreen(document.documentElement));
     if (!fullscreenRestored) {
       setFullscreenRequired(true);
       return;
@@ -431,21 +452,26 @@ export function GameRuntimePlayer({
     if (state.status === "READY") await action("START");
     else if (state.status === "PAUSED") await action("RESUME");
     setIntroVisible(false);
+    moveToSecurityPhase("ASSESSMENT_ACTIVE");
+  };
+  const resumeAfterRecordingInterruption = async () => {
+    if (!(await startGameplayRecording())) return;
     const recorder = gameplayRecorderRef.current;
     if (recorder?.state === "inactive") {
       recorder.start(1000);
       gameplayRecordingStartedAtRef.current = performance.now();
     }
-  };
-  const resumeAfterRecordingInterruption = async () => {
-    if (!(await startGameplayRecording())) return;
+    moveToSecurityPhase("ENTERING_FULLSCREEN");
     const entered =
-      checkFullscreenState() || (await enterFullscreen(playerRef.current));
-    if (!entered) return;
+      checkFullscreenState() ||
+      (await enterFullscreen(document.documentElement));
+    if (!entered) {
+      setFullscreenRequired(true);
+      return;
+    }
     await action("RESUME");
-    const recorder = gameplayRecorderRef.current;
-    if (recorder?.state === "inactive") recorder.start(1000);
     setRecordingInterrupted(false);
+    moveToSecurityPhase("ASSESSMENT_ACTIVE");
   };
   const action = async (actionName: string, payload?: any, visualDelay = 0) => {
     if (state.demo) {
@@ -568,6 +594,7 @@ export function GameRuntimePlayer({
   ) => {
     if (
       !secureMode ||
+      securityPhaseRef.current !== "ASSESSMENT_ACTIVE" ||
       state.status !== "RUNNING" ||
       suppressSecurityRef.current ||
       securityBusyRef.current
@@ -589,15 +616,22 @@ export function GameRuntimePlayer({
     }
   };
   useEffect(() => {
-    if (!secureMode || state.status !== "RUNNING") return;
+    if (
+      state.status !== "RUNNING" ||
+      securityPhase !== "ASSESSMENT_ACTIVE"
+    )
+      return;
     const fullscreenChanged = () => {
-      if (!checkFullscreenState() && !suppressSecurityRef.current)
-        void reportSecurityViolation("fullscreen_exit");
+      if (!checkFullscreenState() && !suppressSecurityRef.current) {
+        setFullscreenRequired(true);
+        if (secureMode) void reportSecurityViolation("fullscreen_exit");
+      } else if (checkFullscreenState()) {
+        setFullscreenRequired(false);
+      }
     };
     const visibilityChanged = () => {
       if (document.hidden) void reportSecurityViolation("tab_switch");
     };
-    const lostFocus = () => void reportSecurityViolation("tab_switch");
     const beforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "Refreshing or leaving will submit your assessment.";
@@ -607,7 +641,6 @@ export function GameRuntimePlayer({
     document.addEventListener("mozfullscreenchange", fullscreenChanged);
     document.addEventListener("MSFullscreenChange", fullscreenChanged);
     document.addEventListener("visibilitychange", visibilityChanged);
-    window.addEventListener("blur", lostFocus);
     window.addEventListener("beforeunload", beforeUnload);
     return () => {
       document.removeEventListener("fullscreenchange", fullscreenChanged);
@@ -615,10 +648,9 @@ export function GameRuntimePlayer({
       document.removeEventListener("mozfullscreenchange", fullscreenChanged);
       document.removeEventListener("MSFullscreenChange", fullscreenChanged);
       document.removeEventListener("visibilitychange", visibilityChanged);
-      window.removeEventListener("blur", lostFocus);
       window.removeEventListener("beforeunload", beforeUnload);
     };
-  }, [secureMode, state.status, warningCount]);
+  }, [secureMode, securityPhase, state.status, warningCount]);
   const resumeSecureAssessment = async () => {
     const element = playerRef.current;
     if (element && !checkFullscreenState()) await enterFullscreen(element);
@@ -769,8 +801,22 @@ export function GameRuntimePlayer({
           `${((event.clientY - bounds.top) / bounds.height - 0.5) * 2}`,
         );
       }}
-      className={`game-runtime-player fixed inset-0 z-[9999] flex h-[100dvh] w-screen flex-col bg-gradient-to-br from-[#071633] via-[#123b5a] to-[#007f70] text-white ${isAdventure ? "is-adventure-game" : ""} ${isBoardGame ? "is-board-game" : ""} ${isBuildingGame ? "is-building-game" : ""} ${isDragDropGame ? "is-drag-drop-game" : ""} ${isFishingGame ? "is-fishing-game" : ""} ${isLogicGame ? "is-logic-game" : ""} ${isMazeGame ? "is-maze-game" : ""} ${isMemoryGame ? "is-memory-game" : ""} ${isRacingGame ? "is-racing-game" : ""} ${isSortingGame ? "is-sorting-game" : ""} ${isTreasureHunt ? "is-treasure-hunt" : ""}`}
+      className={`assessment-root game-runtime-player fixed inset-0 z-[9999] flex h-[100dvh] min-h-[100dvh] w-screen flex-col overflow-hidden bg-gradient-to-br from-[#071633] via-[#123b5a] to-[#007f70] text-white ${isAdventure ? "is-adventure-game" : ""} ${isBoardGame ? "is-board-game" : ""} ${isBuildingGame ? "is-building-game" : ""} ${isDragDropGame ? "is-drag-drop-game" : ""} ${isFishingGame ? "is-fishing-game" : ""} ${isLogicGame ? "is-logic-game" : ""} ${isMazeGame ? "is-maze-game" : ""} ${isMemoryGame ? "is-memory-game" : ""} ${isRacingGame ? "is-racing-game" : ""} ${isSortingGame ? "is-sorting-game" : ""} ${isTreasureHunt ? "is-treasure-hunt" : ""}`}
     >
+      {securityPhase === "ASSESSMENT_ACTIVE" && (
+        <div className="pointer-events-none absolute right-4 top-2 z-40 rounded-full border border-emerald-300/40 bg-slate-950/75 px-3 py-1.5 text-[10px] font-black text-emerald-200 shadow-lg backdrop-blur-sm">
+          <span className="mr-1.5 text-emerald-400">●</span> Screen Recording
+          Active
+        </div>
+      )}
+      {screenShareError && showGameIntro && (
+        <div
+          role="alert"
+          className="absolute inset-x-4 bottom-4 z-40 mx-auto max-w-2xl rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-center text-xs font-bold leading-5 text-amber-900 shadow-2xl"
+        >
+          {screenShareError}
+        </div>
+      )}
       {!isFollowTheLights &&
         !isBallStack &&
         !isSoundDetective &&
@@ -1024,9 +1070,21 @@ export function GameRuntimePlayer({
               }
             />
           ) : isMemoryVault ? (
-            <MemoryVaultGame disabled={!isPracticeMode&&state.status!=="RUNNING"} remainingSeconds={seconds} practiceOnly={isPracticeMode} attemptSeed={Number(state.attemptNumber||state.id?.length||1)} onComplete={(metrics)=>action("MEMORY_VAULT_COMPLETE",metrics)}/>
+            <MemoryVaultGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              attemptSeed={Number(state.attemptNumber || state.id?.length || 1)}
+              onComplete={(metrics) => action("MEMORY_VAULT_COMPLETE", metrics)}
+            />
           ) : isQuickSwitch ? (
-            <QuickSwitchGame disabled={!isPracticeMode&&state.status!=="RUNNING"} remainingSeconds={seconds} practiceOnly={isPracticeMode} attemptSeed={Number(state.attemptNumber||state.id?.length||1)} onComplete={(metrics)=>action("QUICK_SWITCH_COMPLETE",metrics)}/>
+            <QuickSwitchGame
+              disabled={!isPracticeMode && state.status !== "RUNNING"}
+              remainingSeconds={seconds}
+              practiceOnly={isPracticeMode}
+              attemptSeed={Number(state.attemptNumber || state.id?.length || 1)}
+              onComplete={(metrics) => action("QUICK_SWITCH_COMPLETE", metrics)}
+            />
           ) : isMemoryMarket ? (
             <MemoryMarketGame
               disabled={!isPracticeMode && state.status !== "RUNNING"}
@@ -1508,40 +1566,38 @@ export function GameRuntimePlayer({
           </section>
         </div>
       )}
-      {secureMode &&
-        fullscreenRequired &&
-        (state.status === "READY" || introVisible) && (
-          <div className="absolute inset-0 z-[60] grid place-items-center bg-slate-950/95 p-4 backdrop-blur-md">
-            <section
-              role="alertdialog"
-              aria-modal="true"
-              aria-label="Fullscreen required"
-              className="w-full max-w-md rounded-3xl border border-cyan-300/30 bg-white p-6 text-center shadow-2xl sm:p-8"
+      {fullscreenRequired && state.status !== "COMPLETED" && (
+        <div className="absolute inset-0 z-[60] grid place-items-center bg-slate-950/95 p-4 backdrop-blur-md">
+          <section
+            role="alertdialog"
+            aria-modal="true"
+            aria-label="Fullscreen required"
+            className="w-full max-w-md rounded-3xl border border-cyan-300/30 bg-white p-6 text-center shadow-2xl sm:p-8"
+          >
+            <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#007f70] text-white">
+              <Maximize2 className="h-8 w-8" />
+            </div>
+            <h2 className="mt-5 text-xl font-black text-[#071633]">
+              Fullscreen is required
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              This is a secure assessment. You cannot begin until the game is in
+              fullscreen mode.
+            </p>
+            <button
+              type="button"
+              onClick={() => void startGame()}
+              className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#007f70] px-4 py-3 text-sm font-black text-white"
             >
-              <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#007f70] text-white">
-                <Maximize2 className="h-8 w-8" />
-              </div>
-              <h2 className="mt-5 text-xl font-black text-[#071633]">
-                Fullscreen is required
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                This is a secure assessment. You cannot begin until the game is
-                in fullscreen mode.
-              </p>
-              <button
-                type="button"
-                onClick={() => void startGame()}
-                className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#007f70] px-4 py-3 text-sm font-black text-white"
-              >
-                <Maximize2 className="h-4 w-4" /> Enter fullscreen and begin
-              </button>
-              <p className="mt-4 text-[10px] font-bold text-slate-500">
-                Switching tabs or exiting fullscreen during the assessment is
-                recorded.
-              </p>
-            </section>
-          </div>
-        )}
+              <Maximize2 className="h-4 w-4" /> Enter fullscreen and begin
+            </button>
+            <p className="mt-4 text-[10px] font-bold text-slate-500">
+              Switching tabs or exiting fullscreen during the assessment is
+              recorded.
+            </p>
+          </section>
+        </div>
+      )}
       {assessmentCompleted && (
         <div className="absolute inset-0 z-[100] grid place-items-center bg-[#041728]/90 p-5 backdrop-blur-md">
           <section className="w-full max-w-md rounded-3xl border border-emerald-300/40 bg-white p-8 text-center shadow-2xl">
@@ -2076,12 +2132,21 @@ function AssessmentTutorialIntro({
     preview.engine?.engineKey || tutorial.engineKey || "QUIZ_CHALLENGE",
     gameName,
   );
+  const conciseGameName = gameName.split("—")[0].trim();
   const steps: string[] = instructionCopy.steps;
   const [showMockGame, setShowMockGame] = useState(false);
+  useEffect(() => {
+    if (!showMockGame) return;
+    const cancelMockGame = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowMockGame(false);
+    };
+    window.addEventListener("keydown", cancelMockGame);
+    return () => window.removeEventListener("keydown", cancelMockGame);
+  }, [showMockGame]);
   return (
     <div className="h-full w-full overflow-y-auto bg-gradient-to-br from-[#071633] via-[#0b4960] to-[#008f80]">
-      <section className="grid min-h-full w-full lg:grid-cols-[1.05fr_.95fr]">
-        <div className="flex flex-col justify-start p-6 pt-10 sm:p-10 sm:pt-12 lg:p-14 lg:pt-16">
+      <section className="grid min-h-full w-full lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,1.22fr)_minmax(300px,.78fr)]">
+        <div className="flex min-w-0 flex-col justify-start overflow-y-auto p-4 sm:p-5 lg:p-6">
           <p
             className="keep-white text-xs font-black uppercase tracking-[.22em] !text-cyan-200"
             style={{ color: "#a5f3fc" }}
@@ -2089,24 +2154,24 @@ function AssessmentTutorialIntro({
             Before you begin · Read the instructions
           </p>
           <h1
-            className="keep-white mt-3 text-3xl font-black leading-tight !text-white sm:text-5xl"
+            className="keep-white mt-1 max-w-3xl text-2xl font-black leading-tight !text-white sm:text-3xl"
             style={{ color: "#ffffff" }}
           >
-            {tutorial.tutorialTitle || `How to play ${gameName}`}
+            {`How to play ${conciseGameName}`}
           </h1>
           <p
-            className="keep-white mt-4 max-w-3xl text-base font-medium leading-7 !text-white sm:text-lg"
+            className="keep-white mt-2 max-w-3xl text-xs font-medium leading-5 !text-white sm:text-sm"
             style={{ color: "#ffffff" }}
           >
             {instructionCopy.tutorialDescription}
           </p>
-          <ol className="mt-7 grid gap-3 sm:grid-cols-2">
+          <ol className="mt-3 grid gap-2 sm:grid-cols-2">
             {steps.map((step, index) => (
               <li
                 key={`${index}-${step}`}
-                className="flex min-h-20 items-center gap-3 rounded-xl border border-white/25 bg-white/10 p-4 text-sm font-semibold leading-6 shadow-sm"
+                className="flex min-h-12 items-center gap-2 rounded-xl border border-white/25 bg-white/10 p-2.5 text-xs font-semibold leading-4 shadow-sm"
               >
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-cyan-200 font-black text-[#052438]">
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-cyan-200 text-xs font-black text-[#052438]">
                   {index + 1}
                 </span>
                 <span
@@ -2118,9 +2183,9 @@ function AssessmentTutorialIntro({
               </li>
             ))}
           </ol>
-          <div className="mt-6 rounded-2xl border border-cyan-200/35 bg-cyan-300/10 p-4 shadow-lg shadow-black/15">
+          <div className="mt-3 rounded-2xl border border-cyan-200/35 bg-cyan-300/10 p-3 shadow-lg shadow-black/15">
             <div className="flex items-start gap-3">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cyan-200 text-[#052438]">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cyan-200 text-[#052438]">
                 <Play className="h-5 w-5" />
               </div>
               <div>
@@ -2131,13 +2196,13 @@ function AssessmentTutorialIntro({
                   Mock game · Optional practice
                 </p>
                 <h2
-                  className="keep-white mt-1 text-lg font-black !text-white"
+                  className="keep-white mt-0.5 text-base font-black !text-white"
                   style={{ color: "#ffffff" }}
                 >
                   Practice the controls first
                 </h2>
                 <p
-                  className="keep-white mt-1 text-xs font-semibold leading-5 !text-white"
+                  className="keep-white mt-0.5 text-[11px] font-semibold leading-4 !text-white"
                   style={{ color: "#ffffff" }}
                 >
                   Safe demo only—no timer, score, or submission.
@@ -2147,15 +2212,15 @@ function AssessmentTutorialIntro({
             <button
               type="button"
               onClick={() => setShowMockGame(true)}
-              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-cyan-100 bg-cyan-200 px-6 py-3.5 text-sm font-black text-[#052438] shadow-lg transition hover:bg-cyan-100 focus:outline-none focus:ring-4 focus:ring-cyan-200/40"
+              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-cyan-100 bg-cyan-200 px-5 py-2.5 text-xs font-black text-[#052438] shadow-lg transition hover:bg-cyan-100 focus:outline-none focus:ring-4 focus:ring-cyan-200/40"
             >
               <Play className="h-4 w-4" /> Open Mock Game
             </button>
           </div>
         </div>
-        <div className="flex min-h-[45vh] items-center justify-center border-t border-white/10 bg-black/20 p-6 sm:p-10 lg:min-h-full lg:border-l lg:border-t-0">
-          <section className="w-full max-w-lg rounded-[2rem] border border-white/20 bg-[#071f35]/90 p-7 text-center shadow-2xl sm:p-10">
-            <div className="mx-auto grid h-20 w-20 place-items-center rounded-3xl border border-amber-200/50 bg-amber-300/15 text-4xl">
+        <div className="flex min-h-[320px] items-center justify-center border-t border-white/10 bg-black/20 p-4 lg:min-h-0 lg:border-l lg:border-t-0 lg:p-5">
+          <section className="w-full max-w-sm rounded-3xl border border-white/20 bg-[#071f35]/90 p-5 text-center shadow-2xl">
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl border border-amber-200/50 bg-amber-300/15 text-2xl">
               {instructionCopy.icon}
             </div>
             <p
@@ -2165,28 +2230,28 @@ function AssessmentTutorialIntro({
               Real assessment · Scored
             </p>
             <h2
-              className="keep-white mt-2 text-2xl font-black !text-white sm:text-3xl"
+              className="keep-white mt-1 text-lg font-black !text-white sm:text-xl"
               style={{ color: "#ffffff" }}
             >
               Begin your real attempt
             </h2>
             <p
-              className="keep-white mx-auto mt-3 max-w-sm text-sm leading-6 !text-white"
+              className="keep-white mx-auto mt-2 max-w-sm text-xs leading-5 !text-white"
               style={{ color: "#ffffff" }}
             >
               Continue only when you are ready. Your timer starts and every
               answer is recorded.
             </p>
-            <div className="mt-5 flex items-center justify-center gap-2 rounded-xl border border-amber-300/45 bg-amber-300/10 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-amber-100">
+            <div className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-amber-300/45 bg-amber-300/10 px-3 py-2 text-[9px] font-black uppercase tracking-wider text-amber-100">
               <Shield className="h-3.5 w-3.5" /> Timed · Scored · Answers
               submitted
             </div>
             <button
               type="button"
               onClick={onStart}
-              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-amber-100 bg-amber-300 px-6 py-3.5 text-sm font-black text-[#302006] shadow-lg shadow-amber-950/30 transition hover:-translate-y-0.5 hover:bg-amber-200 focus:outline-none focus:ring-4 focus:ring-amber-200/40"
+              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-amber-100 bg-amber-300 px-5 py-2.5 text-xs font-black text-[#302006] shadow-lg shadow-amber-950/30 transition hover:-translate-y-0.5 hover:bg-amber-200 focus:outline-none focus:ring-4 focus:ring-amber-200/40 disabled:cursor-not-allowed disabled:border-white/20 disabled:bg-white/10 disabled:text-white/55 disabled:shadow-none"
             >
-              <Play className="h-4 w-4" /> Begin Real Assessment
+              <Play className="h-4 w-4" /> Start Assessment
             </button>
           </section>
         </div>
@@ -2211,15 +2276,19 @@ function AssessmentTutorialIntro({
             <button
               type="button"
               onClick={() => setShowMockGame(false)}
+              aria-label="Cancel mock game"
               className="inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-4 py-2 text-xs font-black !text-white"
               style={{ color: "#ffffff" }}
             >
-              <X className="h-4 w-4" /> Back to instructions
+              <X className="h-4 w-4" /> Cancel Mock Game
             </button>
           </div>
-          <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3 sm:p-5">
-            <div className="h-full w-full max-w-[1280px]">
-              <ActualGameTutorialDemo preview={preview} />
+          <div className="flex min-h-0 flex-1 items-stretch justify-stretch overflow-hidden">
+            <div className="h-full w-full">
+              <ActualGameTutorialDemo
+                preview={preview}
+                onCancel={() => setShowMockGame(false)}
+              />
             </div>
           </div>
         </div>
@@ -2228,7 +2297,15 @@ function AssessmentTutorialIntro({
   );
 }
 
-function ActualGameTutorialDemo({ preview }: { preview: any }) {
+function ActualGameTutorialDemo({
+  preview,
+  onPracticeComplete,
+  onCancel,
+}: {
+  preview: any;
+  onPracticeComplete?: () => void;
+  onCancel: () => void;
+}) {
   const engineKey = preview.engine?.engineKey || "QUIZ_CHALLENGE";
   const [mockRound, setMockRound] = useState(0);
   const [mockAttempt, setMockAttempt] = useState(1);
@@ -2236,6 +2313,7 @@ function ActualGameTutorialDemo({ preview }: { preview: any }) {
   const advanceMock = () =>
     setMockRound((value) => {
       setMockComplete(true);
+      onPracticeComplete?.();
       return value;
     });
   const repeatMock = () => {
@@ -2285,14 +2363,41 @@ function ActualGameTutorialDemo({ preview }: { preview: any }) {
     "PARKING_ESCAPE",
     "WATER_PIPELINE",
     "PATTERN_MATRIX",
+    "NUMBER_BUILDER",
+    "BALL_SORT",
+    "RED_LIGHT_GREEN_LIGHT",
     "CATCH_THE_TARGET",
     "MENTAL_ROTATION",
     "WATER_JUGS",
     "TANGRAM_BUILDER",
     "SOKOBAN",
+    "COLOR_SHIFT",
+    "AIR_HOCKEY_CHALLENGE",
+    "MEMORY_MARKET",
+    "AIRPORT_CONTROLLER",
+    "RULE_SHIFT_CHALLENGE",
+    "MINI_GOLF_CHALLENGE",
+    "RACING_STRATEGIST",
+    "PLAYMAKER",
+    "CLIMBING_CHALLENGE",
+    "DETECTIVE_INVESTIGATION",
+    "PRECISION_ARCHERY",
+    "WAVE_RIDER",
+    "DRIFT_RACER",
+    "STEALTH_ESCAPE",
+    "MEMORY_VAULT",
+    "QUICK_SWITCH",
+    "MAGIC_TRAIN",
   ];
   if (builtInPracticeEngines.includes(engineKey)) {
-    return <BuiltInGamePractice key={mockAttempt} engineKey={engineKey} />;
+    return (
+      <BuiltInGamePractice
+        key={mockAttempt}
+        engineKey={engineKey}
+        onPracticeComplete={onPracticeComplete}
+        onCancel={onCancel}
+      />
+    );
   }
   if (!question)
     return (
@@ -2389,6 +2494,7 @@ function ActualGameTutorialDemo({ preview }: { preview: any }) {
         onChallenge={async () => undefined}
         onComplete={async () => {
           setMockComplete(true);
+          onPracticeComplete?.();
         }}
       />
     );
@@ -2469,10 +2575,21 @@ function ActualGameTutorialDemo({ preview }: { preview: any }) {
   );
 }
 
-function BuiltInGamePractice({ engineKey }: { engineKey: string }) {
+function BuiltInGamePractice({
+  engineKey,
+  onPracticeComplete,
+  onCancel,
+}: {
+  engineKey: string;
+  onPracticeComplete?: () => void;
+  onCancel: () => void;
+}) {
   const [complete, setComplete] = useState(false);
   const [attempt, setAttempt] = useState(1);
-  const finish = () => setComplete(true);
+  const finish = () => {
+    setComplete(true);
+    onPracticeComplete?.();
+  };
   let game: React.ReactNode;
 
   const mockDurationSeconds = 24 * 60 * 60;
@@ -2655,6 +2772,196 @@ function BuiltInGamePractice({ engineKey }: { engineKey: string }) {
         disabled={false}
         remainingSeconds={mockDurationSeconds}
         practiceOnly
+        onComplete={finish}
+      />
+    );
+  else if (engineKey === "NUMBER_BUILDER")
+    game = (
+      <NumberBuilderGame
+        key={attempt}
+        disabled={false}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        onComplete={finish}
+      />
+    );
+  else if (engineKey === "COLOR_SHIFT")
+    game = (
+      <ColorShiftGame
+        key={attempt}
+        disabled={false}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        onComplete={finish}
+      />
+    );
+  else if (engineKey === "AIR_HOCKEY_CHALLENGE")
+    game = (
+      <AirHockeyChallengeGame
+        key={attempt}
+        disabled={false}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        onComplete={finish}
+      />
+    );
+  else if (engineKey === "MEMORY_MARKET")
+    game = (
+      <MemoryMarketGame
+        key={attempt}
+        disabled={false}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        onComplete={finish}
+      />
+    );
+  else if (engineKey === "AIRPORT_CONTROLLER")
+    game = (
+      <AirportControllerGame
+        key={attempt}
+        disabled={false}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        onComplete={finish}
+      />
+    );
+  else if (engineKey === "RULE_SHIFT_CHALLENGE")
+    game = (
+      <RuleShiftChallengeGame
+        key={attempt}
+        disabled={false}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        onComplete={finish}
+      />
+    );
+  else if (engineKey === "MINI_GOLF_CHALLENGE")
+    game = (
+      <MiniGolfGame
+        key={attempt}
+        disabled={false}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        onComplete={finish}
+      />
+    );
+  else if (engineKey === "RACING_STRATEGIST")
+    game = (
+      <RacingStrategistGame
+        key={attempt}
+        disabled={false}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        onComplete={finish}
+        onBack={onCancel}
+      />
+    );
+  else if (engineKey === "PLAYMAKER")
+    game = (
+      <PlaymakerGame
+        key={attempt}
+        disabled={false}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        onComplete={finish}
+        onBack={onCancel}
+      />
+    );
+  else if (engineKey === "CLIMBING_CHALLENGE")
+    game = (
+      <ClimbingChallengeGame
+        key={attempt}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        onComplete={finish}
+      />
+    );
+  else if (engineKey === "DETECTIVE_INVESTIGATION")
+    game = (
+      <DetectiveInvestigationGame
+        key={attempt}
+        disabled={false}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        onComplete={finish}
+        onBack={onCancel}
+      />
+    );
+  else if (engineKey === "PRECISION_ARCHERY")
+    game = (
+      <PrecisionArcheryGame
+        key={attempt}
+        disabled={false}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        onComplete={finish}
+        onBack={onCancel}
+      />
+    );
+  else if (engineKey === "WAVE_RIDER")
+    game = (
+      <WaveRiderGame
+        key={attempt}
+        disabled={false}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        sound
+        attemptSeed={attempt}
+        onComplete={finish}
+      />
+    );
+  else if (engineKey === "DRIFT_RACER")
+    game = (
+      <DriftRacerGame
+        key={attempt}
+        disabled={false}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        sound
+        attemptSeed={attempt}
+        onComplete={finish}
+      />
+    );
+  else if (engineKey === "STEALTH_ESCAPE")
+    game = (
+      <StealthEscapeGame
+        key={attempt}
+        disabled={false}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        attemptSeed={attempt}
+        onComplete={finish}
+      />
+    );
+  else if (engineKey === "MEMORY_VAULT")
+    game = (
+      <MemoryVaultGame
+        key={attempt}
+        disabled={false}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        attemptSeed={attempt}
+        onComplete={finish}
+      />
+    );
+  else if (engineKey === "QUICK_SWITCH")
+    game = (
+      <QuickSwitchGame
+        key={attempt}
+        disabled={false}
+        remainingSeconds={mockDurationSeconds}
+        practiceOnly
+        attemptSeed={attempt}
+        onComplete={finish}
+      />
+    );
+  else if (engineKey === "MAGIC_TRAIN")
+    game = (
+      <MagicTrainGame
+        key={attempt}
+        disabled={false}
+        sound
+        durationSeconds={mockDurationSeconds}
         onComplete={finish}
       />
     );

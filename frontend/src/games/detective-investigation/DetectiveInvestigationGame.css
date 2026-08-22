@@ -9,7 +9,8 @@
 }
 .detective-hud {
   height: 70px;
-  max-width: 800px;
+  width: 100%;
+  max-width: none;
   margin: auto;
   display: flex;
   align-items: center;
@@ -49,7 +50,7 @@
 }
 .detective-stage {
   position: relative;
-  width: min(800px, 100%);
+  width: 100%;
   height: calc(100% - 70px);
   min-height: 550px;
   margin: auto;

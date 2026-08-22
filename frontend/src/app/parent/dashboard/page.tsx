@@ -28,7 +28,6 @@ import {
   Play,
   RotateCcw
 } from "lucide-react";
-import { GameRuntimePlayer } from "@/components/game-runtime-player";
 
 declare global {
   interface Window {
@@ -355,6 +354,7 @@ export default function ParentDashboard() {
   };
 
   const openGameTutorial = async (assignment: any, continueSequence = false) => {
+    const isResume = assignment.result?.status === "IN_PROGRESS";
     setGameBusy(assignment.id);
     setGameError(null);
     try {
@@ -362,9 +362,6 @@ export default function ParentDashboard() {
         const deadline = Date.now() + 10 * 60 * 1000;
         sequenceDeadlineRef.current = deadline;
         setGameSequenceDeadline(deadline);
-      }
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen?.().catch(() => undefined);
       }
       const tutorial = await parentGameRequest(`game-assessments/parent/games/${assignment.id}/tutorial`, {
         method: "POST",
@@ -374,7 +371,7 @@ export default function ParentDashboard() {
         method: "POST",
         body: JSON.stringify({ childId: assignment.child.id, tutorialViewed: true }),
       });
-      const session = await parentGameRequest(`game-assessments/parent/games/${assignment.id}/start`, {
+      let session = await parentGameRequest(`game-assessments/parent/games/${assignment.id}/start`, {
         method: "POST",
         body: JSON.stringify({ childId: assignment.child.id }),
       });
@@ -385,6 +382,18 @@ export default function ParentDashboard() {
           await document.exitFullscreen().catch(() => undefined);
         }
         return;
+      }
+      if (isResume && ["READY", "PAUSED"].includes(session.status)) {
+        const resumed = await parentGameRequest(
+          `game-assessments/engine/sessions/${session.id}/action`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              action: session.status === "PAUSED" ? "RESUME" : "START",
+            }),
+          },
+        );
+        session = resumed.state || resumed;
       }
       setActiveGameAssignment(assignment);
       setRuntimeTutorial(tutorial);
@@ -433,6 +442,18 @@ export default function ParentDashboard() {
       }
     } catch (gameRequestError) {
       setGameError(gameRequestError instanceof Error ? gameRequestError.message : "The game result could not be saved.");
+    }
+  };
+
+  const cancelAssignedGame = () => {
+    setGameRuntime(null);
+    setRuntimeTutorial(null);
+    setActiveGameAssignment(null);
+    sequenceDeadlineRef.current = null;
+    setGameSequenceDeadline(null);
+    setGameError(null);
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => undefined);
     }
   };
 
@@ -805,9 +826,9 @@ export default function ParentDashboard() {
       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px] font-semibold text-[#71818d]">{assignment.sequence?.total > 1 && <span className="font-black uppercase tracking-wider text-[#8a9aa5]">{assignment.child.studentFirstName}&apos;s Game {assignment.sequence.position} of {assignment.sequence.total}</span>}<span>{assignment.child.studentFirstName} {assignment.child.studentLastName} · {assignment.child.grade}</span></div>
       <p className="mt-1.5 line-clamp-1 text-[9px] text-[#71818d]">{assignment.generatedGame?.template?.category?.name || "Learning game"} · {assignment.attemptsUsed || 0} of {assignment.totalPossibleAttempts || 1} attempts used · Pass {assignment.passingScore}%</p>
       {completed && <div className="mt-3 border-t border-[#dceae6] pt-3">{reviewComplete ? <><div className="flex flex-wrap items-center gap-3"><span className="text-xl font-black text-[#071633]">{scoreAvailable ? `${Math.round(Number(assignment.result.percentage))}%` : "Score pending"}</span><span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-[#08775f]"><CheckCircle className="h-3.5 w-3.5" />{assignment.result.reviewStatus === "NEEDS_FOLLOW_UP" ? "Needs follow-up" : "Reviewed"}</span></div><p className="mt-2 text-[10px] text-[#526474]"><b>School review:</b> {assignment.result.schoolReview || "No additional comments."}</p><button type="button" onClick={() => setSelectedGameReview(assignment)} className="mt-2 inline-flex items-center gap-1 text-[10px] font-extrabold text-[#007f70]">View review <ArrowRight className="h-3 w-3" /></button></> : <div className="flex flex-wrap items-center gap-2"><span className="text-sm font-black text-[#607080]">Score pending</span>{finallySubmitted ? <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-[#71818d]"><Clock3 className="h-3.5 w-3.5" />Submitted for review</span> : <span className="text-[10px] font-extrabold text-amber-700">{regularGame ? "Ready for group submission" : "Choose submit or retake"}</span>}</div>}</div>}
-      {!completed && assignment.availability?.available && <button type="button" disabled={gameBusy === assignment.id} onClick={() => void openGameTutorial(assignment)} className="keep-white mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#007f70] px-3 py-2 text-[10px] font-extrabold text-white"><Play className="keep-white h-3.5 w-3.5" />{assignment.result?.status === "IN_PROGRESS" ? "Resume game" : "Start game"}</button>}
+      {!completed && assignment.availability?.available && <button type="button" disabled={gameBusy === assignment.id} onClick={() => router.push(`/game-assessment/${assignment.id}?role=parent&childId=${assignment.child.id}`)} className="keep-white mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#007f70] px-3 py-2 text-[10px] font-extrabold text-white"><Play className="keep-white h-3.5 w-3.5" />{assignment.result?.status === "IN_PROGRESS" ? "Open Game to Resume" : "Open Game"}</button>}
       {completed && <p className={`mt-3 rounded-lg px-3 py-2 text-[10px] font-extrabold ${canRetake ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{canRetake ? `${assignment.remainingReassessments} reassessment${assignment.remainingReassessments === 1 ? "" : "s"} remaining` : "No reassessments remaining."}</p>}
-      {completed && (canRetake || (!finallySubmitted && !regularGame)) && <div className={`mt-3 grid gap-2 ${canRetake && !finallySubmitted && !regularGame ? "sm:grid-cols-2" : ""}`}>{canRetake && <button type="button" disabled={gameBusy === assignment.id} onClick={() => void openGameTutorial(assignment)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#8fc9bd] bg-white px-3 py-2 text-[10px] font-extrabold text-[#007f70] disabled:opacity-50"><RotateCcw className="h-3.5 w-3.5" />Retake assessment</button>}{!finallySubmitted && !regularGame && <button type="button" disabled={gameBusy === assignment.id} onClick={() => void finalizeAssignedAssessment(assignment)} className="keep-white inline-flex items-center justify-center gap-2 rounded-lg bg-[#007f70] px-3 py-2 text-[10px] font-extrabold text-white disabled:opacity-50"><Send className="keep-white h-3.5 w-3.5" />Submit assessment</button>}</div>}
+      {completed && (canRetake || (!finallySubmitted && !regularGame)) && <div className={`mt-3 grid gap-2 ${canRetake && !finallySubmitted && !regularGame ? "sm:grid-cols-2" : ""}`}>{canRetake && <button type="button" disabled={gameBusy === assignment.id} onClick={() => router.push(`/game-assessment/${assignment.id}?role=parent&childId=${assignment.child.id}`)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#8fc9bd] bg-white px-3 py-2 text-[10px] font-extrabold text-[#007f70] disabled:opacity-50"><RotateCcw className="h-3.5 w-3.5" />Retake assessment</button>}{!finallySubmitted && !regularGame && <button type="button" disabled={gameBusy === assignment.id} onClick={() => void finalizeAssignedAssessment(assignment)} className="keep-white inline-flex items-center justify-center gap-2 rounded-lg bg-[#007f70] px-3 py-2 text-[10px] font-extrabold text-white disabled:opacity-50"><Send className="keep-white h-3.5 w-3.5" />Submit assessment</button>}</div>}
     </article>;
   };
 
@@ -942,12 +963,12 @@ export default function ParentDashboard() {
                   {completed && <p className={`mt-3 rounded-lg px-3 py-2 text-[10px] font-extrabold ${canRetake ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{canRetake ? `${assignment.remainingReassessments} reassessment${assignment.remainingReassessments === 1 ? "" : "s"} remaining` : "No reassessments remaining."}</p>}
                   {!completed && (assignment.availability?.sequenceLocked ? <p className="mt-2.5 rounded-lg bg-slate-100 px-3 py-2 text-[9px] font-extrabold text-slate-600">🔒 Complete {selectedGameChild ? "" : `${assignment.child.studentFirstName}'s `}game {Math.max(1, Number(assignment.sequence?.position || 1) - 1)} first</p> : assignment.availability?.reason === "Maximum attempts reached." ? <p className="mt-2.5 text-[9px] font-extrabold text-rose-700">Maximum attempts reached</p> : <p className="mt-2.5 text-[9px] font-extrabold text-[#007f70]">{assignment.result?.status === "IN_PROGRESS" ? "Continue the current game" : "Ready for the student to play"}</p>)}
                   {!completed && assignment.availability?.available && <div className="mt-3 flex gap-2">
-                    <button type="button" disabled={gameBusy === assignment.id} onClick={() => void openGameTutorial(assignment)} className="keep-white inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#007f70] px-3 py-2 text-[10px] font-extrabold text-white hover:bg-[#006b5e] disabled:opacity-50">
+                    <button type="button" disabled={gameBusy === assignment.id} onClick={() => router.push(`/game-assessment/${assignment.id}?role=parent&childId=${assignment.child.id}`)} className="keep-white inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#007f70] px-3 py-2 text-[10px] font-extrabold text-white hover:bg-[#006b5e] disabled:opacity-50">
                       {gameBusy === assignment.id ? <Loader2 className="keep-white h-4 w-4 animate-spin" /> : <Play className="keep-white h-4 w-4" />}
                       {assignment.result?.status === "IN_PROGRESS" ? "Resume game" : "Start game"}
                     </button>
                   </div>}
-                  {completed && (canRetake || !finallySubmitted) && <div className={`mt-4 grid gap-2 ${canRetake && !finallySubmitted ? "sm:grid-cols-2" : ""}`}>{canRetake && <button type="button" disabled={gameBusy === assignment.id} onClick={() => void openGameTutorial(assignment)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#8fc9bd] bg-white px-3 py-2.5 text-[10px] font-extrabold text-[#007f70] disabled:opacity-50"><RotateCcw className="h-4 w-4" />Retake assessment</button>}{!finallySubmitted && <button type="button" disabled={gameBusy === assignment.id} onClick={() => void finalizeAssignedAssessment(assignment)} className="keep-white inline-flex items-center justify-center gap-2 rounded-xl bg-[#007f70] px-3 py-2.5 text-[10px] font-extrabold text-white disabled:opacity-50"><Send className="keep-white h-4 w-4" />Submit assessment</button>}</div>}
+                  {completed && (canRetake || !finallySubmitted) && <div className={`mt-4 grid gap-2 ${canRetake && !finallySubmitted ? "sm:grid-cols-2" : ""}`}>{canRetake && <button type="button" disabled={gameBusy === assignment.id} onClick={() => router.push(`/game-assessment/${assignment.id}?role=parent&childId=${assignment.child.id}`)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#8fc9bd] bg-white px-3 py-2.5 text-[10px] font-extrabold text-[#007f70] disabled:opacity-50"><RotateCcw className="h-4 w-4" />Retake assessment</button>}{!finallySubmitted && <button type="button" disabled={gameBusy === assignment.id} onClick={() => void finalizeAssignedAssessment(assignment)} className="keep-white inline-flex items-center justify-center gap-2 rounded-xl bg-[#007f70] px-3 py-2.5 text-[10px] font-extrabold text-white disabled:opacity-50"><Send className="keep-white h-4 w-4" />Submit assessment</button>}</div>}
                 </article>
               )})}
             </div>
@@ -1192,8 +1213,6 @@ export default function ParentDashboard() {
           ))}
         </div>
       </div>
-
-      {gameRuntime && <GameRuntimePlayer initial={gameRuntime} tutorial={runtimeTutorial} request={parentGameRequest} onClose={(session) => void completeAssignedGame(session)} onComplete={completeAssignedGame} secureMode sequenceDeadline={gameSequenceDeadline} />}
 
       {demoPayment && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#071633]/70 p-4 backdrop-blur-sm">

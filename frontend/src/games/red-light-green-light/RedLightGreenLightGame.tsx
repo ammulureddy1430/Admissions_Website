@@ -85,10 +85,13 @@ class SoundSynth {
 // Green/Red durations are longer and more predictable at Level 1, and shorter/unpredictable at Level 4
 const LEVEL_TIMINGS = [
   { greenMin: 3500, greenMax: 5000, redMin: 2500, redMax: 3500 }, // Level 1
-  { greenMin: 2500, greenMax: 4000, redMin: 2000, redMax: 3000 }, // Level 2
+  { greenMin: 1700, greenMax: 3200, redMin: 1200, redMax: 2300 }, // Round 2: faster and less predictable
   { greenMin: 2000, greenMax: 3000, redMin: 1500, redMax: 2500 }, // Level 3
   { greenMin: 1200, greenMax: 2500, redMin: 1200, redMax: 2000 }, // Level 4
 ];
+const TOTAL_LEVELS = 2;
+const FINISH_PROGRESS = 98;
+const FINISH_CROSSING_DELAY_MS = 350;
 
 export default function RedLightGreenLightGame({
   disabled = false,
@@ -131,8 +134,11 @@ export default function RedLightGreenLightGame({
   const startedOnThisGreen = useRef(false);
   const violatedThisRed = useRef(false);
   const pressingRef = useRef(false);
+  const lightStateRef = useRef<"GREEN" | "RED">("GREEN");
+  const roundTransitionRef = useRef(false);
+  const roundTransitionTimerRef = useRef<number | null>(null);
 
-  const overallProgress = Math.min(100, Math.round((((level - 1) + characterProgress / 85) / 4) * 100));
+  const overallProgress = Math.min(100, Math.round((((level - 1) + characterProgress / FINISH_PROGRESS) / TOTAL_LEVELS) * 100));
 
   // Sound and analytics instance init
   useEffect(() => {
@@ -140,11 +146,18 @@ export default function RedLightGreenLightGame({
     analytics.current = new RedLightGreenLightAnalyticsService(onComplete);
   }, [sound, onComplete]);
 
+  useEffect(() => () => {
+    if (roundTransitionTimerRef.current !== null) {
+      window.clearTimeout(roundTransitionTimerRef.current);
+    }
+  }, []);
+
   // General finish routine
   const finish = useCallback(
     async (status: RawRedLightGreenLightMetrics["completionStatus"]) => {
       if (finished.current) return;
       finished.current = true;
+      pressingRef.current = false;
       setIsPressing(false);
 
       const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
@@ -190,6 +203,8 @@ export default function RedLightGreenLightGame({
   // Start game handler
   const handleStart = () => {
     startedAt.current = Date.now();
+    pressingRef.current = false;
+    setIsPressing(false);
     setStarted(true);
     lightStateChangedAt.current = Date.now();
     greenLightEvents.current = 1;
@@ -208,6 +223,7 @@ export default function RedLightGreenLightGame({
 
     const timer = window.setTimeout(() => {
       const nextState = lightState === "GREEN" ? "RED" : "GREEN";
+      lightStateRef.current = nextState;
       setLightState(nextState);
       lightStateChangedAt.current = Date.now();
 
@@ -233,8 +249,9 @@ export default function RedLightGreenLightGame({
     if (!isPressing) return;
 
     const interval = window.setInterval(() => {
-      if (lightState === "GREEN") {
-        setCharacterProgress((prev) => Math.min(85, prev + 1.2));
+      if (!pressingRef.current) return;
+      if (lightStateRef.current === "GREEN") {
+        setCharacterProgress((prev) => Math.min(FINISH_PROGRESS, prev + 1.2));
       } else if (!violatedThisRed.current) {
         violatedThisRed.current = true;
         prematureMovements.current++;
@@ -244,38 +261,52 @@ export default function RedLightGreenLightGame({
     }, 80);
 
     return () => window.clearInterval(interval);
-  }, [isPressing, lightState, level, disabled, celebrating]);
+  }, [isPressing, started, disabled, celebrating]);
 
   // Level completion / win checks effect
   useEffect(() => {
-    if (characterProgress >= 85 && !celebrating && !finished.current) {
+    if (characterProgress >= FINISH_PROGRESS && !roundTransitionRef.current && !finished.current) {
+      roundTransitionRef.current = true;
       sounds.current?.playLevelUp();
-      if (level >= 4) {
-        // Final level solved
-        void finish("COMPLETED");
+      pressingRef.current = false;
+      if (level >= TOTAL_LEVELS) {
+        roundTransitionTimerRef.current = window.setTimeout(() => {
+          roundTransitionTimerRef.current = null;
+          void finish("COMPLETED");
+        }, FINISH_CROSSING_DELAY_MS);
       } else {
-        setCelebrating(true);
-        setIsPressing(false);
-        const timer = window.setTimeout(() => {
-          setCelebrating(false);
-          setCharacterProgress(0);
-          setLevel((prevLvl) => prevLvl + 1);
-        }, 1200);
-        return () => window.clearTimeout(timer);
+        roundTransitionTimerRef.current = window.setTimeout(() => {
+          setCelebrating(true);
+          setIsPressing(false);
+          roundTransitionTimerRef.current = window.setTimeout(() => {
+            setCharacterProgress(0);
+            setLevel((prevLvl) => prevLvl + 1);
+            setLightState("GREEN");
+            lightStateRef.current = "GREEN";
+            lightStateChangedAt.current = Date.now();
+            greenLightEvents.current++;
+            startedOnThisGreen.current = false;
+            violatedThisRed.current = false;
+            setFeedback("ROUND 2 — quicker lights! Hold on GREEN, freeze on RED");
+            sounds.current?.playGreen();
+            setCelebrating(false);
+            roundTransitionRef.current = false;
+            roundTransitionTimerRef.current = null;
+          }, 1200);
+        }, FINISH_CROSSING_DELAY_MS);
       }
     }
-  }, [characterProgress, level, celebrating, finish]);
+  }, [characterProgress, level, finish]);
 
   // Tap-and-Hold Button Handlers
-  const handlePressStart = (e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
+  const handlePressStart = useCallback(() => {
     if (disabled || finished.current || celebrating) return;
     
     if (pressingRef.current) return;
     pressingRef.current = true;
     setIsPressing(true);
 
-    if (lightState === "GREEN") {
+    if (lightStateRef.current === "GREEN") {
       if (!startedOnThisGreen.current) {
         startedOnThisGreen.current = true;
         correctStarts.current++;
@@ -289,42 +320,50 @@ export default function RedLightGreenLightGame({
       setMistakes(prematureMovements.current);
       setFeedback("Not yet — wait for GREEN");
     }
-  };
+  }, [disabled, celebrating]);
 
-  const handlePressEnd = () => {
+  const handlePressEnd = useCallback(() => {
     if (!pressingRef.current) return;
     pressingRef.current = false;
     setIsPressing(false);
 
-    if (lightState === "RED") {
+    if (lightStateRef.current === "RED") {
       correctStops.current++;
       // Log stop reaction latency (time since light turned red)
       const latency = Date.now() - lightStateChangedAt.current;
       redStopTimes.current.push(latency);
       if (!violatedThisRed.current) setFeedback("Perfect stop! Wait for GREEN");
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!started || result || disabled || celebrating) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.code !== "Space" || event.repeat) return;
       event.preventDefault();
-      handlePressStart(event as unknown as React.MouseEvent);
+      handlePressStart();
     };
     const onKeyUp = (event: KeyboardEvent) => {
       if (event.code !== "Space") return;
       event.preventDefault();
       handlePressEnd();
     };
+    const releaseInput = () => handlePressEnd();
+    const onVisibilityChange = () => {
+      if (document.hidden) releaseInput();
+    };
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", releaseInput);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
-      pressingRef.current = false;
+      window.removeEventListener("blur", releaseInput);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      handlePressEnd();
     };
-  }, [started, result, disabled, celebrating, lightState]);
+  }, [started, result, disabled, celebrating, handlePressStart, handlePressEnd]);
 
   // Convert timer formatting
   const formatTime = (time: number) => {
@@ -334,12 +373,12 @@ export default function RedLightGreenLightGame({
   };
 
   return (
-    <div className="rlgl-container" role="application" aria-label="Red Light, Green Light assessment">
+    <div className={`rlgl-container ${level === 2 ? "rlgl-round-two" : ""}`} role="application" aria-label="Red Light, Green Light assessment">
       {/* HUD status */}
       <div className="rlgl-hud">
         <div className="rlgl-level">
-          <span>LEVEL</span>
-          <b>{level} / 4</b>
+          <span>ROUND</span>
+          <b>{level} / {TOTAL_LEVELS}</b>
         </div>
         <div className="rlgl-level">
           <span>GAME PROGRESS</span>
@@ -365,6 +404,7 @@ export default function RedLightGreenLightGame({
         <span className={`rlgl-signal-status ${lightState.toLowerCase()}`}>
           {lightState === "GREEN" ? "🟢 WALK" : "🔴 STOP"}
         </span>
+        {level === 2 && <span className="rlgl-round-two-badge">ROUND 2 · QUICK SIGNALS</span>}
         <span className="rlgl-feedback" aria-live="polite">{feedback}</span>
       </div>
 
@@ -388,12 +428,14 @@ export default function RedLightGreenLightGame({
         <button
           type="button"
           className={`rlgl-hold-btn ${lightState === "RED" ? "danger-state" : ""}`}
-          onMouseDown={handlePressStart}
-          onMouseUp={handlePressEnd}
-          onMouseLeave={handlePressEnd}
-          onTouchStart={handlePressStart}
-          onTouchEnd={handlePressEnd}
-          onTouchCancel={handlePressEnd}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            event.currentTarget.setPointerCapture(event.pointerId);
+            handlePressStart();
+          }}
+          onPointerUp={handlePressEnd}
+          onPointerCancel={handlePressEnd}
+          onLostPointerCapture={handlePressEnd}
           disabled={!started || disabled || Boolean(result)}
           aria-label="Hold to walk on green; release to stop on red"
         >
@@ -408,7 +450,7 @@ export default function RedLightGreenLightGame({
         <div className="rlgl-intro">
           <div className="rlgl-intro-card">
             <div className="rlgl-intro-mark">🦊</div>
-            <p>{Math.ceil(durationSeconds / 60)} MIN · 4 LEVELS</p>
+            <p>{Math.ceil(durationSeconds / 60)} MIN · {TOTAL_LEVELS} ROUNDS</p>
             <h2>Red Light, Green Light</h2>
             <div className="rlgl-how-to-play">
               <div><span><Target /></span><b>1. Watch</b><small>Look at the traffic light.</small></div>
@@ -426,17 +468,26 @@ export default function RedLightGreenLightGame({
       {/* Celebration Level-Up Overlay */}
       {celebrating && (
         <div className="rlgl-celebration">
-          <span>🌟 Level Complete! 🌟</span>
+          <span>🌟 Round Complete! 🌟</span>
         </div>
       )}
 
       {/* Final results summary screen */}
-      {result && (
+      {result?.completionStatus === "COMPLETED" && (
         <div className="rlgl-finish">
           <div>
             <span>🏁</span>
             <h2>Well Done!</h2>
-            <p>You completed level {result.difficultyReached} of the self-regulation challenge!</p>
+            <p>You crossed the finish line in round {result.difficultyReached}!</p>
+          </div>
+        </div>
+      )}
+      {result?.completionStatus === "TIMEOUT" && (
+        <div className="rlgl-finish">
+          <div>
+            <span>⏱️</span>
+            <h2>Time&apos;s Up</h2>
+            <p>Reach the finish line in round {TOTAL_LEVELS} to complete the game.</p>
           </div>
         </div>
       )}

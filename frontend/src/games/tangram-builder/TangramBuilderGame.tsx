@@ -12,7 +12,12 @@ import {
   slotFor,
 } from "./TangramEngine";
 import { scoreTangram } from "./ScoringEngine";
-import type { TangramAttempt, TangramMetrics, TangramPieceState } from "./Types";
+import type {
+  TangramAttempt,
+  TangramLevel,
+  TangramMetrics,
+  TangramPieceState,
+} from "./Types";
 import "./TangramBuilderGame.css";
 
 type Props = {
@@ -31,6 +36,12 @@ type DragState = {
   startY: number;
   wasPlaced: boolean;
 };
+
+const createPlayablePieces = (level: TangramLevel, practiceOnly: boolean) =>
+  createPieces(level).map((piece) => ({
+    ...piece,
+    y: practiceOnly ? Math.min(piece.y, 67) : piece.y,
+  }));
 
 function PieceShape({ piece, silhouette = false }: { piece: TangramPieceState; silhouette?: boolean }) {
   return (
@@ -63,7 +74,9 @@ export default function TangramBuilderGame({
           : level.pieces.length === 6
             ? 3.3
             : 3;
-  const [pieces, setPieces] = useState(() => createPieces(level));
+  const [pieces, setPieces] = useState(() =>
+    createPlayablePieces(level, practiceOnly),
+  );
   const [selected, setSelected] = useState<string | null>(null);
   const [transitioning, setTransitioning] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -128,12 +141,12 @@ export default function TangramBuilderGame({
       }
       const nextIndex = levelIndex + 1;
       setLevelIndex(nextIndex);
-      setPieces(createPieces(TANGRAM_LEVELS[nextIndex]));
+      setPieces(createPlayablePieces(TANGRAM_LEVELS[nextIndex], practiceOnly));
       setSelected(null);
       levelStarted.current = performance.now();
       setTransitioning(false);
     }, 550);
-  }, [attemptFrom, finish, levelIndex]);
+  }, [attemptFrom, finish, levelIndex, practiceOnly]);
 
   const rotate = (amount: number) => {
     if (!selected || disabled || transitioning || finished.current) return;
@@ -193,7 +206,7 @@ export default function TangramBuilderGame({
 
   const reset = () => {
     if (disabled || transitioning || finished.current) return;
-    setPieces((current) => createPieces(level).map((piece, index) => ({
+    setPieces((current) => createPlayablePieces(level, practiceOnly).map((piece, index) => ({
       ...piece,
       moveCount: current[index]?.moveCount || 0,
       rotationCount: current[index]?.rotationCount || 0,
@@ -211,7 +224,7 @@ export default function TangramBuilderGame({
       transitionTimer.current = null;
       const nextIndex = (levelIndex + 1) % TANGRAM_LEVELS.length;
       setLevelIndex(nextIndex);
-      setPieces(createPieces(TANGRAM_LEVELS[nextIndex]));
+      setPieces(createPlayablePieces(TANGRAM_LEVELS[nextIndex], practiceOnly));
       setSelected(null);
       levelStarted.current = performance.now();
       setTransitioning(false);
@@ -219,7 +232,7 @@ export default function TangramBuilderGame({
   };
 
   return (
-    <div className={`tangram-game${transitioning ? " is-transitioning" : ""}`}>
+    <div className={`tangram-game${transitioning ? " is-transitioning" : ""}${practiceOnly ? " is-practice" : ""}`}>
       <div className="tangram-game__progress" aria-hidden>
         {TANGRAM_LEVELS.map((item, index) => <i key={item.id} className={index <= levelIndex ? "is-active" : ""} />)}
       </div>

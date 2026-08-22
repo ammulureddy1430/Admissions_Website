@@ -23,7 +23,6 @@ import {
   Gamepad2,
   Play
 } from "lucide-react";
-import { GameRuntimePlayer } from "@/components/game-runtime-player";
 
 type SlotAvailability = "BEFORE" | "ACTIVE" | "AFTER" | "INVALID";
 
@@ -133,19 +132,6 @@ export default function StudentDashboard() {
 
   const openGameTutorial = async (assignment: any) => {
     try {
-      if (!document.fullscreenElement) {
-        const root = document.documentElement as HTMLElement & {
-          webkitRequestFullscreen?: () => Promise<void> | void;
-        };
-        if (root.requestFullscreen) {
-          await root.requestFullscreen({ navigationUI: "hide" });
-        } else if (root.webkitRequestFullscreen) {
-          await Promise.resolve(root.webkitRequestFullscreen());
-        }
-        if (!document.fullscreenElement && !(document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement) {
-          throw new Error("Chrome did not enter fullscreen. Allow fullscreen for localhost, then try again.");
-        }
-      }
       setGameBusy(assignment.id);
       setError(null);
       const tutorial = await studentGameRequest(`game-assessments/student/games/${assignment.id}/tutorial`);
@@ -839,11 +825,11 @@ export default function StudentDashboard() {
                   <button
                     type="button"
                     disabled={!game.availability?.available}
-                    onClick={() => void openGameTutorial(game)}
+                    onClick={() => router.push(`/game-assessment/${game.id}?role=student`)}
                     className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#008f80] px-4 py-3 text-xs font-extrabold !text-white shadow-[0_10px_22px_rgba(0,143,128,0.18)] transition hover:bg-[#007d70] disabled:cursor-not-allowed disabled:bg-[#91c2bb] disabled:shadow-none"
                   >
                     {gameBusy === game.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                    {game.result?.status === "COMPLETED" ? "Retake Assessment" : game.result?.status === "IN_PROGRESS" ? "Resume Assessment" : "View tutorial"}
+                    {game.result?.status === "COMPLETED" ? "Open Game to Retake" : game.result?.status === "IN_PROGRESS" ? "Open Game to Resume" : "Open Game"}
                   </button>
                 </div>
               ))}
@@ -907,16 +893,6 @@ export default function StudentDashboard() {
             </button>
           </div>
         </div>
-      )}
-      {gameRuntime && (
-        <GameRuntimePlayer
-          initial={gameRuntime}
-          tutorial={runtimeTutorial}
-          request={studentGameRequest}
-          onClose={() => { setGameRuntime(null); setRuntimeTutorial(null); setActiveGameAssignment(null); }}
-          onComplete={completeAssignedGame}
-          secureMode
-        />
       )}
       {/* At-School Slot Booking Modal */}
       {bookingAssessment && bookingData && typeof window !== "undefined" && createPortal(

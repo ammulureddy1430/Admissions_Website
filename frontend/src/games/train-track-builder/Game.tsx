@@ -12,7 +12,6 @@ import type { TrackPiece, TrainTrackScores } from "./Types";
 import "./Game.css";
 
 const TOTAL_ROUNDS = 4;
-const ROUTE_NAMES = ["Step-up", "Step-down", "Zigzag", "Switchback"];
 type Feedback = "building" | "ready" | "running" | "success" | "blocked";
 
 export default function TrainTrackBuilderGame({ disabled = false, sound = true, durationSeconds = TRAIN_TRACK_DURATION_SECONDS, maxRounds = TOTAL_ROUNDS, onComplete }: { disabled?: boolean; sound?: boolean; durationSeconds?: number; maxRounds?: number; onComplete: (metrics: TrainTrackScores) => void | Promise<void> }) {
@@ -33,7 +32,6 @@ export default function TrainTrackBuilderGame({ disabled = false, sound = true, 
   const analytics = useRef(new TrainTrackAnalyticsService(onComplete));
   const sounds = useRef<TrainSoundManager | null>(null);
   const connected = useMemo(() => engine.connected(pieces), [engine, pieces]);
-  const alignedCount = useMemo(() => pieces.filter(piece => engine.rotations.isAligned(piece)).length, [engine, pieces]);
 
   useEffect(() => {
     const scheduledTimers = timers.current;
@@ -82,12 +80,15 @@ export default function TrainTrackBuilderGame({ disabled = false, sound = true, 
       if (wasConnected) {
         metrics.current.successfulRoutes += 1; metrics.current.tracksCompleted += pieces.length;
         metrics.current.completionTimes.push(Math.max(0, eventTime - startedAt.current));
-        setCompletedRounds(metrics.current.successfulRoutes); setFeedback("success"); setConfetti(true); sounds.current?.play(720, .35);
+        setFeedback("success"); setConfetti(true); sounds.current?.play(720, .35);
       } else { setFeedback("blocked"); sounds.current?.play(150, .28); }
+      setCompletedRounds(metrics.current.roundsPlayed);
       const timeout = window.setTimeout(() => {
-        if (wasConnected && metrics.current.successfulRoutes >= maxRounds) { void finish(); return; }
-        if (wasConnected) { const next = engine.next(); setPuzzle(next); setPieces(next.pieces); }
-        setTrainIndex(-1); setRunning(false); setConfetti(false); setFeedback(wasConnected ? "building" : connected ? "ready" : "building");
+        if (metrics.current.roundsPlayed >= maxRounds) { void finish(); return; }
+        const next = engine.next();
+        setPuzzle(next);
+        setPieces(next.pieces);
+        setTrainIndex(-1); setRunning(false); setConfetti(false); setFeedback(engine.connected(next.pieces) ? "ready" : "building");
         startedAt.current = performance.now();
       }, wasConnected ? 1050 : 850);
       timers.current.push(timeout);
@@ -96,12 +97,10 @@ export default function TrainTrackBuilderGame({ disabled = false, sound = true, 
 
   const trainCell = trainIndex < 0 ? { row: puzzle.route[0].row, col: -1 } : trainIndex >= puzzle.route.length ? puzzle.station : puzzle.route[trainIndex];
   const progress = Math.min(100, completedRounds / TOTAL_ROUNDS * 100);
-  const routeName = ROUTE_NAMES[puzzle.difficulty - 1];
-  const message = { building: `${routeName} · ${alignedCount} of ${pieces.length} tracks ready`, ready: `${routeName} complete — the train is ready!`, running: `Riding the ${routeName.toLowerCase()} route…`, success: "Great job — finish line reached!", blocked: "Track blocked — fix the disconnected pieces" }[feedback];
 
   return <div className="tt-world" role="application" aria-label="Train Track Builder cognitive assessment">
     <div className="tt-progress" aria-label={`${completedRounds} of ${TOTAL_ROUNDS} routes completed`}><span style={{ width: `${progress}%` }} /></div>
-    <div className={`tt-status tt-status--${feedback}`} aria-live="polite">{feedback === "ready" || feedback === "success" ? <Check /> : feedback === "blocked" ? <CircleAlert /> : <TrainFront />}<div><strong>{message}</strong><small>Route {Math.min(completedRounds + 1, TOTAL_ROUNDS)} of {TOTAL_ROUNDS}</small></div></div>
+    <div className={`tt-status tt-status--${feedback}`} aria-live="polite">{feedback === "ready" || feedback === "success" ? <Check /> : feedback === "blocked" ? <CircleAlert /> : <TrainFront />}<div><small>Route {Math.min(completedRounds + 1, TOTAL_ROUNDS)} of {TOTAL_ROUNDS}</small></div></div>
     <div className="tt-timer"><Timer /><strong>{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</strong></div>
     <div className="tt-level" aria-hidden>{Array.from({ length: TOTAL_ROUNDS }, (_, index) => <i key={index} className={index < completedRounds ? "done" : index === completedRounds ? "active" : ""} />)}</div>
     <div className="tt-clouds" aria-hidden><i /><i /><i /></div><div className="tt-mountains" aria-hidden><i /><i /><i /></div>

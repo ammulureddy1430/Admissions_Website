@@ -129,6 +129,39 @@ const AGE_GROUPS = [
   "13–16 Years",
 ];
 
+const GRADE_AGE_GROUPS: Record<string, string> = {
+  nursery: "3–4 Years",
+  "pre-nursery": "3–4 Years",
+  preschool: "3–4 Years",
+  lkg: "4–5 Years",
+  kindergarten: "4–5 Years",
+  ukg: "5–7 Years",
+  "grade 1": "5–7 Years",
+  "class 1": "5–7 Years",
+  "grade 2": "7–9 Years",
+  "class 2": "7–9 Years",
+  "grade 3": "7–9 Years",
+  "class 3": "7–9 Years",
+  "grade 4": "9–11 Years",
+  "class 4": "9–11 Years",
+  "grade 5": "9–11 Years",
+  "class 5": "9–11 Years",
+  "grade 6": "11–13 Years",
+  "class 6": "11–13 Years",
+  "grade 7": "11–13 Years",
+  "class 7": "11–13 Years",
+  "grade 8": "13–16 Years",
+  "class 8": "13–16 Years",
+  "grade 9": "13–16 Years",
+  "class 9": "13–16 Years",
+  "grade 10": "13–16 Years",
+  "class 10": "13–16 Years",
+};
+
+const studentMatchesSelectedAgeGroup = (student: Student, ageGroup: string) =>
+  !ageGroup ||
+  GRADE_AGE_GROUPS[(student.grade || "").trim().toLowerCase()] === ageGroup;
+
 const isHiddenGame = (game: Game) =>
   game.name.trim().toLowerCase().startsWith("traffic control");
 
@@ -409,10 +442,15 @@ export default function GamesPage() {
     setSelectedBulkGames([]);
     setStudentLoading(true);
     try {
+      const eligibleStudents: Student[] = await request(
+        `games/bulk-eligible-students?ageGroup=${encodeURIComponent(ageGroupFilter || "ALL")}`,
+      );
       setBulkStudents(
-        await request(
-          `games/bulk-eligible-students?ageGroup=${encodeURIComponent(ageGroupFilter || "ALL")}`,
-        ),
+        ageGroupFilter
+          ? eligibleStudents.filter((student) =>
+              studentMatchesSelectedAgeGroup(student, ageGroupFilter),
+            )
+          : eligibleStudents,
       );
     } catch (reason) {
       setError(

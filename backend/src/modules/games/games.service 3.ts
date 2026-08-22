@@ -1334,8 +1334,7 @@ export class GamesService implements OnModuleInit {
     schoolId: string,
   ) {
     const ageGroup = normalizeGameAgeGroup(ageGroupValue);
-    const allAgeGroups = ageGroupValue?.toUpperCase() === 'ALL';
-    if (!ageGroup && !allAgeGroups)
+    if (!ageGroup)
       throw new BadRequestException(
         'Please select a valid age group to assign all games.',
       );
@@ -1357,7 +1356,7 @@ export class GamesService implements OnModuleInit {
     const registeredSlugs = GAME_CATALOG.map((game) => game.slug);
     const games = await this.prisma.game.findMany({
       where: {
-        ...(ageGroup ? { ageGroup } : {}),
+        ageGroup,
         isActive: true,
         status: 'ACTIVE',
         gameType: { not: 'ASSESSMENT_ENGINE' },
@@ -1373,19 +1372,10 @@ export class GamesService implements OnModuleInit {
       },
       orderBy: { name: 'asc' },
     });
-    const eligibleGames =
-      student && allAgeGroups
-        ? games.filter((game) =>
-            studentMatchesAgeGroup(
-              student.grade,
-              student.studentDob,
-              game.ageGroup,
-            ),
-          )
-        : games;
+    const eligibleGames = games;
     if (!studentId)
       return {
-        ageGroup: ageGroup || 'ALL',
+        ageGroup,
         games: eligibleGames.map((game) => ({
           ...game,
           alreadyAssigned: false,
@@ -1404,7 +1394,7 @@ export class GamesService implements OnModuleInit {
       existing.flatMap((row) => (row.gameId ? [row.gameId] : [])),
     );
     return {
-      ageGroup: ageGroup || 'ALL',
+      ageGroup,
       games: eligibleGames.map((game) => ({
         ...game,
         alreadyAssigned: assigned.has(game.id),
@@ -1414,14 +1404,13 @@ export class GamesService implements OnModuleInit {
 
   async bulkEligibleStudents(ageGroupValue: string, schoolId: string) {
     const ageGroup = normalizeGameAgeGroup(ageGroupValue);
-    const allAgeGroups = ageGroupValue?.toUpperCase() === 'ALL';
-    if (!ageGroup && !allAgeGroups)
+    if (!ageGroup)
       throw new BadRequestException('Please select a valid age group.');
 
     const registeredSlugs = GAME_CATALOG.map((game) => game.slug);
     const games = await this.prisma.game.findMany({
       where: {
-        ...(ageGroup ? { ageGroup } : {}),
+        ageGroup,
         isActive: true,
         status: 'ACTIVE',
         gameType: { not: 'ASSESSMENT_ENGINE' },
@@ -1448,15 +1437,7 @@ export class GamesService implements OnModuleInit {
       orderBy: [{ studentFirstName: 'asc' }, { studentLastName: 'asc' }],
     });
     const eligible = students.filter((student) =>
-      ageGroup
-        ? studentMatchesAgeGroup(student.grade, student.studentDob, ageGroup)
-        : games.some((game) =>
-            studentMatchesAgeGroup(
-              student.grade,
-              student.studentDob,
-              game.ageGroup,
-            ),
-          ),
+      studentMatchesAgeGroup(student.grade, student.studentDob, ageGroup),
     );
     const results = await this.prisma.gameResult.findMany({
       where: {
@@ -1477,18 +1458,11 @@ export class GamesService implements OnModuleInit {
     }
 
     return eligible.map(({ studentDob, ...student }) => {
-      const eligibleGames = ageGroup
-        ? games
-        : games.filter((game) =>
-            studentMatchesAgeGroup(student.grade, studentDob, game.ageGroup),
-          );
-      const matchedAgeGroups = [
-        ...new Set(eligibleGames.map((game) => game.ageGroup)),
-      ];
+      const eligibleGames = games;
       const assigned = assignedByStudent.get(student.id) || new Set<string>();
       return {
         ...student,
-        ageGroup: ageGroup || matchedAgeGroups.join(', '),
+        ageGroup,
         allGamesAssigned:
           eligibleGames.length > 0 &&
           eligibleGames.every((game) => assigned.has(game.id)),
@@ -1512,6 +1486,11 @@ export class GamesService implements OnModuleInit {
     ];
     if (!selectedStudentIds.length)
       throw new BadRequestException('Select at least one eligible student.');
+    const selectedAgeGroup = normalizeGameAgeGroup(dto.ageGroup);
+    if (!selectedAgeGroup)
+      throw new BadRequestException(
+        'Please select a valid age group to assign all games.',
+      );
     if (selectedStudentIds.length > 1) {
       const students = await this.prisma.application.findMany({
         where: {
@@ -1529,6 +1508,7 @@ export class GamesService implements OnModuleInit {
       const requestedGames = await this.prisma.game.findMany({
         where: {
           id: { in: dto.gameIds },
+          ageGroup: selectedAgeGroup,
           isActive: true,
           status: 'ACTIVE',
           gameType: { not: 'ASSESSMENT_ENGINE' },
@@ -1536,6 +1516,10 @@ export class GamesService implements OnModuleInit {
         },
         select: { id: true, ageGroup: true },
       });
+      if (requestedGames.length !== new Set(dto.gameIds).size)
+        throw new BadRequestException(
+          `Every selected game must be active and belong to the ${selectedAgeGroup} age group.`,
+        );
       const results = [];
       for (const student of students) {
         const eligibleGameIds = requestedGames
@@ -1573,12 +1557,7 @@ export class GamesService implements OnModuleInit {
       };
     }
     const studentId = selectedStudentIds[0];
-    const ageGroup = normalizeGameAgeGroup(dto.ageGroup);
-    const allAgeGroups = dto.ageGroup?.toUpperCase() === 'ALL';
-    if (!ageGroup && !allAgeGroups)
-      throw new BadRequestException(
-        'Please select a valid age group to assign all games.',
-      );
+    const ageGroup = selectedAgeGroup;
     const requestedIds = [...new Set(dto.gameIds)];
     const games = await this.prisma.game.findMany({
       where: {
@@ -1718,7 +1697,7 @@ export class GamesService implements OnModuleInit {
             assignmentSettings: {
               deliveryMode: 'SCHOOL',
               allowTutorialSkip: false,
-              bulkAgeGroup: ageGroup || 'ALL',
+              bulkAgeGroup: ageGroup,
             },
             status: 'ASSIGNED',
           },
@@ -1745,7 +1724,7 @@ export class GamesService implements OnModuleInit {
       return created;
     });
     return {
-      ageGroup: ageGroup || 'ALL',
+      ageGroup,
       student: {
         id: student.id,
         name: `${student.studentFirstName} ${student.studentLastName}`,
